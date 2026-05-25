@@ -1,6 +1,6 @@
+using Featly.Storage.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Featly.Storage.Sqlite;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Storage.Sqlite.Tests;

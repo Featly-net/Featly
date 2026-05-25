@@ -1,12 +1,12 @@
 using System.Net;
+using Featly.Server;
+using Featly.Storage.InMemory;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Featly.Server;
-using Featly.Storage.InMemory;
 using Xunit;
 
 namespace Featly.Server.Tests;

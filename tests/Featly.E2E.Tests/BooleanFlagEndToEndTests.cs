@@ -1,5 +1,10 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Featly;
+using Featly.Sdk;
+using Featly.Sdk.Internal;
+using Featly.Server;
+using Featly.Storage.InMemory;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -7,11 +12,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Featly;
-using Featly.Sdk;
-using Featly.Sdk.Internal;
-using Featly.Server;
-using Featly.Storage.InMemory;
 using Xunit;
 
 namespace Featly.E2E.Tests;

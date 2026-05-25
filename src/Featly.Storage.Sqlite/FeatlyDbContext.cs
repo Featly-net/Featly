@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Featly.Storage.Sqlite.Configurations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Featly.Storage.Sqlite;
 

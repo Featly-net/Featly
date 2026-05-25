@@ -1,3 +1,4 @@
+using Featly.Storage.Sqlite.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -5,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Featly.Storage.Sqlite.Stores;
 using AbstractionsMarker = Featly.IFeatlyStore;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 

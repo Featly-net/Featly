@@ -1,11 +1,11 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Featly.Server.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Featly.Server.Authentication;
-using StorageFacade = Featly.Storage.IFeatlyStore;
 using ChangeNotification = Featly.Storage.ChangeNotification;
+using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Endpoints;
 

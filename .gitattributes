@@ -1,0 +1,49 @@
+# Featly — line ending normalization
+#
+# The .editorconfig sets `end_of_line = lf` repo-wide. On Windows checkouts,
+# git's default `core.autocrlf=true` was still rewriting working-tree files
+# to CRLF, which made `dotnet format --verify-no-changes` fail in CI.
+#
+# This file makes git authoritative: it stores LF in the repo and checks out
+# LF on every OS for the listed file types. Binary files stay untouched.
+
+# Default: text files normalized to LF.
+* text=auto eol=lf
+
+# Source files — always LF.
+*.cs            text eol=lf
+*.csproj        text eol=lf
+*.props         text eol=lf
+*.targets       text eol=lf
+*.sln           text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.html          text eol=lf
+*.css           text eol=lf
+*.js            text eol=lf
+*.editorconfig  text eol=lf
+*.gitattributes text eol=lf
+*.gitignore     text eol=lf
+
+# Windows scripts intentionally keep CRLF.
+*.cmd           text eol=crlf
+*.bat           text eol=crlf
+*.ps1           text eol=crlf
+
+# Binary file types — never normalize, never diff line endings.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.pdf           binary
+*.zip           binary
+*.dll           binary
+*.exe           binary
+*.snk           binary
+*.pfx           binary
+*.db            binary
+*.sqlite        binary
+*.sqlite3       binary
