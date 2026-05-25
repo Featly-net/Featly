@@ -1,0 +1,104 @@
+name: Bug report
+description: Report something that does not behave as documented.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as you can.
+        For security vulnerabilities, do **not** open a public issue. See [SECURITY.md](../SECURITY.md).
+
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and did not find a duplicate
+          required: true
+        - label: I read the relevant sections of `ARCHITECTURE.md` and confirmed this is a bug, not designed behavior
+          required: true
+        - label: This is **not** a security vulnerability (those go through GitHub Security Advisories)
+          required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+      placeholder: When I call `featly.Flags.IsEnabledAsync("x")` with context Y, I expect Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include stack traces and logs in fenced code blocks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest code, configuration, or HTTP request that triggers the bug. A failing unit test in a draft PR is even better.
+      render: csharp
+    validations:
+      required: true
+
+  - type: input
+    id: featly-version
+    attributes:
+      label: Featly version
+      description: NuGet version, commit SHA, or branch.
+      placeholder: 0.1.0-preview / commit abc1234 / main
+    validations:
+      required: true
+
+  - type: input
+    id: dotnet-version
+    attributes:
+      label: .NET version
+      placeholder: .NET 8.0.x / .NET 10.0.x
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Storage provider
+      options:
+        - InMemory
+        - Sqlite
+        - SqlServer (planned)
+        - Postgres (planned)
+        - Other (please describe in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment pattern
+      description: See ARCHITECTURE.md Section 2.
+      options:
+        - Pattern 1 — Embedded per app, isolated DB
+        - Pattern 2 — Centralized, SDKs point at it
+        - Pattern 3 — Embedded per app, shared DB
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Windows 11 / Ubuntu 24.04 / macOS 15
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might help — recent configuration changes, unusual deployment topology, suspected root cause.

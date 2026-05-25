@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/Featly-net/Featly/discussions
+    about: For usage questions, design discussions, ideas, and anything that is not a clear bug or a concrete feature request.
+  - name: Security vulnerability
+    url: https://github.com/Featly-net/Featly/security/advisories/new
+    about: Please do not file public issues for security vulnerabilities. Report privately via GitHub Security Advisories. See SECURITY.md.
+  - name: Architecture and design intent
+    url: https://github.com/Featly-net/Featly/blob/main/ARCHITECTURE.md
+    about: Before proposing a change, read ARCHITECTURE.md to understand the design opinions of the project.

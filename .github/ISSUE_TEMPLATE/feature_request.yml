@@ -1,0 +1,74 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Featly has strong design opinions — please read
+        `ARCHITECTURE.md` and `PLAN.md` before writing a long proposal, and check whether
+        the idea fits the architectural direction.
+
+        For features that touch the architectural surface (new top-level concept, new entity,
+        new public interface, new deployment pattern), an ADR will be required before
+        implementation. The maintainers will guide you through it.
+
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and discussions and did not find a duplicate
+          required: true
+        - label: I read the relevant sections of `ARCHITECTURE.md` and `PLAN.md`
+          required: true
+        - label: I am proposing this feature for the open-source project, not requesting custom work
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? Describe the situation, not the solution.
+      placeholder: As a Featly operator running Pattern 2, I cannot...
+    validations:
+      required: true
+
+  - type: textarea
+    id: users
+    attributes:
+      label: Who needs this and why
+      description: Which user (Editor / Approver / Admin / SDK consumer / operator) is blocked, and how often.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Optional. If you already have a design in mind, sketch it here. Otherwise leave blank — we can discuss approaches.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider, and why did you discard them?
+
+  - type: textarea
+    id: fit
+    attributes:
+      label: Architectural fit
+      description: How does this fit the principles in `ARCHITECTURE.md` (local-first evaluation, embedded-like-Hangfire, OpenFeature-first, storage-is-an-interface, DB-beats-config, predictable-not-magical, resilient-by-default)? If it conflicts with one, explain why the trade-off is worth it.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Does this touch the architectural surface?
+      description: New top-level concept, new entity, new public interface, new deployment pattern → yes.
+      options:
+        - "No — refinement of existing behavior"
+        - "Yes — ADR will be needed"
+        - "Not sure — maintainers, please advise"
+    validations:
+      required: true
