@@ -52,12 +52,21 @@ packages/
 *.dbmdl
 *.jfm
 
-# Local databases (SQLite quickstart leftovers)
-*.db
+# Local databases (SQLite quickstart leftovers).
+# Use specific filenames + bin/-scoped globs instead of bare `*.sqlite`,
+# because `*.sqlite` would also ignore the Featly.Storage.Sqlite project
+# directory itself (gitignore matches directories, not just file extensions).
+featly.db
+featly.sqlite
+featly.sqlite3
+**/bin/**/*.db
+**/bin/**/*.sqlite
+**/bin/**/*.sqlite3
 *.db-shm
 *.db-wal
-*.sqlite
-*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
 
 # Secrets / dotnet user-secrets
 secrets.json
