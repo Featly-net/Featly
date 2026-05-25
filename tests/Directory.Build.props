@@ -1,0 +1,21 @@
+<Project>
+
+  <!-- Inherit from the repo-root Directory.Build.props. -->
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <!-- Test projects never ship as packages and need no XML docs. -->
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Test code follows the xUnit convention of underscore-separated method
+      names (Method_Scenario_Expectation). CA1707 would forbid that style,
+      so suppress it inside tests/ only. Production code still enforces it.
+    -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+</Project>

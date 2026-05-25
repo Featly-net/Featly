@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Samples.SelfHosted</RootNamespace>
+    <AssemblyName>Featly.Samples.SelfHosted</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>featly-sample-selfhosted</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Featly.Server\Featly.Server.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Dashboard\Featly.Dashboard.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Storage.InMemory\Featly.Storage.InMemory.csproj" />
+  </ItemGroup>
+
+</Project>
