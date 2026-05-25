@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Featly.Server.Endpoints;
 
 namespace Featly.Server;
 
@@ -11,10 +12,14 @@ namespace Featly.Server;
 public static class FeatlyServerEndpointRouteBuilderExtensions
 {
     /// <summary>
-    /// Maps the Featly HTTP API and health endpoints. M1 only exposes
-    /// <c>GET /health/live</c>; the SDK and Admin APIs come online in M2.
+    /// Maps the Featly HTTP API and health endpoints. M2 exposes:
+    /// <list type="bullet">
+    ///   <item><c>GET /health/live</c> — liveness probe (no auth).</item>
+    ///   <item><c>GET|POST|PUT /api/admin/flags/...</c> — admin CRUD (admin token).</item>
+    ///   <item><c>GET /api/sdk/config</c> — config snapshot (SDK token).</item>
+    ///   <item><c>GET /api/sdk/stream</c> — SSE change notifications (SDK token).</item>
+    /// </list>
     /// </summary>
-    /// <returns>A group convention builder for further customization.</returns>
     public static RouteGroupBuilder MapFeatlyApi(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -25,9 +30,9 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
              .WithName("Featly.Health.Live")
              .WithDescription("Liveness probe. Returns 200 if the host process can respond.");
 
-        // M2: GET /api/sdk/config, GET /api/sdk/stream, POST /api/sdk/events
-        // M2: POST /api/admin/flags, PUT /api/admin/flags/{key}
-        // M6: bearer auth on /api/admin/*
+        var apiGroup = group.MapGroup("/api");
+        apiGroup.MapAdminFlags();
+        apiGroup.MapSdkEndpoints();
 
         return group;
     }

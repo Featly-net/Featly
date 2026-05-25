@@ -8,9 +8,9 @@ public class SmokeTests
     [Fact]
     public void Engine_Assembly_Is_Reachable()
     {
-        // Placeholder for M1: ensures the test pipeline runs end-to-end.
-        // M3 replaces this with full evaluation engine coverage.
-        var assembly = typeof(Featly.Engine.EngineMarker).Assembly;
+        // M3 expands this to full evaluation engine coverage. M2's evaluator
+        // tests live alongside the boolean-flag behavior in EvaluatorTests.
+        var assembly = typeof(Featly.Engine.Evaluator).Assembly;
         assembly.Should().NotBeNull();
     }
 }

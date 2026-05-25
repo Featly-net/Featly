@@ -1,14 +1,30 @@
 namespace Featly.Storage.InMemory;
 
 /// <summary>
-/// In-memory implementation of <see cref="IFeatlyStore"/>. State is process-local,
-/// not persisted, and reset whenever the host restarts. Intended for tests,
-/// demos, and ephemeral environments.
+/// Process-local <see cref="IFeatlyStore"/> implementation. State is held in
+/// thread-safe collections and is lost when the host restarts. Intended for
+/// tests, demos, and ephemeral environments.
 /// </summary>
-/// <remarks>
-/// No-op placeholder for M1. Sub-store implementations land alongside the
-/// corresponding feature milestones (M2 flags, M4 configs, ...).
-/// </remarks>
 public sealed class InMemoryFeatlyStore : IFeatlyStore
 {
+    /// <summary>Creates a fresh store with empty sub-stores.</summary>
+    public InMemoryFeatlyStore()
+    {
+        Flags = new InMemoryFlagStore();
+        Projects = new InMemoryProjectStore();
+        Environments = new InMemoryEnvironmentStore();
+        Changes = new InMemoryChangeNotifier();
+    }
+
+    /// <inheritdoc />
+    public IFlagStore Flags { get; }
+
+    /// <inheritdoc />
+    public IProjectStore Projects { get; }
+
+    /// <inheritdoc />
+    public IEnvironmentStore Environments { get; }
+
+    /// <inheritdoc />
+    public IChangeNotifier Changes { get; }
 }

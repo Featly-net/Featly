@@ -32,6 +32,12 @@ public sealed class Flag
     /// <summary>Fallback variant used when no rule matches.</summary>
     public required string DefaultVariantKey { get; set; }
 
+    /// <summary>
+    /// The named outcomes this flag can return. The engine selects one of
+    /// these by matching rules or by falling back to <see cref="DefaultVariantKey"/>.
+    /// </summary>
+    public List<Variant> Variants { get; set; } = [];
+
     /// <summary>Environment this flag is scoped to.</summary>
     public required Guid EnvironmentId { get; init; }
 
