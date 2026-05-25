@@ -23,10 +23,13 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 - **M2 vertical slice.** Boolean flag end-to-end: domain entities (`Project`, `Environment`, `Variants` on `Flag`, `ConfigSnapshot`); storage contracts (`IFlagStore`, `IProjectStore`, `IEnvironmentStore`, `IChangeNotifier`); real `InMemoryFeatlyStore`; minimal `Evaluator` (kill switch + default variant); server with static-token bearer auth, default-project bootstrap, admin CRUD endpoints, and SDK `GET /api/sdk/config` (ETag) plus `GET /api/sdk/stream` (SSE); SDK with local-evaluation cache, fluent `AddFeatly().UseServer(...)` API, and `BackgroundService` keeping the snapshot fresh via SSE + polling fallback.
 - Sample apps updated: `SelfHosted.Sample` (server + dashboard + in-memory store) and `WebApi.Sample` (SDK consumer with `/checkout` endpoint).
 - 22 tests covering Evaluator behavior, FlagClient eval paths, admin/SDK auth, ETag negotiation, and the end-to-end "create-flag-then-read-from-SDK" round-trip.
+- **`Featly.Storage.Sqlite`**: EF Core-backed persistent storage. Internal `FeatlyDbContext` with `Project`, `Environment`, `Flag` tables. `Variants` stored as an owned JSON column; `Tags` as a JSON primitive collection. Initial migration `InitialCreate`. Pooled `IDbContextFactory<FeatlyDbContext>` so the singleton sub-stores allocate context per operation. `SqliteAutoMigrationHostedService` applies pending migrations at boot when `AutoMigrate=true`. `services.AddFeatlySqliteStore(opts => opts.ConnectionString = "...")` DI extension; options bind from `Featly:Storage:Sqlite`.
+- 10 SQLite store tests covering schema migration, Project/Environment uniqueness, Flag round-trip with variants and tags, archive semantics, and ChangeNotifier pub/sub.
 
 ### Changed
 
-_(nothing yet)_
+- `samples/SelfHosted.Sample` now uses `AddFeatlySqliteStore` by default (`Data Source=featly.db`) — the Hangfire-style quickstart now has real persistence. `Featly.Storage.InMemory` is still referenced for the swap-in-one-line alternative.
+- Centrally-managed NuGet versions: pinned `System.Security.Cryptography.Xml` to `10.0.8` to dodge the vulnerable `9.0.0` pulled in transitively by EF Core Design (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf).
 
 ### Deprecated
 

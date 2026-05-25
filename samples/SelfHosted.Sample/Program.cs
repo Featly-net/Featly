@@ -1,11 +1,17 @@
 using Featly.Dashboard;
 using Featly.Server;
-using Featly.Storage.InMemory;
+using Featly.Storage.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Storage. M2 swaps this for SQLite in real deployments.
-builder.Services.AddFeatlyInMemoryStore();
+// Storage. SQLite is the Hangfire-style quickstart default: a single .db file
+// in the host's content root, schema applied automatically on first boot.
+// Options can also be bound from appsettings under "Featly:Storage:Sqlite".
+//
+// To run with no persistence (tests, demos, ephemeral hosts), swap with:
+//   using Featly.Storage.InMemory;
+//   builder.Services.AddFeatlyInMemoryStore();
+builder.Services.AddFeatlySqliteStore();
 
 // Featly server-side services.
 builder.Services.AddFeatlyServer();
@@ -15,7 +21,7 @@ var app = builder.Build();
 // Dashboard UI at /featly. Placeholder until M5.
 app.MapFeatlyDashboard("/featly");
 
-// Featly HTTP API: only /health/live in M1; admin and SDK endpoints land in M2.
+// Featly HTTP API: /health/live (no auth) + admin/SDK endpoints (token auth).
 app.MapFeatlyApi();
 
 app.Run();
