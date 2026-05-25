@@ -1,0 +1,69 @@
+<Project>
+
+  <!--
+    Featly — common MSBuild defaults applied to every project.
+    Overrides go inside the individual .csproj or in a closer Directory.Build.props.
+  -->
+
+  <PropertyGroup Label="Language and runtime">
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build hygiene">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <CheckEolTargetFramework>true</CheckEolTargetFramework>
+    <!--
+      NU1507: Central Package Management warning that fires when a project references a
+        PackageVersion but no source is declared in nuget.config. Harmless here.
+      CA1720: "Identifier contains type name." Suppressed because Featly exposes
+        FlagType/ConfigType enum members named String, Int, Long, Double, Decimal,
+        Bool, etc. directly to end users via the dashboard, API, and config files —
+        renaming them would obscure intent for a feature-management product.
+    -->
+    <NoWarn>$(NoWarn);NU1507;CA1720</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Deterministic builds">
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package metadata (applied to packable projects)">
+    <Version>0.0.1</Version>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">preview.1</VersionSuffix>
+    <Authors>Thiago Lugarini and Featly contributors</Authors>
+    <Company>Featly</Company>
+    <Product>Featly</Product>
+    <Copyright>Copyright (c) 2026 Thiago Lugarini and Featly contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Featly-net/Featly</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Featly-net/Featly</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>feature-flags;feature-management;dynamic-configuration;experimentation;rbac;openfeature;dotnet;aspnetcore</PackageTags>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Defaults — projects opt in to packing and XML docs">
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup Label="SourceLink (deterministic links from PDB to GitHub)">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

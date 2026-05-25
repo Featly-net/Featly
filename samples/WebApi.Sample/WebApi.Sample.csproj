@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Samples.WebApi</RootNamespace>
+    <AssemblyName>Featly.Samples.WebApi</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>featly-sample-webapi</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Featly.AspNetCore\Featly.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Sdk\Featly.Sdk.csproj" />
+  </ItemGroup>
+
+</Project>

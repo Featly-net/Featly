@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Featly.Cli</RootNamespace>
+    <AssemblyName>featly</AssemblyName>
+    <Description>Featly — global dotnet tool. Migrations, environment lock/unlock, import/export, API key generation.</Description>
+
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>featly</ToolCommandName>
+    <PackageId>Featly.Cli</PackageId>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Featly.Abstractions\Featly.Abstractions.csproj" />
+    <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
+    <ProjectReference Include="..\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
