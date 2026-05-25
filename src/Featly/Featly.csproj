@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Featly meta-package. Installs Featly.Server + Featly.Dashboard +
+    Featly.Storage.Sqlite so a single `dotnet add package Featly` gets you the
+    full embedded experience. Per ARCHITECTURE.md's package matrix this is the
+    package targeted at self-hosters.
+
+    The project itself ships no code. IncludeBuildOutput=false suppresses the
+    empty assembly; the .nupkg carries only the dependency closure.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly</RootNamespace>
+    <AssemblyName>Featly</AssemblyName>
+    <Description>Featly meta-package. Installs Featly.Server + Featly.Dashboard + Featly.Storage.Sqlite for a complete self-hosted, embedded feature management setup.</Description>
+
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Featly.Server\Featly.Server.csproj" PrivateAssets="None" />
+    <ProjectReference Include="..\Featly.Dashboard\Featly.Dashboard.csproj" PrivateAssets="None" />
+    <ProjectReference Include="..\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" PrivateAssets="None" />
+  </ItemGroup>
+
+</Project>

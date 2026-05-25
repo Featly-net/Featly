@@ -40,7 +40,12 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata (applied to packable projects)">
-    <Version>0.0.1</Version>
+    <!--
+      Use VersionPrefix + VersionSuffix instead of a hardcoded Version so the
+      pack picks up the suffix automatically. The result is `0.0.1-preview.1`
+      until a release tag overrides VersionSuffix=""  via `-p:VersionSuffix=`.
+    -->
+    <VersionPrefix>0.0.1</VersionPrefix>
     <VersionSuffix Condition="'$(VersionSuffix)' == ''">preview.1</VersionSuffix>
     <Authors>Thiago Lugarini and Featly contributors</Authors>
     <Company>Featly</Company>
@@ -64,6 +69,13 @@
 
   <ItemGroup Label="SourceLink (deterministic links from PDB to GitHub)">
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Label="NuGet README — preview placeholder until M5"
+             Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)docs\nuget-readme-preview.md"
+          Pack="true"
+          PackagePath="\README.md" />
   </ItemGroup>
 
 </Project>
