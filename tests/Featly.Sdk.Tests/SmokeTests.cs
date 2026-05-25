@@ -8,8 +8,8 @@ public class SmokeTests
     [Fact]
     public void Sdk_Assembly_Is_Reachable()
     {
-        // Placeholder for M1. Real client tests land in M2.
-        var assembly = typeof(SdkMarker).Assembly;
+        // Real client behavior is exercised by FlagClientTests.
+        var assembly = typeof(FeatlyClientBuilder).Assembly;
         assembly.Should().NotBeNull();
     }
 }

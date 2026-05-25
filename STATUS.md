@@ -5,40 +5,53 @@
 
 ## Active milestone
 
-**M1 — Skeleton** (in progress)
+**M2 — First vertical slice** (mostly complete; SQLite persistence to follow as a fast-follow PR)
 
 ### Goal
 
-Solution structure exists, every project builds, CI runs, nothing useful happens yet.
+A boolean flag, evaluated locally by the SDK, served by the server, persisted in storage. Proves the architecture end-to-end.
 
 ### Done
 
-- 11 `src/` projects (Abstractions, Engine, Sdk, AspNetCore, OpenFeature.Provider, Server, Dashboard, Storage.Abstractions, Storage.InMemory, Storage.Sqlite, Cli) with correct multi-targeting per `CLAUDE.md`
-- 5 `tests/` projects (Engine.Tests, Sdk.Tests, Server.Tests, Storage.Sqlite.Tests, E2E.Tests) wired to xUnit v3 + FluentAssertions + NSubstitute
-- 2 `samples/` projects (WebApi.Sample placeholder, SelfHosted.Sample functional)
-- Build infrastructure: `global.json` (pin SDK 10.0.300), `.editorconfig`, `Directory.Build.props` (Nullable + TreatWarningsAsErrors + AnalysisLevel + SourceLink), `Directory.Packages.props` (CPM)
-- Placeholder contract types: `Flag`, `Variant`, `FlagType`, `Config`, `ConfigType`, `EvaluationContext`, `EvaluationReason`, `EvaluationResult<T>`, `IFeatlyClient`, `IFeatlyStore`
-- `Featly.Server` exposes `GET /health/live`
-- `Featly.Dashboard` middleware serves an embedded "coming soon" page at `/featly`
-- `Featly.Storage.InMemory` no-op store boots the server
-- CI workflow (`.github/workflows/ci.yml`): matrix [ubuntu, windows] x [.NET 8 + 10 SDKs], restore/build/test/pack-preview
+- **Domain entities** in `Featly.Abstractions`: `Project`, `Environment`, `Flag` (with `Variants`), `ConfigSnapshot`
+- **Storage contracts** in `Featly.Storage.Abstractions`: `IFeatlyStore` facade + `IFlagStore`, `IProjectStore`, `IEnvironmentStore`, `IChangeNotifier`
+- **`Featly.Storage.InMemory`**: thread-safe sub-stores backed by `ConcurrentDictionary`; in-process `IChangeNotifier`
+- **`Featly.Engine.Evaluator`**: boolean-minimum flag evaluation (kill switch, archived short-circuit, default-variant resolution); rules in M3
+- **`Featly.Server`**:
+  - `FeatlyServerOptions` bound from `Featly:Server` configuration
+  - Static-token bearer auth with `FeatlyAdmin` + `FeatlySdk` schemes (real Argon2 API keys land in M6)
+  - `DefaultProjectBootstrapHostedService` auto-creates a default Project + Environment on first boot
+  - Admin API: `GET|POST|PUT /api/admin/flags` with optional `?env=` query parameter
+  - SDK API: `GET /api/sdk/config` with ETag/`If-None-Match`, `GET /api/sdk/stream` with SSE notifications
+- **`Featly.Sdk`**:
+  - `IFeatlyClient` + `IFlagClient` real implementations
+  - `FeatlySnapshotCache` (thread-safe `ImmutableDictionary` lookup)
+  - `FeatlyConfigSyncService` BackgroundService: initial fetch, long-lived SSE connection, polling fallback with ETag
+  - `services.AddFeatly().UseServer(url, apiKey).UseEnvironment(...)` fluent DI surface
+- **Samples**: `SelfHosted.Sample` boots server + dashboard + InMemory; `WebApi.Sample` consumes via the SDK
+- **Tests** (22 passing): Engine, SDK FlagClient, Server admin/SDK endpoints with auth, E2E boolean flag round-trip via TestServer
 
-### Verified (Done-when criteria)
+### Done-when criteria (PLAN.md M2)
 
-- `dotnet run --project samples/SelfHosted.Sample` starts the host
-- `GET /health/live` returns 200 with `{"status":"live"}`
-- `GET /featly` returns 200 with the placeholder HTML
-- `dotnet test` passes (5 smoke tests)
+- [x] End-to-end test passes consistently (Featly.E2E.Tests.BooleanFlagEndToEndTests)
+- [x] A developer can create a boolean flag via HTTP and the sample app's `IsEnabledAsync` reflects it within a polling interval
+- [ ] Persisted in SQLite — **pending; tracked as M2 follow-up PR**
 
-### Not in scope for M1 (deferred to later milestones)
+### Not in scope for M2 (deferred to later milestones)
 
-- Any real evaluation logic — comes in M2 (boolean flag end-to-end) and M3 (rules, conditions, segments, bucketing)
-- Real SDK client surface (`IFlagClient`, `IConfigClient`, `IEventClient`) — M2 onward
-- EF Core migrations and SQLite schema — M2
-- Auth, RBAC, custom roles, approval workflows, webhooks, experiments, OpenFeature provider implementation — M6 through M11
-- CLI commands (`db migrate`, `env lock`, ...) — M12
+- Targeting rules, conditions, segments, bucketing — M3
+- Dynamic configs (`IConfigClient`) — M4
+- Dashboard UI for flags — M5
+- Real auth pipeline + RBAC + Project entity scoping — M6, M7
+- Approval workflows — M8
+- Experiments — M9
+- Webhooks — M10
+- OpenFeature provider implementation — M11
+- CLI commands and first release — M12
 
 ## Open follow-ups
 
+- **M2 fast-follow PR**: `Featly.Storage.Sqlite` with `FeatlyDbContext` (internal), EF Core configurations, Initial migration, sub-stores; `AddFeatlySqliteStore(opts => opts.UseConnectionString(...))`
 - `CODE_OF_CONDUCT.md` referenced by `CONTRIBUTING.md` but not yet added
 - ADR on testing library choice (FluentAssertions 7.x → migrate to Shouldly or AwesomeAssertions before bumping past 8.x)
+- ADR on database-overrides-config settings provider (M2 introduces server options bound from config only; DB-overrides logic lands once `ISystemSettingsStore` exists in M6+)
