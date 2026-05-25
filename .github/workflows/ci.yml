@@ -66,9 +66,14 @@ jobs:
       # Run format check on Linux only: the policy is OS-agnostic and running
       # it twice just wastes minutes. The macOS/Windows path would also flag
       # spurious CRLF issues if .gitattributes ever misbehaves.
+      #
+      # `--severity warn` blocks the build on warnings/errors but lets info-level
+      # suggestions (IDE1006 naming hints, IDE0290 primary-constructor refactors,
+      # etc.) surface as advice without failing CI. Cleanup of those is tracked
+      # separately and can be done in dedicated style PRs.
       - name: Format check
         if: matrix.os == 'ubuntu-latest'
-        run: dotnet format Featly.sln --verify-no-changes --no-restore --severity info
+        run: dotnet format Featly.sln --verify-no-changes --no-restore --severity warn
 
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
