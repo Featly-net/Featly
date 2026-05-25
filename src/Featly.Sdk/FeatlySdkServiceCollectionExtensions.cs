@@ -1,8 +1,8 @@
 using System.Net.Http.Headers;
+using Featly.Sdk.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Featly.Sdk.Internal;
 
 namespace Featly.Sdk;
 

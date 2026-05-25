@@ -1,6 +1,6 @@
 using System.Text.Json;
-using FluentAssertions;
 using Featly.Sdk.Internal;
+using FluentAssertions;
 using Xunit;
 
 namespace Featly.Sdk.Tests;

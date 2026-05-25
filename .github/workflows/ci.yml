@@ -53,7 +53,7 @@ jobs:
         run: dotnet --info
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
@@ -62,6 +62,13 @@ jobs:
 
       - name: Restore
         run: dotnet restore Featly.sln
+
+      # Run format check on Linux only: the policy is OS-agnostic and running
+      # it twice just wastes minutes. The macOS/Windows path would also flag
+      # spurious CRLF issues if .gitattributes ever misbehaves.
+      - name: Format check
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet format Featly.sln --verify-no-changes --no-restore --severity info
 
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
@@ -78,7 +85,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults/**/*
@@ -107,7 +114,7 @@ jobs:
           global-json-file: global.json
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
@@ -126,7 +133,7 @@ jobs:
           -p:ContinuousIntegrationBuild=true
 
       - name: Upload nupkgs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nupkgs
           path: artifacts/*.*nupkg

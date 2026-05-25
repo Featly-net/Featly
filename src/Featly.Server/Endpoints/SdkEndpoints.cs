@@ -3,11 +3,11 @@ using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using Featly.Server.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Net.Http.Headers;
-using Featly.Server.Authentication;
 using ChangeNotification = Featly.Storage.ChangeNotification;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 

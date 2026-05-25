@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Featly.Server.Authentication;
+using Featly.Server.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Json;
@@ -7,8 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Featly.Server.Authentication;
-using Featly.Server.Hosting;
 
 namespace Featly.Server;
 

@@ -1,7 +1,7 @@
+using Featly.Server.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Featly.Server.Endpoints;
 
 namespace Featly.Server;
 
