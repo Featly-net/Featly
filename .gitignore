@@ -1,0 +1,75 @@
+# Local AI assistant config — never commit
+.claude/
+.cursor/
+.aider*
+
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.binlog
+*.log
+
+# Test results and coverage
+TestResults/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+coverage.opencover.xml
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# IDE — Visual Studio
+.vs/
+*.opendb
+*.VC.db
+*.VC.opendb
+
+# IDE — Rider / JetBrains
+.idea/
+*.sln.iml
+
+# IDE — VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages.lock.json
+
+# EF Core
+*.dbmdl
+*.jfm
+
+# Local databases (SQLite quickstart leftovers)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Secrets / dotnet user-secrets
+secrets.json
+appsettings.*.local.json
+appsettings.Development.json
+*.pfx
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Misc
+*.swp
+*~

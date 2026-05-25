@@ -1,0 +1,25 @@
+# Code owners for Featly
+#
+# Order matters: the last matching pattern takes precedence.
+# Owners listed here are automatically requested for review on PRs that touch
+# matching paths. They are also the default reviewers required by branch
+# protection when CODEOWNERS review is enabled.
+#
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+*                               @thiagoluga
+
+# Architectural and process docs require maintainer review
+/ARCHITECTURE.md                @thiagoluga
+/PLAN.md                        @thiagoluga
+/CONTRIBUTING.md                @thiagoluga
+/SECURITY.md                    @thiagoluga
+/CODE_OF_CONDUCT.md             @thiagoluga
+/NOTICE.md                      @thiagoluga
+/LICENSE                        @thiagoluga
+/docs/adr/                      @thiagoluga
+
+# Repository infrastructure
+/.github/                       @thiagoluga
+/.github/workflows/             @thiagoluga
