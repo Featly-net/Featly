@@ -20,6 +20,13 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
+    <!--
+      The meta package ships no assembly (IncludeBuildOutput=false), so there
+      are no PDBs to publish. Override the repo-wide IncludeSymbols=true so
+      pack doesn't produce an empty .snupkg that nuget.org then rejects with
+      "The package does not contain any symbol (.pdb) files." (HTTP 400).
+    -->
+    <IncludeSymbols>false</IncludeSymbols>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
