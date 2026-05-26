@@ -117,6 +117,58 @@ public class SdkConfigEndpointTests
     }
 
     [Fact]
+    public async Task GET_sdk_config_includes_configs_alongside_flags_and_segments()
+    {
+        using var host = await BuildHostAsync();
+        var admin = host.GetTestClient();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var sdk = host.GetTestClient();
+        sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
+
+        await admin.PostAsJsonAsync("/api/admin/configs", new
+        {
+            key = "checkout.timeout",
+            name = "Checkout Timeout",
+            type = "Int",
+            defaultValue = 30,
+        }, TestContext.Current.CancellationToken);
+
+        var response = await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var snapshot = await response.Content.ReadFromJsonAsync<ConfigSnapshot>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        snapshot.Should().NotBeNull();
+        snapshot!.Configs.Should().ContainSingle(c => c.Key == "checkout.timeout");
+        snapshot.Configs[0].DefaultValue.GetInt32().Should().Be(30);
+    }
+
+    [Fact]
+    public async Task GET_sdk_config_etag_invalidates_when_config_changes()
+    {
+        using var host = await BuildHostAsync();
+        var admin = host.GetTestClient();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var sdk = host.GetTestClient();
+        sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
+
+        var first = await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), TestContext.Current.CancellationToken);
+        var firstEtag = first.Headers.ETag!.Tag;
+
+        await admin.PostAsJsonAsync("/api/admin/configs", new
+        {
+            key = "feature.banner",
+            name = "Banner",
+            type = "String",
+            defaultValue = "default",
+        }, TestContext.Current.CancellationToken);
+
+        var second = await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), TestContext.Current.CancellationToken);
+        var secondEtag = second.Headers.ETag!.Tag;
+
+        secondEtag.Should().NotBe(firstEtag);
+    }
+
+    [Fact]
     public async Task GET_sdk_config_returns_304_when_etag_matches()
     {
         using var host = await BuildHostAsync();

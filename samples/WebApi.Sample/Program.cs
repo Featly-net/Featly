@@ -6,9 +6,11 @@ using Featly.Sdk;
 // captures the existing reference instead of re-allocating on every request.
 string[] tryItHints =
 [
-    "/checkout                         — defaults, no context",
-    "/checkout?country=BR&plan=pro     — explicit query targeting",
-    "/checkout?targetingKey=alice@x.io — drives split bucketing",
+    "/checkout                                 — flag defaults, no context",
+    "/checkout?country=BR&plan=pro             — explicit query targeting",
+    "/checkout?targetingKey=alice@x.io         — drives split bucketing",
+    "/checkout/timeout                         — dynamic config, default value",
+    "/checkout/timeout?country=BR              — config rule per country",
 ];
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,6 +80,41 @@ app.MapGet("/checkout", async (HttpContext http, IFeatlyClient featly, Cancellat
             targetingKey = ctx.TargetingKey,
             attributes = ctx.Attributes,
         },
+    });
+});
+
+// Config-driven endpoint. Dynamic configs share the targeting engine with flags
+// but produce a typed value directly instead of selecting a variant. Operators
+// edit `checkout.timeout` in the dashboard and the change propagates to every
+// connected SDK without redeploying.
+app.MapGet("/checkout/timeout", async (HttpContext http, IFeatlyClient featly, CancellationToken ct) =>
+{
+    var country = http.Request.Query["country"].ToString();
+    var plan = http.Request.Query["plan"].ToString();
+
+    EvaluationContext? ctx = null;
+    if (!string.IsNullOrWhiteSpace(country) || !string.IsNullOrWhiteSpace(plan))
+    {
+        var attrs = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(country))
+        { attrs["user.country"] = country; }
+        if (!string.IsNullOrWhiteSpace(plan))
+        { attrs["user.plan"] = plan; }
+        ctx = new EvaluationContext(Attributes: attrs);
+    }
+
+    // 30s is the bootstrap fallback used while the SDK is still warming up the
+    // snapshot — once Featly returns the config, this value is overridden by
+    // whichever rule (or default) matches the context.
+    var result = await featly.Configs.EvaluateAsync("checkout.timeout", defaultValue: 30, ctx, ct);
+
+    return Results.Ok(new
+    {
+        config = "checkout.timeout",
+        seconds = result.Value,
+        reason = result.Reason.ToString(),
+        ruleMatched = result.RuleMatched,
+        contextUsed = ctx is null ? null : new { attributes = ctx.Attributes },
     });
 });
 

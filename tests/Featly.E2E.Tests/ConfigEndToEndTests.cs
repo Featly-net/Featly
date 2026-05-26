@@ -17,66 +17,64 @@ using Xunit;
 namespace Featly.E2E.Tests;
 
 /// <summary>
-/// Proves the M2 contract end-to-end: create a flag via the admin HTTP API,
-/// trigger a polled refresh in the SDK, and confirm <see cref="IFlagClient"/>
-/// returns the matching value.
+/// End-to-end proof for M4 PR 4B: create a dynamic config via the admin HTTP
+/// API, poll the SDK snapshot, and verify <see cref="IConfigClient"/> serves
+/// the value with the same targeting semantics flags already have.
 /// </summary>
-public class BooleanFlagEndToEndTests
+public class ConfigEndToEndTests
 {
-    private const string AdminKey = "admin-key-e2e";
-    private const string SdkKey = "sdk-key-e2e";
+    private const string AdminKey = "admin-key-e2e-config";
+    private const string SdkKey = "sdk-key-e2e-config";
 
     [Fact]
-    public async Task SDK_observes_a_flag_created_via_the_admin_API()
+    public async Task SDK_observes_a_config_created_via_the_admin_API()
     {
         using var serverHost = await BuildServerHostAsync();
-        var serverClient = serverHost.GetTestClient();
         var adminClient = CreateAuthorizedClient(serverHost, AdminKey);
 
-        // Build the SDK against the TestServer's HttpMessageHandler.
         await using var sdkProvider = BuildSdkServices(serverHost.GetTestServer());
         var snapshotCache = sdkProvider.GetRequiredService<FeatlySnapshotCache>();
         var featly = sdkProvider.GetRequiredService<IFeatlyClient>();
         var http = sdkProvider.GetRequiredService<FeatlyHttpClient>();
 
-        // 1. Create a boolean flag enabled with default variant "on".
-        var createResponse = await adminClient.PostAsJsonAsync("/api/admin/flags", new
+        // 1. Create a typed config with a default value of 30 seconds.
+        var createResponse = await adminClient.PostAsJsonAsync("/api/admin/configs", new
         {
-            key = "demo",
-            name = "Demo",
-            type = "Boolean",
-            enabled = true,
-            defaultVariantKey = "on",
-            variants = new[]
-            {
-                new { key = "on", name = "On", value = true },
-                new { key = "off", name = "Off", value = false },
-            },
+            key = "checkout.timeout",
+            name = "Checkout Timeout",
+            type = "Int",
+            defaultValue = 30,
         }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
 
-        // 2. Manually drive one refresh (we don't want to wait the polling interval in a test).
+        // 2. Refresh the snapshot once (no waiting on polling).
         var fetched = await http.FetchConfigAsync(environmentKey: null, ifNoneMatch: null, ct: TestContext.Current.CancellationToken);
         fetched.Snapshot.Should().NotBeNull();
         snapshotCache.Replace(fetched.Snapshot!, fetched.Etag);
 
-        // 3. The SDK should now see the flag.
-        var enabled = await featly.Flags.IsEnabledAsync("demo", ct: TestContext.Current.CancellationToken);
-        enabled.Should().BeTrue();
+        // 3. SDK sees the default value.
+        var seconds = await featly.Configs.GetAsync("checkout.timeout", defaultValue: 0, ct: TestContext.Current.CancellationToken);
+        seconds.Should().Be(30);
 
-        // 4. Update the flag to flip the default variant to "off" and re-sync.
-        //    This proves the snapshot is reloaded and the change propagates.
-        await adminClient.PutAsJsonAsync("/api/admin/flags/demo", new
+        // 4. Update the config to add a BR rule -> 60s, leaving the default at 30.
+        await adminClient.PutAsJsonAsync("/api/admin/configs/checkout.timeout", new
         {
-            key = "demo",
-            name = "Demo",
-            type = "Boolean",
-            enabled = true,
-            defaultVariantKey = "off",
-            variants = new[]
+            key = "checkout.timeout",
+            name = "Checkout Timeout",
+            type = "Int",
+            defaultValue = 30,
+            rules = new[]
             {
-                new { key = "on", name = "On", value = true },
-                new { key = "off", name = "Off", value = false },
+                new
+                {
+                    order = 0,
+                    name = "BR",
+                    conditions = new[]
+                    {
+                        new { attribute = "user.country", @operator = "Equals", value = (object)"BR" },
+                    },
+                    value = (object)60,
+                },
             },
         }, TestContext.Current.CancellationToken);
 
@@ -84,10 +82,30 @@ public class BooleanFlagEndToEndTests
         refreshed.Snapshot.Should().NotBeNull();
         snapshotCache.Replace(refreshed.Snapshot!, refreshed.Etag);
 
-        var enabledAfter = await featly.Flags.IsEnabledAsync("demo", ct: TestContext.Current.CancellationToken);
-        enabledAfter.Should().BeFalse("the default variant was switched to 'off' and the SDK re-fetched the snapshot");
+        // 5. BR users now get 60s; everyone else still gets 30s.
+        var brCtx = new EvaluationContext(Attributes: new Dictionary<string, object?> { ["user.country"] = "BR" });
+        var brSeconds = await featly.Configs.GetAsync("checkout.timeout", defaultValue: 0, brCtx, TestContext.Current.CancellationToken);
+        brSeconds.Should().Be(60, "BR rule matches");
 
-        _ = serverClient; // suppress unused warning
+        var usCtx = new EvaluationContext(Attributes: new Dictionary<string, object?> { ["user.country"] = "US" });
+        var usSeconds = await featly.Configs.GetAsync("checkout.timeout", defaultValue: 0, usCtx, TestContext.Current.CancellationToken);
+        usSeconds.Should().Be(30, "US falls through to the default");
+    }
+
+    [Fact]
+    public async Task SDK_sees_NotFound_for_a_config_not_yet_synced()
+    {
+        using var serverHost = await BuildServerHostAsync();
+        await using var sdkProvider = BuildSdkServices(serverHost.GetTestServer());
+        var featly = sdkProvider.GetRequiredService<IFeatlyClient>();
+
+        var result = await featly.Configs.EvaluateAsync(
+            "does.not.exist",
+            defaultValue: "fallback",
+            ct: TestContext.Current.CancellationToken);
+
+        result.Value.Should().Be("fallback");
+        result.Reason.Should().Be(EvaluationReason.NotFound);
     }
 
     private static HttpClient CreateAuthorizedClient(IHost host, string bearer)

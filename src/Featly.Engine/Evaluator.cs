@@ -97,6 +97,69 @@ public static class Evaluator
         return true;
     }
 
+    /// <summary>
+    /// Evaluates a dynamic <see cref="Config"/> against <paramref name="context"/>
+    /// using the same rule + condition + segment machinery as flags. The outcome
+    /// is the value served directly (no variant indirection); the engine walks
+    /// <see cref="Config.Rules"/> ordered by <see cref="ConfigRule.Order"/> asc
+    /// and returns the first match's <see cref="ConfigRule.Value"/>. Returns
+    /// <see cref="Config.DefaultValue"/> when no rule matches.
+    /// </summary>
+    public static EvaluationResult<JsonElement> EvaluateConfig(
+        Config? config,
+        EvaluationContext? context,
+        JsonElement fallback,
+        ISegmentLookup? segments = null)
+    {
+        if (config is null)
+        {
+            return new EvaluationResult<JsonElement>(
+                Key: "",
+                Value: fallback,
+                VariantKey: "",
+                Reason: EvaluationReason.NotFound);
+        }
+
+        if (config.Archived)
+        {
+            return new EvaluationResult<JsonElement>(
+                Key: config.Key,
+                Value: fallback,
+                VariantKey: "",
+                Reason: EvaluationReason.NotFound);
+        }
+
+        segments ??= DictionarySegmentLookup.Empty;
+
+        for (var i = 0; i < config.Rules.Count; i++)
+        {
+            var rule = config.Rules[i];
+            if (!rule.Enabled)
+            {
+                continue;
+            }
+
+            if (!AllConditionsMatch(rule.Conditions, context, segments))
+            {
+                continue;
+            }
+
+            return new EvaluationResult<JsonElement>(
+                Key: config.Key,
+                Value: rule.Value,
+                VariantKey: "",
+                Reason: EvaluationReason.TargetingMatch,
+                RuleMatched: rule.Name);
+        }
+
+        // No rule matched — serve the default value.
+        return new EvaluationResult<JsonElement>(
+            Key: config.Key,
+            Value: config.DefaultValue,
+            VariantKey: "",
+            Reason: EvaluationReason.Default);
+    }
+
     private static EvaluationResult<JsonElement> ApplyRuleOutcome(
         Flag flag,
         Rule rule,
