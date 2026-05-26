@@ -35,7 +35,10 @@ public class SqliteChangeNotifierTests
         var notifier = host.Store.Changes;
 
         var hits = 0;
-        var subscription = notifier.Subscribe((_, _) => { hits++; return ValueTask.CompletedTask; });
+        // `using` so the subscription is disposed even if NotifyAsync throws.
+        // We still call Dispose explicitly below to assert the unsubscribe
+        // behavior, which is idempotent thanks to the Interlocked guard.
+        using var subscription = notifier.Subscribe((_, _) => { hits++; return ValueTask.CompletedTask; });
         await notifier.NotifyAsync(new ChangeNotification(null, "Flag", null, DateTimeOffset.UtcNow), ct);
         subscription.Dispose();
         await notifier.NotifyAsync(new ChangeNotification(null, "Flag", null, DateTimeOffset.UtcNow), ct);

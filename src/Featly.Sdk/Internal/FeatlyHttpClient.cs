@@ -66,7 +66,9 @@ internal sealed class FeatlyHttpClient(HttpClient httpClient)
             ? "/api/sdk/stream"
             : $"/api/sdk/stream?env={Uri.EscapeDataString(environmentKey)}";
 
-        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        // `using` so the request is disposed on the way out; HttpClient does
+        // not own the message and SendAsync only needs it during the call.
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
         return await httpClient

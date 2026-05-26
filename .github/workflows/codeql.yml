@@ -50,9 +50,9 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
-          # Default + security-extended is a reasonable tradeoff between
-          # signal and noise for an open-source library.
-          queries: security-and-quality
+          # Path exclusions and query suite live in the config file so the
+          # rules are version-controlled alongside the rest of the policy.
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Restore
         run: dotnet restore Featly.sln
