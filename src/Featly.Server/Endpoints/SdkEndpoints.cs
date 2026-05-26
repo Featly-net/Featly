@@ -45,7 +45,11 @@ internal static class SdkEndpoints
             return;
         }
 
-        var mostRecent = await store.Flags.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
+        // Compose the ETag from the most recent flag AND segment update so
+        // edits in either bucket invalidate cached snapshots on the SDK side.
+        var flagsMostRecent = await store.Flags.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
+        var segmentsMostRecent = await store.Segments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
+        var mostRecent = Latest(flagsMostRecent, segmentsMostRecent);
         var etag = ComputeEtag(environment.Id, mostRecent);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
@@ -58,11 +62,13 @@ internal static class SdkEndpoints
         }
 
         var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
         var snapshot = new ConfigSnapshot(
             EnvironmentId: environment.Id,
             EnvironmentKey: environment.Key,
             At: DateTimeOffset.UtcNow,
-            Flags: flags);
+            Flags: flags,
+            Segments: segments);
 
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = MediaTypeNames.Application.Json;
@@ -162,6 +168,15 @@ internal static class SdkEndpoints
     {
         var ticks = mostRecent.HasValue ? mostRecent.Value.UtcTicks : 0L;
         return $"\"{environmentId:N}-{ticks.ToString(CultureInfo.InvariantCulture)}\"";
+    }
+
+    private static DateTimeOffset? Latest(DateTimeOffset? a, DateTimeOffset? b)
+    {
+        if (a is null)
+        { return b; }
+        if (b is null)
+        { return a; }
+        return a.Value >= b.Value ? a : b;
     }
 }
 

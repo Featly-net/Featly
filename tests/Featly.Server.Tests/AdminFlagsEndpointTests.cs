@@ -72,6 +72,91 @@ public class AdminFlagsEndpointTests
     }
 
     [Fact]
+    public async Task PUT_admin_flags_persists_rules_array()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        // Create without rules first.
+        await client.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "rules-flag",
+            name = "Rules flag",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        // PUT updates the flag with two rules: a deterministic match and a 50/50 split.
+        var put = await client.PutAsJsonAsync("/api/admin/flags/rules-flag", new
+        {
+            key = "rules-flag",
+            name = "Rules flag",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+            rules = new object[]
+            {
+                new
+                {
+                    order = 0,
+                    name = "BR rollout",
+                    enabled = true,
+                    conditions = new[]
+                    {
+                        new { attribute = "user.country", @operator = "Equals", value = (object)"BR" },
+                    },
+                    outcome = new { variantKey = "on" },
+                },
+                new
+                {
+                    order = 1,
+                    name = "Enterprise split",
+                    enabled = true,
+                    conditions = new[]
+                    {
+                        new { attribute = "user.plan", @operator = "Equals", value = (object)"enterprise" },
+                    },
+                    outcome = new
+                    {
+                        splits = new[]
+                        {
+                            new { variantKey = "on",  weight = 50 },
+                            new { variantKey = "off", weight = 50 },
+                        },
+                    },
+                },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var loaded = await put.Content.ReadFromJsonAsync<Flag>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        loaded.Should().NotBeNull();
+        loaded!.Rules.Should().HaveCount(2);
+
+        var brRule = loaded.Rules.Single(r => r.Order == 0);
+        brRule.Name.Should().Be("BR rollout");
+        brRule.Conditions.Should().ContainSingle().Which.Attribute.Should().Be("user.country");
+        brRule.Outcome.VariantKey.Should().Be("on");
+
+        var enterpriseRule = loaded.Rules.Single(r => r.Order == 1);
+        enterpriseRule.Outcome.Splits.Should().HaveCount(2);
+        enterpriseRule.Outcome.Splits!.Sum(s => s.Weight).Should().Be(100);
+    }
+
+    [Fact]
     public async Task POST_admin_flags_rejects_when_using_sdk_scope_key()
     {
         using var host = await BuildHostAsync();

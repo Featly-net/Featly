@@ -84,6 +84,7 @@ public class FlagClientTests
             EnvironmentId: envId,
             EnvironmentKey: "development",
             At: DateTimeOffset.UtcNow,
-            Flags: new[] { flag });
+            Flags: [flag],
+            Segments: []);
     }
 }

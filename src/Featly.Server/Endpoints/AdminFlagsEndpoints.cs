@@ -131,6 +131,7 @@ internal static class AdminFlagsEndpoints
         existing.DefaultVariantKey = body.DefaultVariantKey;
         existing.Variants = [.. body.Variants];
         existing.Tags = [.. (body.Tags ?? [])];
+        existing.Rules = body.Rules is null ? [] : [.. body.Rules];
 
         await store.Flags.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
@@ -178,7 +179,8 @@ public sealed record FlagWriteRequest(
     bool Enabled,
     string DefaultVariantKey,
     IReadOnlyList<Variant> Variants,
-    IReadOnlyList<string>? Tags = null)
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<Rule>? Rules = null)
 {
     internal Flag ToEntity(Guid environmentId, string actor) => new()
     {
@@ -190,6 +192,7 @@ public sealed record FlagWriteRequest(
         Enabled = Enabled,
         DefaultVariantKey = DefaultVariantKey,
         Variants = [.. Variants],
+        Rules = Rules is null ? [] : [.. Rules],
         EnvironmentId = environmentId,
         Tags = [.. (Tags ?? [])],
         Archived = false,
