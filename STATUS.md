@@ -93,9 +93,14 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
 - [x] SDK evaluates the rule locally for any subject and context
 - [x] Performance: p99 < 10μs hit cleanly per `docs/PERFORMANCE.md`
 
-## Coming next — M5 (PLAN.md)
+## Coming next — M5 (in progress)
 
-Dashboard UI: list/edit flags, configs, segments. The architecture rule that everything reachable in the dashboard must also be reachable via API is already true — M5 is purely the front-end on top of the existing HTTP surface.
+Dashboard UI in four sequenced PRs:
+
+- [x] **PR 5A — skeleton** (this PR): asset pipeline + middleware serving real `index.html` / `app.css` / `app.js`, layout + navigation, light/dark tokens, explicit hover states.
+- [ ] **PR 5B — listings**: Flags / Configs / Segments / Environment selector, read-only via `fetch()`.
+- [ ] **PR 5C — detail + rule editor**: visual rule editor, save via admin API, polling + SSE for live updates.
+- [ ] **PR 5D — "test this context"**: server-side dry-run eval endpoint + UI form.
 
 ### Done — M2 (complete)
 

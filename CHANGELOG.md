@@ -8,7 +8,9 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added
+
+- **M5 PR 5A — dashboard skeleton.** `Featly.Dashboard` now ships a navigable shell instead of the M1 "coming soon" placeholder. Three embedded assets (`wwwroot/index.html`, `wwwroot/app.css`, `wwwroot/app.js`) are served by `MapFeatlyDashboard`: the root and any sub-path return `index.html` (so deep links like `/featly/flags` work with browser refresh), and `app.css` / `app.js` get their own routes. The client is a vanilla-JS path-based SPA with a tiny router, design-token CSS (light/dark via `prefers-color-scheme`), explicit hover/focus states on every interactive element, and placeholder views for Flags / Configs / Segments / Settings. M5B replaces the placeholders with the real list screens. 2 new E2E tests cover SPA fallback + embedded asset serving (131 tests passing total).
 
 ## [0.0.2-preview.1] - 2026-05-26
 

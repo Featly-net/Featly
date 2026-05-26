@@ -27,7 +27,7 @@ public class HostBootTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Dashboard_serves_coming_soon_placeholder()
+    public async Task Dashboard_root_serves_the_shell()
     {
         var client = _factory.CreateClient();
         var response = await client.GetAsync(new Uri("/featly", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -35,6 +35,34 @@ public class HostBootTests : IClassFixture<WebApplicationFactory<Program>>
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
-        body.Should().Contain("Featly").And.Contain("coming soon");
+        body.Should().Contain("Featly").And.Contain("app.js");
+        // The mount-path placeholder must be substituted before the response goes out.
+        body.Should().NotContain("__MOUNT_PATH__");
+    }
+
+    [Fact]
+    public async Task Dashboard_deep_link_falls_back_to_the_shell()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync(new Uri("/featly/flags", UriKind.Relative), TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
+        body.Should().Contain("app.js");
+    }
+
+    [Fact]
+    public async Task Dashboard_serves_embedded_css_and_js()
+    {
+        var client = _factory.CreateClient();
+
+        var css = await client.GetAsync(new Uri("/featly/app.css", UriKind.Relative), TestContext.Current.CancellationToken);
+        css.StatusCode.Should().Be(HttpStatusCode.OK);
+        css.Content.Headers.ContentType?.MediaType.Should().Be("text/css");
+
+        var js = await client.GetAsync(new Uri("/featly/app.js", UriKind.Relative), TestContext.Current.CancellationToken);
+        js.StatusCode.Should().Be(HttpStatusCode.OK);
+        js.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript");
     }
 }
