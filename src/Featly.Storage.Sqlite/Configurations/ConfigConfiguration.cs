@@ -43,8 +43,9 @@ internal sealed class ConfigConfiguration : IEntityTypeConfiguration<Config>
 
         builder.Property(c => c.Archived);
 
-        builder.Property(c => c.CreatedAt);
-        builder.Property(c => c.UpdatedAt);
+        // Persist timestamps as 64-bit UTC ticks so MAX / ORDER BY work in SQL.
+        builder.Property(c => c.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
+        builder.Property(c => c.UpdatedAt).HasConversion<DateTimeOffsetTicksConverter>();
         builder.Property(c => c.CreatedBy).HasMaxLength(256);
         builder.Property(c => c.UpdatedBy).HasMaxLength(256);
 

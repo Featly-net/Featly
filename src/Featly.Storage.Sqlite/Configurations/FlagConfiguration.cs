@@ -42,8 +42,9 @@ internal sealed class FlagConfiguration : IEntityTypeConfiguration<Flag>
 
         builder.Property(f => f.Archived);
 
-        builder.Property(f => f.CreatedAt);
-        builder.Property(f => f.UpdatedAt);
+        // Persist timestamps as 64-bit UTC ticks so MAX / ORDER BY work in SQL.
+        builder.Property(f => f.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
+        builder.Property(f => f.UpdatedAt).HasConversion<DateTimeOffsetTicksConverter>();
         builder.Property(f => f.CreatedBy).HasMaxLength(256);
         builder.Property(f => f.UpdatedBy).HasMaxLength(256);
 

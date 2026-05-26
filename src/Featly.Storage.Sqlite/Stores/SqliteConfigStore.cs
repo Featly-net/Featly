@@ -89,14 +89,11 @@ internal sealed class SqliteConfigStore(IDbContextFactory<FeatlyDbContext> conte
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
-        // SQLite ORDER BY on DateTimeOffset fails — aggregate client-side, same
-        // pattern as SqliteFlagStore.GetMostRecentUpdateAsync.
-        var timestamps = await db.Configs.AsNoTracking()
+        // UpdatedAt is persisted as UTC ticks (long), so MAX runs in SQL.
+        return await db.Configs.AsNoTracking()
             .Where(c => c.EnvironmentId == environmentId)
-            .Select(c => c.UpdatedAt)
-            .ToListAsync(ct)
+            .Select(c => (DateTimeOffset?)c.UpdatedAt)
+            .MaxAsync(ct)
             .ConfigureAwait(false);
-
-        return timestamps.Count == 0 ? null : timestamps.Max();
     }
 }
