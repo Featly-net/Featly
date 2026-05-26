@@ -24,12 +24,29 @@ public static class FeatlySdkServiceCollectionExtensions
             .BindConfiguration(FeatlySdkOptions.SectionName);
 
         services.TryAddSingleton<FeatlySnapshotCache>();
-        services.TryAddSingleton<IFlagClient>(sp =>
-            new FlagClient(sp.GetRequiredService<FeatlySnapshotCache>()));
+        services.TryAddSingleton<IFeatlyContextAccessor, NoOpFeatlyContextAccessor>();
+        services.TryAddSingleton<IFlagClient>(sp => new FlagClient(
+            sp.GetRequiredService<FeatlySnapshotCache>(),
+            sp.GetRequiredService<IFeatlyContextAccessor>()));
         services.TryAddSingleton<IFeatlyClient>(sp =>
             new FeatlyClient(sp.GetRequiredService<IFlagClient>()));
 
         return new FeatlyClientBuilder(services);
+    }
+
+    /// <summary>
+    /// Replaces the default no-op <see cref="IFeatlyContextAccessor"/> with
+    /// <typeparamref name="TAccessor"/>. Use this to wire ambient context
+    /// resolvers — for example <c>HttpContextFeatlyContextAccessor</c> from
+    /// <c>Featly.AspNetCore</c>, or your own custom resolver.
+    /// </summary>
+    public static FeatlyClientBuilder UseContextAccessor<TAccessor>(this FeatlyClientBuilder builder)
+        where TAccessor : class, IFeatlyContextAccessor
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.RemoveAll<IFeatlyContextAccessor>();
+        builder.Services.AddSingleton<IFeatlyContextAccessor, TAccessor>();
+        return builder;
     }
 
     /// <summary>

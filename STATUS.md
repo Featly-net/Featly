@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**M3 — Multi-variant flags with targeting rules** (in progress; PRs 3A + 3B + 3C landed)
+**M3 — Multi-variant flags with targeting rules** (complete; all four PRs merged)
 
 ### Goal (M3)
 
@@ -52,12 +52,25 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
   - Every mutation emits a `ChangeNotification(EntityType: "Segment")` so SSE clients re-fetch
 - **8 new server tests** (15 total in `Featly.Server.Tests`): 5 covering segment CRUD + auth gating, 1 PUT-flag-with-rules round-trip, 2 SDK snapshot showing segments and ETag invalidation on segment change
 
-### Coming next — M3 PR 3D
+### Done — M3 PR 3D (SDK ambient context + AspNetCore + sample)
 
-- `IFeatlyContextAccessor` wired in DI; `HttpContextFeatlyContextAccessor` in `Featly.AspNetCore`
-- SDK populates `DictionarySegmentLookup` from the snapshot, hands it to `Evaluator`
-- WebApi sample shows targeting (`user.country=BR` ⇒ `v2`, others ⇒ `v1`)
-- End-to-end test of a multi-variant flag with targeting via TestServer
+- **`FeatlySnapshotCache`** indexes `Segments` and exposes an `ISegmentLookup`; `FlagClient` hands it to the engine on every call, so `InSegment` resolves locally without a server round-trip
+- **`FlagClient`** picks up the ambient context from `IFeatlyContextAccessor` when callers don't pass one. Explicit context always wins
+- **`NoOpFeatlyContextAccessor`** is the SDK default; `builder.UseContextAccessor<TAccessor>()` swaps it
+- **`Featly.AspNetCore.HttpContextFeatlyContextAccessor`** maps `HttpContext.User` claims (NameIdentifier/Sub/email/name) into an `EvaluationContext`. Wired via `builder.UseHttpContextAccessor()`
+- **`samples/WebApi.Sample`** with targeting demo: `/checkout?country=BR&plan=pro` exercises rule matching, `?targetingKey=...` drives split bucketing; response includes matched rule, variant, and reason
+- **4 new SDK tests** (`AmbientContextAccessorTests`): ambient pickup, explicit override, no-op fallthrough, segments resolved locally
+- **89 tests pass** overall (was 85)
+
+### M3 — "Done when" criteria from PLAN.md
+
+- [x] Configure a flag like "100% for `user.country=BR`, 10% rollout for `user.plan=pro`, off for everyone else" via the API
+- [x] SDK evaluates the rule locally for any subject and context
+- [x] Performance: p99 < 10μs hit cleanly per `docs/PERFORMANCE.md`
+
+## Coming next — M4 (PLAN.md)
+
+Dynamic configuration (`Config` + `ConfigRule`) sharing the targeting engine with flags. `IConfigClient.GetAsync<T>` in the SDK. Admin API for configs.
 
 ### Done — M2 (complete)
 

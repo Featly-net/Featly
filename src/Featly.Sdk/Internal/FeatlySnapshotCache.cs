@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Featly.Engine;
 
 namespace Featly.Sdk.Internal;
 
@@ -10,7 +11,11 @@ namespace Featly.Sdk.Internal;
 /// </summary>
 internal sealed class FeatlySnapshotCache
 {
-    private CacheEntry _current = new(null, null, ImmutableDictionary<string, Flag>.Empty);
+    private CacheEntry _current = new(
+        Snapshot: null,
+        Etag: null,
+        FlagsByKey: ImmutableDictionary<string, Flag>.Empty,
+        SegmentLookup: DictionarySegmentLookup.Empty);
 
     public CacheEntry Current => Volatile.Read(ref _current);
 
@@ -18,20 +23,35 @@ internal sealed class FeatlySnapshotCache
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        var builder = ImmutableDictionary.CreateBuilder<string, Flag>(StringComparer.Ordinal);
+        var flagsBuilder = ImmutableDictionary.CreateBuilder<string, Flag>(StringComparer.Ordinal);
         foreach (var flag in snapshot.Flags)
         {
-            builder[flag.Key] = flag;
+            flagsBuilder[flag.Key] = flag;
         }
 
-        Volatile.Write(ref _current, new CacheEntry(snapshot, etag, builder.ToImmutable()));
+        var segmentsBuilder = ImmutableDictionary.CreateBuilder<string, Segment>(StringComparer.Ordinal);
+        foreach (var segment in snapshot.Segments)
+        {
+            segmentsBuilder[segment.Key] = segment;
+        }
+        var segmentLookup = new DictionarySegmentLookup(segmentsBuilder.ToImmutable());
+
+        Volatile.Write(ref _current, new CacheEntry(
+            Snapshot: snapshot,
+            Etag: etag,
+            FlagsByKey: flagsBuilder.ToImmutable(),
+            SegmentLookup: segmentLookup));
     }
 
     public Flag? TryGetFlag(string key)
         => Current.FlagsByKey.TryGetValue(key, out var flag) ? flag : null;
 
+    /// <summary>The lookup the engine consults to resolve <c>InSegment</c> conditions.</summary>
+    public ISegmentLookup Segments => Current.SegmentLookup;
+
     internal sealed record CacheEntry(
         ConfigSnapshot? Snapshot,
         string? Etag,
-        ImmutableDictionary<string, Flag> FlagsByKey);
+        ImmutableDictionary<string, Flag> FlagsByKey,
+        ISegmentLookup SegmentLookup);
 }

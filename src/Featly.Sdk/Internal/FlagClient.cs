@@ -7,7 +7,16 @@ namespace Featly.Sdk.Internal;
 /// SDK implementation of <see cref="IFlagClient"/>. Pure local evaluation
 /// against the cached snapshot maintained by <see cref="FeatlySnapshotCache"/>.
 /// </summary>
-internal sealed class FlagClient(FeatlySnapshotCache cache) : IFlagClient
+/// <remarks>
+/// Pulls the segment lookup from the cache so <c>InSegment</c> conditions
+/// resolve locally without a server round-trip. When the caller does not
+/// pass an explicit <see cref="EvaluationContext"/>, the ambient one is
+/// requested from <see cref="IFeatlyContextAccessor"/> (default
+/// implementation returns null, so no context).
+/// </remarks>
+internal sealed class FlagClient(
+    FeatlySnapshotCache cache,
+    IFeatlyContextAccessor contextAccessor) : IFlagClient
 {
     public ValueTask<bool> IsEnabledAsync(string key, EvaluationContext? context = null, CancellationToken ct = default)
     {
@@ -16,7 +25,7 @@ internal sealed class FlagClient(FeatlySnapshotCache cache) : IFlagClient
 
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(false);
-        var result = Evaluator.EvaluateFlag(flag, context, fallback);
+        var result = Evaluator.EvaluateFlag(flag, ResolveContext(context), fallback, cache.Segments);
         return ValueTask.FromResult(result.As(false));
     }
 
@@ -27,7 +36,7 @@ internal sealed class FlagClient(FeatlySnapshotCache cache) : IFlagClient
 
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(defaultValue);
-        var result = Evaluator.EvaluateFlag(flag, context, fallback);
+        var result = Evaluator.EvaluateFlag(flag, ResolveContext(context), fallback, cache.Segments);
         return ValueTask.FromResult(result.As(defaultValue));
     }
 
@@ -38,7 +47,7 @@ internal sealed class FlagClient(FeatlySnapshotCache cache) : IFlagClient
 
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(defaultValue);
-        var raw = Evaluator.EvaluateFlag(flag, context, fallback);
+        var raw = Evaluator.EvaluateFlag(flag, ResolveContext(context), fallback, cache.Segments);
 
         var typed = new EvaluationResult<T>(
             Key: raw.Key,
@@ -50,4 +59,7 @@ internal sealed class FlagClient(FeatlySnapshotCache cache) : IFlagClient
 
         return ValueTask.FromResult(typed);
     }
+
+    private EvaluationContext? ResolveContext(EvaluationContext? explicitContext)
+        => explicitContext ?? contextAccessor.Current;
 }

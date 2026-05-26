@@ -7,11 +7,22 @@ namespace Featly.Sdk.Tests;
 
 public class FlagClientTests
 {
+    private sealed class NoOpAccessor : IFeatlyContextAccessor
+    {
+        public EvaluationContext? Current => null;
+    }
+
+    private sealed class FixedAccessor(EvaluationContext context) : IFeatlyContextAccessor
+    {
+        public EvaluationContext? Current { get; } = context;
+    }
+
+
     [Fact]
     public async Task IsEnabledAsync_returns_false_when_cache_is_empty()
     {
         var cache = new FeatlySnapshotCache();
-        var client = new FlagClient(cache);
+        var client = new FlagClient(cache, new NoOpAccessor());
 
         var enabled = await client.IsEnabledAsync("missing-flag", ct: TestContext.Current.CancellationToken);
 
@@ -23,7 +34,7 @@ public class FlagClientTests
     {
         var cache = new FeatlySnapshotCache();
         cache.Replace(BuildSnapshot(enabled: true, defaultVariantKey: "on"), etag: "\"abc\"");
-        var client = new FlagClient(cache);
+        var client = new FlagClient(cache, new NoOpAccessor());
 
         var enabled = await client.IsEnabledAsync("demo", ct: TestContext.Current.CancellationToken);
 
@@ -38,7 +49,7 @@ public class FlagClientTests
         // kill switch to mean "false".
         var cache = new FeatlySnapshotCache();
         cache.Replace(BuildSnapshot(enabled: false, defaultVariantKey: "off"), etag: "\"abc\"");
-        var client = new FlagClient(cache);
+        var client = new FlagClient(cache, new NoOpAccessor());
 
         var enabled = await client.IsEnabledAsync("demo", ct: TestContext.Current.CancellationToken);
 
@@ -50,7 +61,7 @@ public class FlagClientTests
     {
         var cache = new FeatlySnapshotCache();
         cache.Replace(BuildSnapshot(enabled: true, defaultVariantKey: "on"), etag: "\"abc\"");
-        var client = new FlagClient(cache);
+        var client = new FlagClient(cache, new NoOpAccessor());
 
         var result = await client.EvaluateAsync("demo", defaultValue: false, ct: TestContext.Current.CancellationToken);
 
