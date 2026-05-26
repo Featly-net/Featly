@@ -102,7 +102,7 @@ public class AdminConfigsEndpointTests
                     name = "BR",
                     conditions = new[]
                     {
-                        new { attribute = "user.country", @operator = "Equals", value = (object)"BR" },
+                        new { attribute = "user.country", @operator = "Equals", value = "BR" },
                     },
                     value = (object)90,
                 },

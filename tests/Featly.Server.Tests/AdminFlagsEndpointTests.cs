@@ -115,7 +115,7 @@ public class AdminFlagsEndpointTests
                     enabled = true,
                     conditions = new[]
                     {
-                        new { attribute = "user.country", @operator = "Equals", value = (object)"BR" },
+                        new { attribute = "user.country", @operator = "Equals", value = "BR" },
                     },
                     outcome = new { variantKey = "on" },
                 },
@@ -126,7 +126,7 @@ public class AdminFlagsEndpointTests
                     enabled = true,
                     conditions = new[]
                     {
-                        new { attribute = "user.plan", @operator = "Equals", value = (object)"enterprise" },
+                        new { attribute = "user.plan", @operator = "Equals", value = "enterprise" },
                     },
                     outcome = new
                     {

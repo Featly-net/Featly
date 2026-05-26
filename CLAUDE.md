@@ -91,6 +91,15 @@ src/
 - **Do not** add a setting to `appsettings` without also making it overridable via the database, unless it is genuinely bootstrap-only (connection string, auto-migrate flag, kestrel URLs).
 - **Do not** add `Co-Authored-By: Claude <noreply@anthropic.com>` (or any equivalent AI co-author trailer) to commit messages. Commits authored by an AI assistant on behalf of the maintainer are committed under the maintainer's identity only.
 
+## Before merging a PR
+
+CI green is necessary but not sufficient. **Always** check both before merging:
+
+1. **CI status** — `gh pr checks <num> --repo Featly-net/Featly`. Every required check must be green.
+2. **PR comments and reviews** — `gh pr view <num> --repo Featly-net/Featly --comments` plus `gh api repos/Featly-net/Featly/pulls/<num>/comments` (inline review comments). Read every unresolved comment, address actionable feedback, and reply to the rest before merging. Never merge over open review threads without surfacing them to the maintainer first.
+
+This applies to every PR, including ones the assistant authored.
+
 ## When making architectural decisions
 
 Document them as an ADR in `docs/adr/`. Use the template at `docs/adr/0000-template.md`. Number sequentially. Status flow: Proposed → Accepted → (Deprecated | Superseded by ADR-N).

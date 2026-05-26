@@ -71,14 +71,17 @@ public class AdminSegmentsEndpointTests
             },
         }, TestContext.Current.CancellationToken);
 
+        // System.Text.Json walks elements via their runtime type, so a mixed
+        // `object[]` carrying two distinct anonymous types serializes cleanly
+        // (one condition's value is a string, the other's an int).
         var put = await client.PutAsJsonAsync("/api/admin/segments/beta", new
         {
             key = "beta",
             name = "Beta testers (renamed)",
-            conditions = new[]
+            conditions = new object[]
             {
-                new { attribute = "user.tier", @operator = "Equals", value = (object)"beta" },
-                new { attribute = "user.age", @operator = "GreaterThan", value = (object)21 },
+                new { attribute = "user.tier", @operator = "Equals", value = "beta" },
+                new { attribute = "user.age", @operator = "GreaterThan", value = 21 },
             },
         }, TestContext.Current.CancellationToken);
 
