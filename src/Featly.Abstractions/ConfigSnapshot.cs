@@ -5,11 +5,12 @@ namespace Featly;
 /// <c>GET /api/sdk/config</c> and consumed by the SDK cache.
 /// </summary>
 /// <remarks>
-/// M2 carries flags only. Configs and segments join the payload as the
-/// corresponding milestones come online (M3 segments, M4 configs).
+/// M3 adds segments alongside flags so the SDK can resolve <c>InSegment</c>
+/// conditions locally. Configs join the payload in M4.
 /// </remarks>
 public sealed record ConfigSnapshot(
     Guid EnvironmentId,
     string EnvironmentKey,
     DateTimeOffset At,
-    IReadOnlyList<Flag> Flags);
+    IReadOnlyList<Flag> Flags,
+    IReadOnlyList<Segment> Segments);

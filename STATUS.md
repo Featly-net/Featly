@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**M3 — Multi-variant flags with targeting rules** (in progress; PRs 3A + 3B landed)
+**M3 — Multi-variant flags with targeting rules** (in progress; PRs 3A + 3B + 3C landed)
 
 ### Goal (M3)
 
@@ -41,10 +41,23 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
 - **40 new engine tests** (46 total): every operator positive + negative, `Negate`, first-match-wins, AND, disabled-rule skip, segment matched + missing-from-lookup, bucketing determinism, distribution within ±5% on 5 000 subjects (50/50 and 90/10)
 - **`tests/Featly.Engine.Benchmarks`** new project. `docs/PERFORMANCE.md` carries the baseline. Every scenario is below the **10 μs p99 target**: boolean fast path 37 ns, 1 rule 134 ns, 5 rules × 3 conditions 1.2 μs, split bucketing 390 ns, InSegment lookup 286 ns
 
-### Coming next — M3 PRs 3C → 3D
+### Done — M3 PR 3C (server)
 
-- **3C** — Server endpoints for segments (CRUD), flag rule editor, snapshot endpoint includes segments
-- **3D** — `IFeatlyContextAccessor` wired in DI; `HttpContextFeatlyContextAccessor` in `Featly.AspNetCore`; end-to-end test of a multi-variant flag with targeting
+- **`ConfigSnapshot`** now carries `Segments` alongside `Flags`; the SDK config endpoint returns both. The ETag folds the most-recent `Flag.UpdatedAt` *and* the most-recent `Segment.UpdatedAt` so edits in either bucket invalidate cached snapshots
+- **`FlagWriteRequest`** accepts an optional `Rules` array. `POST` and `PUT /api/admin/flags` persist targeting rules end-to-end (already round-tripped through SQLite by 3A)
+- **`AdminSegmentsEndpoints`** new — full CRUD under `/api/admin/segments`:
+  - `GET /` list, `GET /{key}`, `POST /`, `PUT /{key}`, `DELETE /{key}`
+  - Auth: same admin policy as flags. Sdk-scoped keys get 401/403
+  - ReadOnly environment rejected with 403
+  - Every mutation emits a `ChangeNotification(EntityType: "Segment")` so SSE clients re-fetch
+- **8 new server tests** (15 total in `Featly.Server.Tests`): 5 covering segment CRUD + auth gating, 1 PUT-flag-with-rules round-trip, 2 SDK snapshot showing segments and ETag invalidation on segment change
+
+### Coming next — M3 PR 3D
+
+- `IFeatlyContextAccessor` wired in DI; `HttpContextFeatlyContextAccessor` in `Featly.AspNetCore`
+- SDK populates `DictionarySegmentLookup` from the snapshot, hands it to `Evaluator`
+- WebApi sample shows targeting (`user.country=BR` ⇒ `v2`, others ⇒ `v1`)
+- End-to-end test of a multi-variant flag with targeting via TestServer
 
 ### Done — M2 (complete)
 
