@@ -1341,11 +1341,12 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | ADR-013 | Polymorphic `RoleAssignment` (User \| Group) with wildcard environment | Accepted |
 | ADR-014 | Cumulative permissions; no deny rules | Accepted |
 | ADR-015 | `IFeatlyStore` as facade with per-entity sub-stores | Accepted |
-| ADR-016 | Database overrides `appsettings` for runtime-editable settings | Accepted |
+| [ADR-016](docs/adr/0016-database-overrides-appsettings.md) | Database overrides `appsettings` for runtime-editable settings | Accepted |
 | ADR-017 | Approval workflow as separate `PendingChange` entity, not entity versioning | Accepted |
 | ADR-018 | Webhooks as the single external notification channel; HMAC-signed | Accepted |
 | ADR-019 | Auto-create default Project and Environment on first boot | Accepted |
 | ADR-020 | Bootstrap admin via `appsettings` with DB override | Accepted |
+| [ADR-021](docs/adr/0021-testing-library.md) | Testing library — stay on FluentAssertions 7.x for v0.0.x, migrate to AwesomeAssertions at v0.1.0 | Proposed |
 
 ---
 
