@@ -82,14 +82,11 @@ internal sealed class SqliteSegmentStore(IDbContextFactory<FeatlyDbContext> cont
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
-        // SQLite cannot ORDER BY DateTimeOffset (TEXT column), so aggregate client-side
-        // for the same reasons documented in SqliteFlagStore.GetMostRecentUpdateAsync.
-        var timestamps = await db.Segments.AsNoTracking()
+        // UpdatedAt is persisted as UTC ticks (long), so MAX runs in SQL.
+        return await db.Segments.AsNoTracking()
             .Where(s => s.EnvironmentId == environmentId)
-            .Select(s => s.UpdatedAt)
-            .ToListAsync(ct)
+            .Select(s => (DateTimeOffset?)s.UpdatedAt)
+            .MaxAsync(ct)
             .ConfigureAwait(false);
-
-        return timestamps.Count == 0 ? null : timestamps.Max();
     }
 }

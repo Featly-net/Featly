@@ -31,7 +31,8 @@ internal sealed class EnvironmentConfiguration : IEntityTypeConfiguration<Enviro
 
         builder.Property(e => e.ReadOnly);
 
-        builder.Property(e => e.CreatedAt);
+        // Persist timestamps as 64-bit UTC ticks so MAX / ORDER BY work in SQL.
+        builder.Property(e => e.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
 
         builder.HasIndex(e => new { e.ProjectId, e.Key })
             .IsUnique();

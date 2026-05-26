@@ -93,16 +93,11 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
-        // SQLite does not support ORDER BY / MAX on DateTimeOffset columns (stored as TEXT),
-        // so we pull the timestamps and aggregate client-side. Fine for an embedded
-        // single-environment store; a future optimisation may persist UpdatedAt as
-        // UTC ticks (long) to push the aggregation back into SQL.
-        var timestamps = await db.Flags.AsNoTracking()
+        // UpdatedAt is persisted as UTC ticks (long), so MAX runs in SQL.
+        return await db.Flags.AsNoTracking()
             .Where(f => f.EnvironmentId == environmentId)
-            .Select(f => f.UpdatedAt)
-            .ToListAsync(ct)
+            .Select(f => (DateTimeOffset?)f.UpdatedAt)
+            .MaxAsync(ct)
             .ConfigureAwait(false);
-
-        return timestamps.Count == 0 ? null : timestamps.Max();
     }
 }

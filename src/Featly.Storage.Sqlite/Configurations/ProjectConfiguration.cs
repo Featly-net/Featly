@@ -29,7 +29,8 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
 
         builder.Property(p => p.IsDefault);
 
-        builder.Property(p => p.CreatedAt);
+        // Persist timestamps as 64-bit UTC ticks so MAX / ORDER BY work in SQL.
+        builder.Property(p => p.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
 
         builder.HasIndex(p => p.Key)
             .IsUnique();
