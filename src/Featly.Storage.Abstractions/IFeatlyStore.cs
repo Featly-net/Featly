@@ -25,6 +25,9 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on segments.</summary>
     ISegmentStore Segments { get; }
 
+    /// <summary>Persistence operations on dynamic configs.</summary>
+    IConfigStore Configs { get; }
+
     /// <summary>In-process change notification stream feeding SSE.</summary>
     IChangeNotifier Changes { get; }
 }

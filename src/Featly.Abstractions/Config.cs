@@ -7,9 +7,6 @@ namespace Featly;
 /// <see cref="Flag"/>, but produces a typed value directly instead of
 /// selecting a variant.
 /// </summary>
-/// <remarks>
-/// Placeholder shape for M1. Full implementation lands in M4.
-/// </remarks>
 public sealed class Config
 {
     /// <summary>Stable identifier for the config row.</summary>
@@ -29,6 +26,14 @@ public sealed class Config
 
     /// <summary>Fallback value used when no rule matches.</summary>
     public required JsonElement DefaultValue { get; set; }
+
+    /// <summary>
+    /// Ordered list of targeting rules. The engine walks them by
+    /// <see cref="ConfigRule.Order"/> and the first rule whose conditions all
+    /// match wins; its <see cref="ConfigRule.Value"/> is served. When no rule
+    /// matches, the engine returns <see cref="DefaultValue"/>.
+    /// </summary>
+    public List<ConfigRule> Rules { get; set; } = [];
 
     /// <summary>Environment this config is scoped to.</summary>
     public required Guid EnvironmentId { get; init; }

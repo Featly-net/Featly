@@ -5,11 +5,36 @@
 
 ## Active milestone
 
-**M3 — Multi-variant flags with targeting rules** (complete; all four PRs merged)
+**M4 — Configs with the same engine** (in progress; PR 4A landed)
 
-### Goal (M3)
+### Goal (M4)
 
-Rules, conditions, segments, and bucketing — the full evaluation engine for flags. Done in four sequenced PRs (3A domain+storage, 3B engine+benchmarks, 3C server, 3D SDK+e2e).
+Dynamic configuration as a parallel entity, sharing the targeting engine with flags. Done in two sequenced PRs (4A domain+storage, 4B engine+server+SDK+sample).
+
+### Done — M4 PR 4A (domain + storage)
+
+- **`ConfigRule`** new in `Featly.Abstractions`: `Order`, optional `Name`, list of `Condition` (reused from flag rules), `Value` (`JsonElement` — direct typed value, no variant indirection), `Enabled`
+- **`Config.Rules`** ordered list added
+- **`IConfigStore`** contract in `Featly.Storage.Abstractions`, plus `IFeatlyStore.Configs` on the facade
+- **`Featly.Storage.InMemory.InMemoryConfigStore`** wired into the facade
+- **`Featly.Storage.Sqlite`**:
+  - `ConfigConfiguration` + `Configs` table (unique `(EnvironmentId, Key)`)
+  - `DefaultValue` and `ConfigRule.Value` stored as raw JSON text via the shared `ConditionValueParser`
+  - `Rules` and nested `Conditions` persisted as owned JSON inside the row
+  - Migration `AddConfigs`: new table only (no schema changes to existing entities)
+  - `SqliteConfigStore` follows the per-operation `IDbContextFactory<FeatlyDbContext>` pattern
+- **Tests** (99 passing total, +10 new in `SqliteConfigStoreTests`): upsert with rules, overwrite preserves id, list filters archived + scopes per-env, **theory covering all 6 representative `ConfigType` values** (String/Int/Long/Double/Bool/Json) round-tripping cleanly, most-recent-update tracking
+
+### Coming next — M4 PR 4B (engine + server + SDK)
+
+- `Evaluator.EvaluateConfig<T>` walking `ConfigRule.Order` with the same AND-conditions semantics
+- `ConfigSnapshot` extended with `Configs`; SDK config endpoint returns them
+- Admin endpoints `/api/admin/configs` (CRUD + rules)
+- `IConfigClient` in the SDK with `GetAsync<T>` / `EvaluateAsync<T>`
+- `IFeatlyClient.Configs` property
+- `FeatlySnapshotCache` indexes configs
+- WebApi sample demonstrates `checkout.timeout` returning 30/60 based on `user.plan`
+- E2E test of a config with a targeting rule
 
 ### Goal (M2 — complete)
 
