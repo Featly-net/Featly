@@ -117,7 +117,7 @@ public class AmbientContextAccessorTests
             ],
         };
 
-        var snapshot = new ConfigSnapshot(envId, "development", DateTimeOffset.UtcNow, [flag], [enterprise]);
+        var snapshot = new ConfigSnapshot(envId, "development", DateTimeOffset.UtcNow, [flag], [enterprise], []);
         var cache = new FeatlySnapshotCache();
         cache.Replace(snapshot, etag: "etag-1");
 
@@ -171,7 +171,7 @@ public class AmbientContextAccessorTests
             ],
         };
 
-        return new ConfigSnapshot(envId, "development", DateTimeOffset.UtcNow, [flag], []);
+        return new ConfigSnapshot(envId, "development", DateTimeOffset.UtcNow, [flag], [], []);
     }
 
     private sealed class FixedAccessor(EvaluationContext context) : IFeatlyContextAccessor

@@ -45,11 +45,13 @@ internal static class SdkEndpoints
             return;
         }
 
-        // Compose the ETag from the most recent flag AND segment update so
-        // edits in either bucket invalidate cached snapshots on the SDK side.
+        // Compose the ETag from the most recent flag, segment, AND config update
+        // so edits in any of the three buckets invalidate cached snapshots on
+        // the SDK side.
         var flagsMostRecent = await store.Flags.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
         var segmentsMostRecent = await store.Segments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var mostRecent = Latest(flagsMostRecent, segmentsMostRecent);
+        var configsMostRecent = await store.Configs.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
+        var mostRecent = Latest(Latest(flagsMostRecent, segmentsMostRecent), configsMostRecent);
         var etag = ComputeEtag(environment.Id, mostRecent);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
@@ -63,12 +65,14 @@ internal static class SdkEndpoints
 
         var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
         var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var configs = await store.Configs.ListAsync(environment.Id, ct).ConfigureAwait(false);
         var snapshot = new ConfigSnapshot(
             EnvironmentId: environment.Id,
             EnvironmentKey: environment.Key,
             At: DateTimeOffset.UtcNow,
             Flags: flags,
-            Segments: segments);
+            Segments: segments,
+            Configs: configs);
 
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = MediaTypeNames.Application.Json;

@@ -28,8 +28,12 @@ public static class FeatlySdkServiceCollectionExtensions
         services.TryAddSingleton<IFlagClient>(sp => new FlagClient(
             sp.GetRequiredService<FeatlySnapshotCache>(),
             sp.GetRequiredService<IFeatlyContextAccessor>()));
-        services.TryAddSingleton<IFeatlyClient>(sp =>
-            new FeatlyClient(sp.GetRequiredService<IFlagClient>()));
+        services.TryAddSingleton<IConfigClient>(sp => new ConfigClient(
+            sp.GetRequiredService<FeatlySnapshotCache>(),
+            sp.GetRequiredService<IFeatlyContextAccessor>()));
+        services.TryAddSingleton<IFeatlyClient>(sp => new FeatlyClient(
+            sp.GetRequiredService<IFlagClient>(),
+            sp.GetRequiredService<IConfigClient>()));
 
         return new FeatlyClientBuilder(services);
     }

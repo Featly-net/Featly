@@ -5,11 +5,11 @@
 
 ## Active milestone
 
-**M4 — Configs with the same engine** (in progress; PR 4A landed)
+**M4 — Configs with the same engine** (complete)
 
 ### Goal (M4)
 
-Dynamic configuration as a parallel entity, sharing the targeting engine with flags. Done in two sequenced PRs (4A domain+storage, 4B engine+server+SDK+sample).
+Dynamic configuration as a parallel entity, sharing the targeting engine with flags. Delivered as two sequenced PRs (4A domain+storage, 4B engine+server+SDK+sample).
 
 ### Done — M4 PR 4A (domain + storage)
 
@@ -25,16 +25,16 @@ Dynamic configuration as a parallel entity, sharing the targeting engine with fl
   - `SqliteConfigStore` follows the per-operation `IDbContextFactory<FeatlyDbContext>` pattern
 - **Tests** (99 passing total, +10 new in `SqliteConfigStoreTests`): upsert with rules, overwrite preserves id, list filters archived + scopes per-env, **theory covering all 6 representative `ConfigType` values** (String/Int/Long/Double/Bool/Json) round-tripping cleanly, most-recent-update tracking
 
-### Coming next — M4 PR 4B (engine + server + SDK)
+### Done — M4 PR 4B (engine + server + SDK + sample)
 
-- `Evaluator.EvaluateConfig<T>` walking `ConfigRule.Order` with the same AND-conditions semantics
-- `ConfigSnapshot` extended with `Configs`; SDK config endpoint returns them
-- Admin endpoints `/api/admin/configs` (CRUD + rules)
-- `IConfigClient` in the SDK with `GetAsync<T>` / `EvaluateAsync<T>`
-- `IFeatlyClient.Configs` property
-- `FeatlySnapshotCache` indexes configs
-- WebApi sample demonstrates `checkout.timeout` returning 30/60 based on `user.plan`
-- E2E test of a config with a targeting rule
+- **`Evaluator.EvaluateConfig`** walks `Config.Rules` by `ConfigRule.Order` asc, AND inside a rule, first-match wins, returns the rule's typed `Value` with reason `TargetingMatch`. Falls back to `Config.DefaultValue` with reason `Default`. Reuses the same `ISegmentLookup` plumbing flags use, so `InSegment` conditions resolve locally
+- **`ConfigSnapshot`** carries `Configs` alongside `Flags` and `Segments`. The SDK `/api/sdk/config` ETag now folds the most-recent timestamps of all three buckets
+- **Admin endpoints** under `/api/admin/configs`: `GET /`, `GET /{key}`, `POST /`, `PUT /{key}`. Same admin auth policy; ReadOnly environments rejected with 403; every mutation emits a `ChangeNotification(EntityType: "Config")`
+- **`IConfigClient`** in the SDK with `GetAsync<T>` / `EvaluateAsync<T>`, mirroring `IFlagClient`. Picks up the ambient `IFeatlyContextAccessor` context when callers don't pass one
+- **`IFeatlyClient.Configs`** property exposes the config client; `FeatlyClient` takes both `IFlagClient` and `IConfigClient` via primary constructor
+- **`FeatlySnapshotCache`** indexes configs by key (`ConfigsByKey` `ImmutableDictionary`) alongside flags and segments
+- **`samples/WebApi.Sample`** demonstrates `checkout.timeout` via a new `/checkout/timeout` endpoint: returns the default (30s) when no context matches and a per-country value when a rule targets `user.country=BR`
+- **Tests** (129 passing total, +30 since 4A): 10 engine tests for `EvaluateConfig` (null/archived/default/rule match/rule order/AND/disabled/segments/JSON payloads), 8 SDK `ConfigClientTests` (cache empty default, typed deserialization, ambient pickup, explicit override, NotFound, blank key), 8 server `AdminConfigsEndpointTests` (full CRUD + auth gating + 4xx semantics), 2 SDK config endpoint tests (configs in snapshot + ETag invalidation), 2 E2E config tests (admin-creates-config-SDK-observes round-trip + NotFound semantics)
 
 ### Goal (M2 — complete)
 
@@ -93,9 +93,9 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
 - [x] SDK evaluates the rule locally for any subject and context
 - [x] Performance: p99 < 10μs hit cleanly per `docs/PERFORMANCE.md`
 
-## Coming next — M4 (PLAN.md)
+## Coming next — M5 (PLAN.md)
 
-Dynamic configuration (`Config` + `ConfigRule`) sharing the targeting engine with flags. `IConfigClient.GetAsync<T>` in the SDK. Admin API for configs.
+Dashboard UI: list/edit flags, configs, segments. The architecture rule that everything reachable in the dashboard must also be reachable via API is already true — M5 is purely the front-end on top of the existing HTTP surface.
 
 ### Done — M2 (complete)
 
