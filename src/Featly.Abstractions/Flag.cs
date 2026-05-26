@@ -38,6 +38,13 @@ public sealed class Flag
     /// </summary>
     public List<Variant> Variants { get; set; } = [];
 
+    /// <summary>
+    /// Ordered list of targeting rules. The engine walks them by <see cref="Rule.Order"/>
+    /// and the first rule whose conditions all match the evaluation context wins.
+    /// When no rule matches, the engine returns the <see cref="DefaultVariantKey"/>.
+    /// </summary>
+    public List<Rule> Rules { get; set; } = [];
+
     /// <summary>Environment this flag is scoped to.</summary>
     public required Guid EnvironmentId { get; init; }
 

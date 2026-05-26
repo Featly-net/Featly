@@ -22,6 +22,9 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on environments.</summary>
     IEnvironmentStore Environments { get; }
 
+    /// <summary>Persistence operations on segments.</summary>
+    ISegmentStore Segments { get; }
+
     /// <summary>In-process change notification stream feeding SSE.</summary>
     IChangeNotifier Changes { get; }
 }

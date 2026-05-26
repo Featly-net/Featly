@@ -5,13 +5,37 @@
 
 ## Active milestone
 
-**M2 — First vertical slice** (complete; SQLite fast-follow merged)
+**M3 — Multi-variant flags with targeting rules** (in progress; PR 3A landed)
 
-### Goal
+### Goal (M3)
+
+Rules, conditions, segments, and bucketing — the full evaluation engine for flags. Done in four sequenced PRs (3A domain+storage, 3B engine+benchmarks, 3C server, 3D SDK+e2e).
+
+### Goal (M2 — complete)
 
 A boolean flag, evaluated locally by the SDK, served by the server, persisted in storage. Proves the architecture end-to-end.
 
-### Done
+### Done — M3 PR 3A (domain + storage)
+
+- **New domain types** in `Featly.Abstractions`: `ConditionOperator` (enum, 16 members), `Condition`, `Split`, `RuleOutcome`, `Rule`, `Segment`, `IFeatlyContextAccessor` (interface; implementation lands in 3D)
+- `Flag.Rules` ordered list added
+- **`ISegmentStore`** contract in `Featly.Storage.Abstractions`, plus `IFeatlyStore.Segments` on the facade
+- **`Featly.Storage.InMemory`**: `InMemorySegmentStore` wired into the facade
+- **`Featly.Storage.Sqlite`**:
+  - `SegmentConfiguration` + `Segments` table (unique `(EnvironmentId, Key)`, conditions as owned JSON)
+  - `FlagConfiguration` extended with `Rules` owned JSON (rules → conditions, outcome → splits all in one document)
+  - `ConditionValueParser` helper round-trips `JsonElement` through raw JSON text
+  - Migration `AddRulesAndSegments` adds the `Rules` column to `Flags` and creates `Segments`
+  - `SqliteSegmentStore` follows the per-operation context pattern
+- **Tests** (37 passing total, +6 in this PR): segment round-trip, list ordering, upsert overwrite, idempotent delete, most-recent-update tracking, and a Flag-with-Rules round-trip exercising nested conditions and weighted splits
+
+### Coming next — M3 PRs 3B → 3D
+
+- **3B** — `Featly.Engine.Evaluator` extended with rule iteration, all 16 condition operators, segment resolution, MurmurHash3 bucketing; unit-test sweep; BenchmarkDotNet baseline targeting p99 < 10μs
+- **3C** — Server endpoints for segments (CRUD), flag rule editor, snapshot endpoint includes segments
+- **3D** — `IFeatlyContextAccessor` wired in DI; `HttpContextFeatlyContextAccessor` in `Featly.AspNetCore`; end-to-end test of a multi-variant flag with targeting
+
+### Done — M2 (complete)
 
 - **Domain entities** in `Featly.Abstractions`: `Project`, `Environment`, `Flag` (with `Variants`), `ConfigSnapshot`
 - **Storage contracts** in `Featly.Storage.Abstractions`: `IFeatlyStore` facade + `IFlagStore`, `IProjectStore`, `IEnvironmentStore`, `IChangeNotifier`
