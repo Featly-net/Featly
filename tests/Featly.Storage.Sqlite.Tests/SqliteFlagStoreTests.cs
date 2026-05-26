@@ -187,4 +187,76 @@ public class SqliteFlagStoreTests
         enterpriseRule.Outcome.Splits.Should().HaveCount(2);
         enterpriseRule.Outcome.Splits!.Sum(s => s.Weight).Should().Be(100);
     }
+
+    [Fact]
+    public async Task Upsert_replaces_rules_on_update()
+    {
+        // Regression for the dashboard edit flow: M5C surfaced that the
+        // SQLite update path was copying every mutable field except Rules,
+        // so saving from the rule editor returned the new rules in the
+        // response but never persisted them. Re-fetching from the store
+        // afterwards must show the new rules — and an empty `[]` payload
+        // must wipe what was there.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        var initial = NewBooleanFlag(envId, "rules-update");
+        initial.Rules =
+        [
+            new Rule
+            {
+                Order = 0,
+                Name = "initial",
+                Conditions =
+                [
+                    new Condition
+                    {
+                        Attribute = "user.country",
+                        Operator = ConditionOperator.Equals,
+                        Value = JsonSerializer.SerializeToElement("BR"),
+                    },
+                ],
+                Outcome = new RuleOutcome { VariantKey = "on" },
+            },
+        ];
+        await host.Store.Flags.UpsertAsync(envId, initial, "alice", ct);
+
+        // Replace the rule with a different one.
+        var update = NewBooleanFlag(envId, "rules-update");
+        update.Rules =
+        [
+            new Rule
+            {
+                Order = 0,
+                Name = "replacement",
+                Conditions =
+                [
+                    new Condition
+                    {
+                        Attribute = "user.plan",
+                        Operator = ConditionOperator.Equals,
+                        Value = JsonSerializer.SerializeToElement("pro"),
+                    },
+                ],
+                Outcome = new RuleOutcome { VariantKey = "off" },
+            },
+        ];
+        await host.Store.Flags.UpsertAsync(envId, update, "bob", ct);
+
+        var afterReplace = await host.Store.Flags.GetAsync(envId, "rules-update", ct);
+        afterReplace!.Rules.Should().ContainSingle()
+            .Which.Name.Should().Be("replacement");
+        afterReplace.Rules[0].Conditions.Should().ContainSingle()
+            .Which.Attribute.Should().Be("user.plan");
+
+        // Now wipe rules with an empty payload — the dashboard's "remove
+        // last rule then save" path.
+        var clear = NewBooleanFlag(envId, "rules-update");
+        clear.Rules = [];
+        await host.Store.Flags.UpsertAsync(envId, clear, "carol", ct);
+
+        var afterClear = await host.Store.Flags.GetAsync(envId, "rules-update", ct);
+        afterClear!.Rules.Should().BeEmpty();
+    }
 }

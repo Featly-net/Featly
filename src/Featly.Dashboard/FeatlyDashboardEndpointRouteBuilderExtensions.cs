@@ -11,19 +11,38 @@ namespace Featly.Dashboard;
 /// Endpoint-routing extensions for mounting the embedded Featly dashboard.
 /// </summary>
 /// <remarks>
-/// M5A ships a navigable SPA skeleton. Three assets are embedded in the
-/// assembly (<c>index.html</c>, <c>app.css</c>, <c>app.js</c>); the middleware
-/// serves them at the configured mount path plus a fallback that lets the
-/// client-side router handle deep links like <c>/featly/flags</c>.
+/// <para>
+/// All assets under <c>wwwroot/</c> are embedded into the assembly at build
+/// time. Two route patterns are exposed under the configured mount path:
+/// </para>
+/// <list type="bullet">
+///   <item><c>{file}.{ext}</c> where <c>ext</c> is <c>css</c>, <c>js</c>,
+///         <c>svg</c>, <c>png</c>, <c>ico</c> or <c>webp</c> — served from
+///         the embedded manifest with the correct <c>Content-Type</c>.</item>
+///   <item>Anything else — the <c>index.html</c> shell, so deep links
+///         like <c>/featly/flags/demo</c> survive a refresh and the
+///         client-side router can mount the right view.</item>
+/// </list>
 /// </remarks>
 public static class FeatlyDashboardEndpointRouteBuilderExtensions
 {
     private const string IndexResourceName = "Featly.Dashboard.wwwroot.index.html";
-    private const string CssResourceName = "Featly.Dashboard.wwwroot.app.css";
-    private const string JsResourceName = "Featly.Dashboard.wwwroot.app.js";
+    private const string ResourcePrefix = "Featly.Dashboard.wwwroot.";
     private const string MountPlaceholder = "__MOUNT_PATH__";
 
     private static readonly Assembly s_assembly = typeof(FeatlyDashboardEndpointRouteBuilderExtensions).Assembly;
+
+    private static readonly Dictionary<string, string> s_contentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".css"] = "text/css",
+        [".js"] = "text/javascript",
+        [".svg"] = "image/svg+xml",
+        [".png"] = "image/png",
+        [".ico"] = "image/x-icon",
+        [".webp"] = "image/webp",
+        [".woff"] = "font/woff",
+        [".woff2"] = "font/woff2",
+    };
 
     /// <summary>
     /// Maps the embedded Featly dashboard at the given URL prefix.
@@ -40,20 +59,44 @@ public static class FeatlyDashboardEndpointRouteBuilderExtensions
         var normalized = NormalizeMountPath(mountPath);
         var group = endpoints.MapGroup(normalized);
 
-        // app.css / app.js — long-cacheable static assets.
-        group.MapGet("/app.css", () => ServeAssetAsync(CssResourceName, "text/css"))
-            .WithName("Featly.Dashboard.Css");
-        group.MapGet("/app.js", () => ServeAssetAsync(JsResourceName, "text/javascript"))
-            .WithName("Featly.Dashboard.Js");
-
-        // index.html for the mount root and any sub-path. The SPA router on
-        // the client takes it from there.
         var rootEndpoint = group.MapGet("/", ctx => ServeIndexAsync(ctx, normalized))
             .WithName("Featly.Dashboard.Index")
             .WithDescription("Embedded Featly dashboard (M5 skeleton).");
-        group.MapGet("/{**path}", ctx => ServeIndexAsync(ctx, normalized));
+
+        // Catch-all: assets (by extension) go to the embedded manifest, anything
+        // else falls back to the shell so the client-side router can resolve it.
+        group.MapGet("/{**path}", ctx => ServeAsync(ctx, normalized));
 
         return rootEndpoint;
+    }
+
+    private static Task ServeAsync(HttpContext context, string mountPath)
+    {
+        var path = (context.Request.RouteValues["path"] as string) ?? "";
+        var ext = Path.GetExtension(path);
+        if (ext.Length > 0 && s_contentTypes.TryGetValue(ext, out var contentType))
+        {
+            return ServeAssetAsync(context, path, contentType);
+        }
+        return ServeIndexAsync(context, mountPath);
+    }
+
+    private static async Task ServeAssetAsync(HttpContext context, string relativePath, string contentType)
+    {
+        var resourceName = ResourcePrefix + relativePath.Replace('/', '.');
+        var stream = s_assembly.GetManifestResourceStream(resourceName);
+        if (stream is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await using (stream)
+        {
+            context.Response.ContentType = contentType;
+            context.Response.Headers.CacheControl = "no-cache";
+            await stream.CopyToAsync(context.Response.Body, context.RequestAborted).ConfigureAwait(false);
+        }
     }
 
     private static async Task ServeIndexAsync(HttpContext context, string mountPath)
@@ -66,32 +109,13 @@ public static class FeatlyDashboardEndpointRouteBuilderExtensions
         await context.Response.WriteAsync(html, Encoding.UTF8, context.RequestAborted).ConfigureAwait(false);
     }
 
-    private static async Task<IResult> ServeAssetAsync(string resourceName, string contentType)
-    {
-        var bytes = await ReadResourceBytesAsync(resourceName).ConfigureAwait(false);
-        return Results.Bytes(bytes, contentType);
-    }
-
     private static async Task<string> ReadResourceAsTextAsync(string resourceName)
     {
-        await using var stream = OpenResourceOrThrow(resourceName);
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        return await reader.ReadToEndAsync().ConfigureAwait(false);
-    }
-
-    private static async Task<byte[]> ReadResourceBytesAsync(string resourceName)
-    {
-        await using var stream = OpenResourceOrThrow(resourceName);
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms).ConfigureAwait(false);
-        return ms.ToArray();
-    }
-
-    private static Stream OpenResourceOrThrow(string resourceName)
-    {
-        return s_assembly.GetManifestResourceStream(resourceName)
+        await using var stream = s_assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
                 $"Embedded resource '{resourceName}' is missing. Did the build drop the file from wwwroot?");
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return await reader.ReadToEndAsync().ConfigureAwait(false);
     }
 
     private static string NormalizeMountPath(string mountPath)
