@@ -18,6 +18,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
     ///   <item><c>GET|POST|PUT /api/admin/flags/...</c> — admin CRUD (admin token).</item>
     ///   <item><c>GET|POST|PUT|DELETE /api/admin/segments/...</c> — admin CRUD for reusable segments (admin token).</item>
     ///   <item><c>GET|POST|PUT /api/admin/configs/...</c> — admin CRUD for dynamic configurations (admin token).</item>
+    ///   <item><c>GET /api/admin/environments</c> — list environments (admin token).</item>
     ///   <item><c>GET /api/sdk/config</c> — config snapshot, flags + segments + configs (SDK token).</item>
     ///   <item><c>GET /api/sdk/stream</c> — SSE change notifications (SDK token).</item>
     /// </list>
@@ -36,6 +37,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
         apiGroup.MapAdminFlags();
         apiGroup.MapAdminSegments();
         apiGroup.MapAdminConfigs();
+        apiGroup.MapAdminEnvironments();
         apiGroup.MapSdkEndpoints();
 
         return group;

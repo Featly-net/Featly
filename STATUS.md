@@ -97,8 +97,8 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
 
 Dashboard UI in four sequenced PRs:
 
-- [x] **PR 5A — skeleton** (this PR): asset pipeline + middleware serving real `index.html` / `app.css` / `app.js`, layout + navigation, light/dark tokens, explicit hover states.
-- [ ] **PR 5B — listings**: Flags / Configs / Segments / Environment selector, read-only via `fetch()`.
+- [x] **PR 5A — skeleton**: asset pipeline + middleware serving real `index.html` / `app.css` / `app.js`, layout + navigation, light/dark tokens, explicit hover states.
+- [x] **PR 5B — listings**: Flags / Configs / Segments tables backed by `/api/admin/*`, environment selector populated from `GET /api/admin/environments`, admin-token paste flow with `localStorage` + "Sign out" (pre-M6 bridge).
 - [ ] **PR 5C — detail + rule editor**: visual rule editor, save via admin API, polling + SSE for live updates.
 - [ ] **PR 5D — "test this context"**: server-side dry-run eval endpoint + UI form.
 
