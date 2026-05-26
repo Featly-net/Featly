@@ -10,6 +10,8 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ### Added
 
+- **M3 PR 3A — targeting domain + storage.** New types in `Featly.Abstractions`: `ConditionOperator` (16 members), `Condition`, `Split`, `RuleOutcome`, `Rule`, `Segment`, plus the `IFeatlyContextAccessor` interface (the ASP.NET Core implementation lands in 3D). `Flag.Rules` ordered list. `ISegmentStore` contract on the storage facade. `Featly.Storage.InMemory` and `Featly.Storage.Sqlite` both ship segment stores. SQLite migration `AddRulesAndSegments` adds the `Rules` JSON column to `Flags` and the new `Segments` table. The shared `ConditionValueParser` helper round-trips `JsonElement` through raw JSON text inside owned JSON documents.
+- 6 new tests in `Featly.Storage.Sqlite.Tests` covering segment round-trip, list ordering, upsert overwrite, idempotent delete, most-recent-update tracking, and a Flag-with-Rules round-trip exercising nested conditions and weighted splits (37 passing total).
 - Initial project foundation: `ARCHITECTURE.md`, `PLAN.md`, `CONTRIBUTING.md`, `NOTICE.md`, `README.md`, `LICENSE` (MIT).
 - Repository scaffolding: `SECURITY.md`, `CHANGELOG.md`, issue and pull request templates, CODEOWNERS, Dependabot configuration, ADR template.
 - **M1 skeleton.** Solution structure with 11 `src/` projects, 5 `tests/` projects, 2 `samples/` projects. Build infrastructure: `global.json`, `.editorconfig`, `Directory.Build.props`, `Directory.Packages.props` (Central Package Management).

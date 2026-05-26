@@ -11,6 +11,7 @@ internal sealed class SqliteFeatlyStore(
     IFlagStore flags,
     IProjectStore projects,
     IEnvironmentStore environments,
+    ISegmentStore segments,
     IChangeNotifier changes) : IFeatlyStore
 {
     public IFlagStore Flags { get; } = flags;
@@ -18,6 +19,8 @@ internal sealed class SqliteFeatlyStore(
     public IProjectStore Projects { get; } = projects;
 
     public IEnvironmentStore Environments { get; } = environments;
+
+    public ISegmentStore Segments { get; } = segments;
 
     public IChangeNotifier Changes { get; } = changes;
 }

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -61,31 +60,48 @@ internal sealed class FlagConfiguration : IEntityTypeConfiguration<Flag>
             variants.Property(v => v.Key).IsRequired().HasMaxLength(128);
             variants.Property(v => v.Name).IsRequired().HasMaxLength(256);
             variants.Property(v => v.Description).HasMaxLength(2048);
-            // EF Core doesn't recognise JsonElement as a primitive. Round-trip
-            // it through the raw JSON text so the value flows verbatim into
-            // the owning JSON column.
             variants.Property(v => v.Value)
                 .HasConversion(
                     static value => value.GetRawText(),
-                    static text => ParseJsonElement(text));
+                    static text => ConditionValueParser.ParseJsonElement(text));
+        });
+
+        // Targeting rules persisted as a single JSON document. Each rule carries
+        // its own ordered conditions and the outcome (either a fixed variant or
+        // a weighted split). The engine walks rules ordered by Rule.Order ASC.
+        builder.OwnsMany(f => f.Rules, rules =>
+        {
+            rules.ToJson();
+            rules.Property(r => r.Id).ValueGeneratedNever();
+            rules.Property(r => r.Order);
+            rules.Property(r => r.Name).HasMaxLength(256);
+            rules.Property(r => r.Enabled);
+
+            rules.OwnsOne(r => r.Outcome, outcome =>
+            {
+                outcome.Property(o => o.VariantKey).HasMaxLength(128);
+                outcome.OwnsMany(o => o.Splits!, splits =>
+                {
+                    splits.Property(s => s.VariantKey).IsRequired().HasMaxLength(128);
+                    splits.Property(s => s.Weight);
+                });
+            });
+
+            rules.OwnsMany(r => r.Conditions, conditions =>
+            {
+                conditions.Property(c => c.Attribute).IsRequired().HasMaxLength(256);
+                conditions.Property(c => c.Operator).HasConversion<string>().HasMaxLength(32);
+                conditions.Property(c => c.Negate);
+                conditions.Property(c => c.Value)
+                    .HasConversion(
+                        static value => value.GetRawText(),
+                        static text => ConditionValueParser.ParseJsonElement(text));
+            });
         });
 
         builder.HasIndex(f => new { f.EnvironmentId, f.Key })
             .IsUnique();
 
         builder.HasIndex(f => f.EnvironmentId);
-    }
-
-    private static JsonElement ParseJsonElement(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return default;
-        }
-
-        using var doc = JsonDocument.Parse(text);
-        // Clone detaches the element from the JsonDocument lifetime
-        // so it survives the using block.
-        return doc.RootElement.Clone();
     }
 }

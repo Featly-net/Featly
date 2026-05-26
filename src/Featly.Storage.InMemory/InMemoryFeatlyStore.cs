@@ -13,6 +13,7 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         Flags = new InMemoryFlagStore();
         Projects = new InMemoryProjectStore();
         Environments = new InMemoryEnvironmentStore();
+        Segments = new InMemorySegmentStore();
         Changes = new InMemoryChangeNotifier();
     }
 
@@ -24,6 +25,9 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IEnvironmentStore Environments { get; }
+
+    /// <inheritdoc />
+    public ISegmentStore Segments { get; }
 
     /// <inheritdoc />
     public IChangeNotifier Changes { get; }

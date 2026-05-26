@@ -115,4 +115,76 @@ public class SqliteFlagStoreTests
         CreatedBy = "test",
         UpdatedBy = "test",
     };
+
+    [Fact]
+    public async Task Upsert_persists_flag_with_targeting_rules()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        var flag = NewBooleanFlag(envId, "rules-flag");
+        flag.Rules =
+        [
+            // Rule 1: BR users get the new flow.
+            new Rule
+            {
+                Order = 0,
+                Name = "BR rollout",
+                Conditions =
+                [
+                    new Condition
+                    {
+                        Attribute = "user.country",
+                        Operator = ConditionOperator.Equals,
+                        Value = JsonSerializer.SerializeToElement("BR"),
+                    },
+                ],
+                Outcome = new RuleOutcome { VariantKey = "on" },
+            },
+            // Rule 2: enterprise plan gets a 50/50 split.
+            new Rule
+            {
+                Order = 1,
+                Name = "Enterprise 50/50",
+                Conditions =
+                [
+                    new Condition
+                    {
+                        Attribute = "user.plan",
+                        Operator = ConditionOperator.Equals,
+                        Value = JsonSerializer.SerializeToElement("enterprise"),
+                    },
+                ],
+                Outcome = new RuleOutcome
+                {
+                    Splits =
+                    [
+                        new Split { VariantKey = "on",  Weight = 50 },
+                        new Split { VariantKey = "off", Weight = 50 },
+                    ],
+                },
+            },
+        ];
+
+        await host.Store.Flags.UpsertAsync(envId, flag, actor: "test", ct);
+
+        var loaded = await host.Store.Flags.GetAsync(envId, "rules-flag", ct);
+
+        loaded.Should().NotBeNull();
+        loaded!.Rules.Should().HaveCount(2);
+
+        var brRule = loaded.Rules.Single(r => r.Order == 0);
+        brRule.Name.Should().Be("BR rollout");
+        brRule.Enabled.Should().BeTrue();
+        brRule.Conditions.Should().ContainSingle()
+            .Which.Attribute.Should().Be("user.country");
+        brRule.Outcome.VariantKey.Should().Be("on");
+        brRule.Outcome.Splits.Should().BeNullOrEmpty();
+
+        var enterpriseRule = loaded.Rules.Single(r => r.Order == 1);
+        enterpriseRule.Outcome.VariantKey.Should().BeNullOrEmpty();
+        enterpriseRule.Outcome.Splits.Should().HaveCount(2);
+        enterpriseRule.Outcome.Splits!.Sum(s => s.Weight).Should().Be(100);
+    }
 }
