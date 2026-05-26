@@ -35,6 +35,7 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
 
         var existing = await db.Flags
             .Include(f => f.Variants)
+            .Include(f => f.Rules)
             .FirstOrDefaultAsync(f => f.EnvironmentId == environmentId && f.Key == flag.Key, ct)
             .ConfigureAwait(false);
 
@@ -55,12 +56,17 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
             existing.UpdatedAt = flag.UpdatedAt;
             existing.UpdatedBy = flag.UpdatedBy;
 
-            // Replace the owned JSON collection in-place. EF Core diffs the
+            // Replace the owned JSON collections in-place. EF Core diffs the
             // serialized JSON column on SaveChanges.
             existing.Variants.Clear();
             foreach (var variant in flag.Variants)
             {
                 existing.Variants.Add(variant);
+            }
+            existing.Rules.Clear();
+            foreach (var rule in flag.Rules)
+            {
+                existing.Rules.Add(rule);
             }
         }
 

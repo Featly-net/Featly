@@ -99,7 +99,7 @@ Dashboard UI in four sequenced PRs:
 
 - [x] **PR 5A — skeleton**: asset pipeline + middleware serving real `index.html` / `app.css` / `app.js`, layout + navigation, light/dark tokens, explicit hover states.
 - [x] **PR 5B — listings**: Flags / Configs / Segments tables backed by `/api/admin/*`, environment selector populated from `GET /api/admin/environments`, admin-token paste flow with `localStorage` + "Sign out" (pre-M6 bridge).
-- [ ] **PR 5C — detail + rule editor**: visual rule editor, save via admin API, polling + SSE for live updates.
+- [x] **PR 5C — detail + rule editor**: dynamic routing for `/flags/{key}` etc., editable detail screens (name, description, enabled, variants, tags, default value/variant), shared visual rule editor for Flag rules / Config rules / Segment conditions, save via PUT with feedback, refresh-on-focus for light live updates. Generalised the dashboard middleware to serve any `wwwroot/` asset by extension. Fixed a pre-existing bug in `SqliteFlagStore.UpsertAsync` where `Rules` were being dropped on update. SSE live updates land alongside an admin stream endpoint in a follow-up.
 - [ ] **PR 5D — "test this context"**: server-side dry-run eval endpoint + UI form.
 
 ### Done — M2 (complete)
