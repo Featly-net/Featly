@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**M3 — Multi-variant flags with targeting rules** (in progress; PR 3A landed)
+**M3 — Multi-variant flags with targeting rules** (in progress; PRs 3A + 3B landed)
 
 ### Goal (M3)
 
@@ -29,9 +29,20 @@ A boolean flag, evaluated locally by the SDK, served by the server, persisted in
   - `SqliteSegmentStore` follows the per-operation context pattern
 - **Tests** (37 passing total, +6 in this PR): segment round-trip, list ordering, upsert overwrite, idempotent delete, most-recent-update tracking, and a Flag-with-Rules round-trip exercising nested conditions and weighted splits
 
-### Coming next — M3 PRs 3B → 3D
+### Done — M3 PR 3B (engine + benchmarks)
 
-- **3B** — `Featly.Engine.Evaluator` extended with rule iteration, all 16 condition operators, segment resolution, MurmurHash3 bucketing; unit-test sweep; BenchmarkDotNet baseline targeting p99 < 10μs
+- **`Featly.Engine.Evaluator` is now feature-complete** per ARCHITECTURE.md §5: walks rules by `Order` asc, AND inside a rule, first-match wins, single-variant outcome → `TargetingMatch`, weighted-split outcome → `Split` via MurmurHash3 bucketing
+- All **16 condition operators** in `Internal/ConditionEvaluator` (Equals/NotEquals, In/NotIn, GreaterThan/GreaterThanOrEqual/LessThan/LessThanOrEqual, Contains/StartsWith/EndsWith, regex Matches with 50ms timeout against ReDoS, Semver Gt/Lt/Eq, InSegment with recursive segment-condition matching). `Negate` flag inverts the predicate
+- **`Internal/MurmurHash3`**: 32-bit in-house implementation, `BucketOf10000` returns the 0..9999 bucket the engine uses
+- **`Internal/Bucketer`**: composes `targetingKey + flagKey + salt`, hashes, walks the cumulative weights
+- **`Internal/AttributeResolver`**: flat-key lookup into `EvaluationContext.Attributes` plus the `targetingKey` shortcut
+- **`Internal/SemverComparer`**: in-house semver 2.0.0 (no external dependency)
+- **`ISegmentLookup`** public contract + `DictionarySegmentLookup` default. M3C/3D populates the lookup from the SDK snapshot
+- **40 new engine tests** (46 total): every operator positive + negative, `Negate`, first-match-wins, AND, disabled-rule skip, segment matched + missing-from-lookup, bucketing determinism, distribution within ±5% on 5 000 subjects (50/50 and 90/10)
+- **`tests/Featly.Engine.Benchmarks`** new project. `docs/PERFORMANCE.md` carries the baseline. Every scenario is below the **10 μs p99 target**: boolean fast path 37 ns, 1 rule 134 ns, 5 rules × 3 conditions 1.2 μs, split bucketing 390 ns, InSegment lookup 286 ns
+
+### Coming next — M3 PRs 3C → 3D
+
 - **3C** — Server endpoints for segments (CRUD), flag rule editor, snapshot endpoint includes segments
 - **3D** — `IFeatlyContextAccessor` wired in DI; `HttpContextFeatlyContextAccessor` in `Featly.AspNetCore`; end-to-end test of a multi-variant flag with targeting
 
