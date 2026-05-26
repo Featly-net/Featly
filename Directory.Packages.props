@@ -42,8 +42,9 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
   </ItemGroup>
 
-  <ItemGroup Label="SourceLink (referenced by Directory.Build.props)">
+  <ItemGroup Label="SourceLink + MinVer (referenced by Directory.Build.props)">
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="MinVer" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

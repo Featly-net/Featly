@@ -40,8 +40,17 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata (applied to packable projects)">
-    <Version>0.0.1</Version>
-    <VersionSuffix Condition="'$(VersionSuffix)' == ''">preview.1</VersionSuffix>
+    <!--
+      Versions are computed by MinVer from git tags + commit height. See
+      https://github.com/adamralph/minver. Defaults below produce:
+        - no tags yet:     0.0.0-preview.0.{height}+{sha}
+        - after v0.0.1:    0.0.1                       (on the tagged commit)
+        - main after tag:  0.0.2-preview.0.{height}+{sha}
+      The CI release workflow strips +metadata before push.
+    -->
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerVerbosity>quiet</MinVerVerbosity>
     <Authors>Thiago Lugarini and Featly contributors</Authors>
     <Company>Featly</Company>
     <Product>Featly</Product>
@@ -64,6 +73,17 @@
 
   <ItemGroup Label="SourceLink (deterministic links from PDB to GitHub)">
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Label="MinVer — version from git tags">
+    <PackageReference Include="MinVer" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Label="NuGet README — preview placeholder until M5"
+             Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)docs\nuget-readme-preview.md"
+          Pack="true"
+          PackagePath="\README.md" />
   </ItemGroup>
 
 </Project>

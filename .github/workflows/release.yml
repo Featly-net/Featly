@@ -1,0 +1,145 @@
+name: Release
+
+# Two publish paths, one workflow:
+#   - push to main         -> publish to GitHub Packages (internal/preview feed)
+#   - tag v*               -> publish to nuget.org       (public stable)
+# Both paths share the same `pack` job. The publish jobs depend on it and gate
+# themselves on the trigger so we never push twice.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish on a manual run"
+        required: true
+        type: choice
+        default: github-packages
+        options:
+          - github-packages
+          - nuget-org
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write   # needed for GitHub Packages push (uses built-in GITHUB_TOKEN)
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CONFIGURATION: Release
+
+jobs:
+  pack:
+    name: Pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # MinVer needs the full history and tags to compute the version.
+          fetch-depth: 0
+
+      - name: Setup .NET 8 SDK (needed for net8.0 multi-target)
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Featly.sln
+
+      - name: Build
+        run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
+
+      - name: Test
+        run: dotnet test Featly.sln --configuration ${{ env.CONFIGURATION }} --no-build --logger "console;verbosity=normal"
+
+      - name: Pack
+        run: dotnet pack Featly.sln --configuration ${{ env.CONFIGURATION }} --no-build --output artifacts
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkgs
+          path: artifacts/*.*nupkg
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-github-packages:
+    name: Publish to GitHub Packages (main)
+    needs: pack
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'github-packages')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: nupkgs
+          path: artifacts
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Push to GitHub Packages
+        # GITHUB_TOKEN comes free with packages:write permission set above.
+        # --skip-duplicate so re-runs after partial failures don't error.
+        run: >
+          dotnet nuget push 'artifacts/*.nupkg'
+          --source https://nuget.pkg.github.com/Featly-net/index.json
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --skip-duplicate
+
+  publish-nuget-org:
+    name: Publish to nuget.org (tag)
+    needs: pack
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'nuget-org')
+    runs-on: ubuntu-latest
+    # Tying the job to a GitHub Environment lets you require manual approval
+    # before publishing to nuget.org. Configure the "nuget-org" environment
+    # at Settings > Environments > nuget-org with required reviewers if you
+    # want a final human checkpoint before a tag goes public.
+    environment:
+      name: nuget-org
+      url: https://www.nuget.org/profiles/thiagolugarini
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: nupkgs
+          path: artifacts
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate NUGET_API_KEY is configured
+        run: |
+          if [ -z "${{ secrets.NUGET_API_KEY }}" ]; then
+            echo "::error::NUGET_API_KEY repository secret is not set. Add it at Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Push to nuget.org
+        run: >
+          dotnet nuget push 'artifacts/*.nupkg'
+          --source https://api.nuget.org/v3/index.json
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --skip-duplicate

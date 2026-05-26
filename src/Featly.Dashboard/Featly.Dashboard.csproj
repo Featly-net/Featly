@@ -21,8 +21,4 @@
     <EmbeddedResource Include="wwwroot\**\*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
 </Project>
