@@ -10,6 +10,7 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ### Changed
 
+- **Extract `InProcessChangeNotifier` into `Featly.Storage.Abstractions`.** The InMemory and SQLite providers previously each shipped a near-identical `IChangeNotifier` implementation (concurrent dictionary of handlers, subscriber-isolation `catch`, dispose-once subscription). Replaced by a single public `Featly.Storage.InProcessChangeNotifier` that both providers (and any future single-instance provider) consume. `InMemoryChangeNotifier` and `SqliteChangeNotifier` are gone. No public-API change for the storage facade: `IChangeNotifier`-typed consumers see the same contract.
 - **Persist `DateTimeOffset` audit timestamps as 64-bit UTC ticks in SQLite.** New `DateTimeOffsetTicksConverter` value converter, applied to `CreatedAt` / `UpdatedAt` on Project, Environment, Flag, Segment, and Config. `MAX` and `ORDER BY` now run server-side instead of pulling N timestamps and aggregating client-side; `GetMostRecentUpdateAsync` on `SqliteFlagStore` / `SqliteSegmentStore` / `SqliteConfigStore` uses `.MaxAsync()`. EF migration `ConvertTimestampsToUtcTicks` alters the columns from `TEXT` to `INTEGER`. **Breaking for any dev database that holds existing rows**: SQLite's implicit `CAST(text AS INTEGER)` produces garbage values for the migrated rows (each ISO-8601 string collapses to the leading year integer). Delete `featly.db` and let the bootstrap recreate it. Production has no real users at v0.0.x, so the breaking change is intentionally tolerated.
 
 ### Added

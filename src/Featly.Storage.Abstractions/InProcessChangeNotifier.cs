@@ -1,23 +1,32 @@
 using System.Collections.Concurrent;
 
-namespace Featly.Storage.Sqlite.Stores;
+namespace Featly.Storage;
 
 /// <summary>
-/// In-process implementation of <see cref="IChangeNotifier"/> for the SQLite
-/// provider. Identical semantics to the in-memory notifier — duplicated on
-/// purpose to keep <c>Featly.Storage.Sqlite</c> independent of
-/// <c>Featly.Storage.InMemory</c>. A future refactor may extract a shared
-/// "in-process" notifier into <c>Featly.Storage.Abstractions</c>; for now the
-/// SQLite provider owns its own copy.
+/// In-process <see cref="IChangeNotifier"/> implementation backed by a
+/// thread-safe handler list. Suitable for single-instance deployments where
+/// publisher and subscribers live in the same process — exactly the scenario
+/// both the in-memory and SQLite providers ship today.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Out-of-process notifiers (Postgres LISTEN/NOTIFY, Redis pub/sub) arrive
 /// alongside the corresponding storage providers in a later milestone.
+/// </para>
+/// <para>
+/// Subscriber failures are isolated by design: any exception thrown by a
+/// handler is swallowed so a misbehaving subscriber does not take down the
+/// publisher. The only exception that propagates is an
+/// <see cref="OperationCanceledException"/> tied to the caller's cancellation
+/// token. OpenTelemetry tracing in a later milestone will surface the
+/// swallowed errors.
+/// </para>
 /// </remarks>
-internal sealed class SqliteChangeNotifier : IChangeNotifier
+public sealed class InProcessChangeNotifier : IChangeNotifier
 {
     private readonly ConcurrentDictionary<Guid, Func<ChangeNotification, CancellationToken, ValueTask>> _handlers = new();
 
+    /// <inheritdoc />
     public async ValueTask NotifyAsync(ChangeNotification notification, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(notification);
@@ -40,6 +49,7 @@ internal sealed class SqliteChangeNotifier : IChangeNotifier
         }
     }
 
+    /// <inheritdoc />
     public IDisposable Subscribe(Func<ChangeNotification, CancellationToken, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -49,7 +59,7 @@ internal sealed class SqliteChangeNotifier : IChangeNotifier
         return new Subscription(this, id);
     }
 
-    private sealed class Subscription(SqliteChangeNotifier owner, Guid id) : IDisposable
+    private sealed class Subscription(InProcessChangeNotifier owner, Guid id) : IDisposable
     {
         private int _disposed;
 

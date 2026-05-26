@@ -15,7 +15,7 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         Environments = new InMemoryEnvironmentStore();
         Segments = new InMemorySegmentStore();
         Configs = new InMemoryConfigStore();
-        Changes = new InMemoryChangeNotifier();
+        Changes = new InProcessChangeNotifier();
     }
 
     /// <inheritdoc />
