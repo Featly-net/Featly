@@ -100,7 +100,9 @@ Dashboard UI in four sequenced PRs:
 - [x] **PR 5A — skeleton**: asset pipeline + middleware serving real `index.html` / `app.css` / `app.js`, layout + navigation, light/dark tokens, explicit hover states.
 - [x] **PR 5B — listings**: Flags / Configs / Segments tables backed by `/api/admin/*`, environment selector populated from `GET /api/admin/environments`, admin-token paste flow with `localStorage` + "Sign out" (pre-M6 bridge).
 - [x] **PR 5C — detail + rule editor**: dynamic routing for `/flags/{key}` etc., editable detail screens (name, description, enabled, variants, tags, default value/variant), shared visual rule editor for Flag rules / Config rules / Segment conditions, save via PUT with feedback, refresh-on-focus for light live updates. Generalised the dashboard middleware to serve any `wwwroot/` asset by extension. Fixed a pre-existing bug in `SqliteFlagStore.UpsertAsync` where `Rules` were being dropped on update. SSE live updates land alongside an admin stream endpoint in a follow-up.
-- [ ] **PR 5D — "test this context"**: server-side dry-run eval endpoint + UI form.
+- [x] **PR 5D — "test this context" preview**: new `POST /api/admin/preview/{flags|configs}/{key}` server-side dry-run endpoint that runs `Evaluator.EvaluateFlag` / `EvaluateConfig` against a candidate context (no persistence). Flag and config detail screens grow a "Test this context" panel with targeting-key + attribute inputs and a result card showing the reason badge, value, matched rule.
+
+**M5 complete.** Coming next per PLAN.md: **M6 — Authentication pipeline + basic RBAC** (replaces the dashboard's localStorage token paste flow with real API keys + system roles).
 
 ### Done — M2 (complete)
 

@@ -408,10 +408,12 @@
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
+            renderPreviewPanel("flag", flag.key),
             auditFooter(flag),
         ].join("\n");
 
         wireFlagEditor(flag);
+        wirePreviewPanel("flag", flag.key);
     }
 
     function renderVariantRow(v) {
@@ -515,9 +517,11 @@
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
+            renderPreviewPanel("config", config.key),
             auditFooter(config),
         ].join("\n");
 
+        wirePreviewPanel("config", config.key);
         var form = document.getElementById("config-form");
         form.addEventListener("click", function (e) {
             var action = e.target.closest("[data-action]")?.getAttribute("data-action");
@@ -756,6 +760,108 @@
                 negate: row.querySelector(".c-negate").checked,
             };
         }).filter(function (c) { return c.attribute; });
+    }
+
+    // ============================================================
+    // Preview ("test this context") panel
+    // ============================================================
+    function renderPreviewPanel(kind, entityKey) {
+        var panelId = "preview-panel";
+        var title = kind === "flag" ? "Test this context" : "Test this context";
+        return '<section class="preview-panel" id="' + panelId + '">'
+            + '<h2>' + esc(title) + '</h2>'
+            + '<p class="muted">Server-side dry-run against the current saved ' + esc(kind) + ' &mdash; nothing is persisted.</p>'
+            + '<div class="preview-fields">'
+            + field("Targeting key", '<input class="preview-tkey" placeholder="alice@example.com" />')
+            + '</div>'
+            + '<h3 class="preview-h3">Attributes</h3>'
+            + '<div class="preview-attrs"></div>'
+            + '<button type="button" class="btn-ghost btn-small" data-action="preview-add-attr">+ Add attribute</button>'
+            + '<div class="preview-actions">'
+            + '  <button type="button" class="btn-primary" data-action="preview-eval">Evaluate</button>'
+            + '  <span class="preview-msg muted"></span>'
+            + '</div>'
+            + '<div class="preview-result hidden"></div>'
+            + '</section>';
+    }
+
+    function renderPreviewAttrRow(attr) {
+        attr = attr || { key: "", value: "" };
+        return '<div class="preview-attr-row">'
+            + '<input class="pa-key" placeholder="user.country" value="' + esc(attr.key) + '" />'
+            + '<input class="pa-value" placeholder="value (JSON or text)" value="' + esc(attr.value) + '" />'
+            + '<button type="button" class="btn-icon" data-action="preview-remove-attr" aria-label="Remove">×</button>'
+            + '</div>';
+    }
+
+    function wirePreviewPanel(kind, entityKey) {
+        var panel = document.getElementById("preview-panel");
+        if (!panel) { return; }
+        var attrsList = panel.querySelector(".preview-attrs");
+        // Seed with one empty row so the user has something to type into.
+        attrsList.insertAdjacentHTML("beforeend", renderPreviewAttrRow());
+
+        panel.addEventListener("click", function (e) {
+            var btn = e.target.closest("[data-action]");
+            if (!btn) { return; }
+            var action = btn.getAttribute("data-action");
+            if (action === "preview-add-attr") {
+                attrsList.insertAdjacentHTML("beforeend", renderPreviewAttrRow());
+            } else if (action === "preview-remove-attr") {
+                btn.closest(".preview-attr-row").remove();
+            } else if (action === "preview-eval") {
+                evaluatePreview(panel, kind, entityKey);
+            }
+        });
+    }
+
+    function evaluatePreview(panel, kind, entityKey) {
+        var tkey = panel.querySelector(".preview-tkey").value.trim();
+        var attrs = {};
+        Array.prototype.slice.call(panel.querySelectorAll(".preview-attr-row")).forEach(function (row) {
+            var k = row.querySelector(".pa-key").value.trim();
+            if (!k) { return; }
+            var raw = row.querySelector(".pa-value").value;
+            var v;
+            try { v = JSON.parse(raw); }
+            catch (_) { v = raw; }
+            attrs[k] = v;
+        });
+        var body = { targetingKey: tkey || null, attributes: attrs };
+        var msg = panel.querySelector(".preview-msg");
+        var resultEl = panel.querySelector(".preview-result");
+        msg.textContent = "Evaluating…";
+        resultEl.classList.add("hidden");
+
+        var resource = kind === "flag" ? "flags" : "configs";
+        api("POST", "/admin/preview/" + resource + "/" + encodeURIComponent(entityKey) + "?env=" + encodeURIComponent(currentEnv.key), body)
+            .then(function (result) {
+                msg.textContent = "";
+                resultEl.classList.remove("hidden");
+                resultEl.innerHTML = renderPreviewResult(result);
+            })
+            .catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); return; }
+                msg.textContent = err.message;
+                msg.className = "preview-msg save-msg--error";
+            });
+    }
+
+    function renderPreviewResult(result) {
+        var reasonBadge = '<span class="preview-reason preview-reason--' + esc(result.reason || "Unknown") + '">' + esc(result.reason || "Unknown") + '</span>';
+        var lines = [
+            '<div class="preview-result__head">' + reasonBadge + (result.ruleMatched ? ' <span class="muted">rule: ' + esc(result.ruleMatched) + '</span>' : "") + '</div>',
+            '<dl class="preview-result__dl">',
+            '  <dt>Value</dt><dd>' + code(JSON.stringify(result.value)) + '</dd>',
+        ];
+        if (result.variantKey) {
+            lines.push('  <dt>Variant</dt><dd>' + code(result.variantKey) + '</dd>');
+        }
+        if (result.error) {
+            lines.push('  <dt>Error</dt><dd class="save-msg--error">' + esc(result.error) + '</dd>');
+        }
+        lines.push('</dl>');
+        return lines.join("\n");
     }
 
     // ============================================================
