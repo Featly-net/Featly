@@ -1,3 +1,4 @@
+using Featly.Storage;
 using Featly.Storage.Sqlite.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -47,7 +48,7 @@ public static class SqliteStorageServiceCollectionExtensions
             builder.UseSqlite(opts.ConnectionString);
         });
 
-        services.TryAddSingleton<IChangeNotifier, SqliteChangeNotifier>();
+        services.TryAddSingleton<IChangeNotifier, InProcessChangeNotifier>();
         services.TryAddSingleton<IFlagStore, SqliteFlagStore>();
         services.TryAddSingleton<IProjectStore, SqliteProjectStore>();
         services.TryAddSingleton<IEnvironmentStore, SqliteEnvironmentStore>();

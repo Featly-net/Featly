@@ -142,4 +142,3 @@ Dashboard UI: list/edit flags, configs, segments. The architecture rule that eve
 - **Reserve the `Featly` and `Featly.*` package names on NuGet.org** — before M3 we should publish minimal `0.0.1-preview.1` placeholders for at least `Featly`, `Featly.Sdk`, and `Featly.Abstractions`, and explore Verified Publisher for the `Featly.*` prefix. Avoids squatting while the rest of the milestones land.
 - `CODE_OF_CONDUCT.md` referenced by `CONTRIBUTING.md` but not yet added
 - Apply ADR-021 at v0.1.0: migrate test projects from `FluentAssertions 7.2.0` to `AwesomeAssertions` (mechanical rename of `using` directives + `Directory.Packages.props` bump)
-- Extract the in-process `IChangeNotifier` from the InMemory and SQLite providers into a shared helper in `Featly.Storage.Abstractions` so future single-instance providers don't duplicate the code (currently identical implementations in both packages)

@@ -3,7 +3,15 @@ using Xunit;
 
 namespace Featly.Storage.Sqlite.Tests;
 
-public class SqliteChangeNotifierTests
+/// <summary>
+/// End-to-end test that the SQLite store exposes a working
+/// <see cref="InProcessChangeNotifier"/> on <c>IFeatlyStore.Changes</c>.
+/// Subscribe + notify + dispose semantics are exercised here through the
+/// public <see cref="IChangeNotifier"/> contract; there is currently no
+/// dedicated test project for <c>Featly.Storage.Abstractions</c>, so this
+/// pair of facts is the canonical coverage for the shared notifier.
+/// </summary>
+public class InProcessChangeNotifierViaSqliteStoreTests
 {
     [Fact]
     public async Task Subscribe_receives_published_notifications()
