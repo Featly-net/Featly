@@ -127,12 +127,20 @@ public class BooleanFlagEndToEndTests
         return host;
     }
 
+    private sealed class E2ENoOpAccessor : IFeatlyContextAccessor
+    {
+        public EvaluationContext? Current => null;
+    }
+
     private static ServiceProvider BuildSdkServices(TestServer server)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<FeatlySnapshotCache>();
-        services.AddSingleton<IFlagClient>(sp => new FlagClient(sp.GetRequiredService<FeatlySnapshotCache>()));
+        services.AddSingleton<IFeatlyContextAccessor, E2ENoOpAccessor>();
+        services.AddSingleton<IFlagClient>(sp => new FlagClient(
+            sp.GetRequiredService<FeatlySnapshotCache>(),
+            sp.GetRequiredService<IFeatlyContextAccessor>()));
         services.AddSingleton<IFeatlyClient>(sp => new FeatlyClient(sp.GetRequiredService<IFlagClient>()));
 
         services.AddHttpClient<FeatlyHttpClient>(client =>
