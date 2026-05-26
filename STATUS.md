@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**M4 — Configs with the same engine** (complete)
+**M4 — Configs with the same engine** (complete; published as `v0.0.2-preview.1` on NuGet)
 
 ### Goal (M4)
 

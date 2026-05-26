@@ -8,6 +8,12 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [0.0.2-preview.1] - 2026-05-26
+
+First substantive preview. v0.0.1 reserved the package names with empty placeholders; v0.0.2-preview.1 ships the full Featly stack through M4 (multi-variant flag evaluation engine + dynamic configs + segments + targeting rules end-to-end).
+
 ### Changed
 
 - **Extract `InProcessChangeNotifier` into `Featly.Storage.Abstractions`.** The InMemory and SQLite providers previously each shipped a near-identical `IChangeNotifier` implementation (concurrent dictionary of handlers, subscriber-isolation `catch`, dispose-once subscription). Replaced by a single public `Featly.Storage.InProcessChangeNotifier` that both providers (and any future single-instance provider) consume. `InMemoryChangeNotifier` and `SqliteChangeNotifier` are gone. No public-API change for the storage facade: `IChangeNotifier`-typed consumers see the same contract.
@@ -76,4 +82,5 @@ Release entries follow this shape:
 [0.1.0]: https://github.com/Featly-net/Featly/releases/tag/v0.1.0
 -->
 
-[Unreleased]: https://github.com/Featly-net/Featly/commits/main
+[Unreleased]: https://github.com/Featly-net/Featly/compare/v0.0.2-preview.1...HEAD
+[0.0.2-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.0.2-preview.1
