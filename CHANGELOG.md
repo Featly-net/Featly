@@ -8,6 +8,12 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [0.0.3-preview.1] - 2026-05-27
+
+Ships M5 end-to-end: the embedded dashboard becomes a real product surface. List, edit, create rules visually, and dry-run an evaluation against any candidate context — all without leaving the browser.
+
 ### Added
 
 - **M5 PR 5D — "test this context" preview.** Closes M5. New admin endpoints `POST /api/admin/preview/flags/{key}` and `/configs/{key}` accept a candidate `EvaluationContext` (targeting key + attributes as JSON) and return the full `EvaluationResult` from the shared `Evaluator` — no persistence, no SDK setup needed. Segments from the same environment are loaded automatically so `InSegment` conditions resolve correctly. The dashboard's flag and config detail screens grow a "Test this context" panel: targeting-key input, add/remove attribute rows, an Evaluate button that posts the request and renders the result with a colored reason badge (`TargetingMatch` / `Split` / `Default` / `Disabled` / `NotFound` / `Error`), value, variant, matched rule. 8 new server tests cover auth gating, default/match/InSegment paths for flags, default/match for configs, and 404 on missing entity. 143 tests passing total. **M5 is complete.**
@@ -94,5 +100,6 @@ Release entries follow this shape:
 [0.1.0]: https://github.com/Featly-net/Featly/releases/tag/v0.1.0
 -->
 
-[Unreleased]: https://github.com/Featly-net/Featly/compare/v0.0.2-preview.1...HEAD
+[Unreleased]: https://github.com/Featly-net/Featly/compare/v0.0.3-preview.1...HEAD
+[0.0.3-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.0.3-preview.1
 [0.0.2-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.0.2-preview.1
