@@ -197,7 +197,7 @@ public class AuthEndpointsTests
         var setCookie = login.Headers.GetValues("Set-Cookie").First();
         var cookieValue = setCookie.Split(';')[0]; // "featly.session=<value>"
 
-        var me = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/auth/me", UriKind.Relative));
+        using var me = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/auth/me", UriKind.Relative));
         me.Headers.Add("Cookie", cookieValue);
 
         var response = await client.SendAsync(me, TestContext.Current.CancellationToken);
@@ -220,7 +220,7 @@ public class AuthEndpointsTests
             TestContext.Current.CancellationToken);
         var sessionCookie = login.Headers.GetValues("Set-Cookie").First().Split(';')[0];
 
-        var logout = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/auth/logout", UriKind.Relative));
+        using var logout = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/auth/logout", UriKind.Relative));
         logout.Headers.Add("Cookie", sessionCookie);
 
         var response = await client.SendAsync(logout, TestContext.Current.CancellationToken);
@@ -246,7 +246,7 @@ public class AuthEndpointsTests
             TestContext.Current.CancellationToken);
         var sessionCookie = login.Headers.GetValues("Set-Cookie").First().Split(';')[0];
 
-        var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/admin/environments", UriKind.Relative));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/admin/environments", UriKind.Relative));
         request.Headers.Add("Cookie", sessionCookie);
 
         var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
