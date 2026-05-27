@@ -14,14 +14,7 @@ internal sealed class InMemoryUserStore : IUserStore
     }
 
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct)
-    {
-        foreach (var u in _byIdentifier.Values)
-        {
-            if (u.Id == id)
-            { return Task.FromResult<User?>(u); }
-        }
-        return Task.FromResult<User?>(null);
-    }
+        => Task.FromResult(_byIdentifier.Values.FirstOrDefault(u => u.Id == id));
 
     public Task<IReadOnlyList<User>> ListAsync(CancellationToken ct)
     {

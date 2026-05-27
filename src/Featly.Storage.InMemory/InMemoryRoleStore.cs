@@ -13,14 +13,7 @@ internal sealed class InMemoryRoleStore : IRoleStore
     }
 
     public Task<Role?> GetByIdAsync(Guid id, CancellationToken ct)
-    {
-        foreach (var r in _byKey.Values)
-        {
-            if (r.Id == id)
-            { return Task.FromResult<Role?>(r); }
-        }
-        return Task.FromResult<Role?>(null);
-    }
+        => Task.FromResult(_byKey.Values.FirstOrDefault(r => r.Id == id));
 
     public Task<IReadOnlyList<Role>> ListAsync(CancellationToken ct)
     {

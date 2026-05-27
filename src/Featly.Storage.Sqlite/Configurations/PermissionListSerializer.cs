@@ -28,17 +28,10 @@ internal static class PermissionListSerializer
             return [];
         }
         var names = JsonSerializer.Deserialize<string[]>(text) ?? [];
-        var list = new List<Permission>(names.Length);
-        foreach (var name in names)
-        {
-            if (Enum.TryParse<Permission>(name, ignoreCase: false, out var p))
-            {
-                list.Add(p);
-            }
-            // Unknown names (a permission removed in a later release) are
-            // silently dropped — the role simply doesn't grant that
-            // permission anymore.
-        }
-        return list;
+        // Unknown names (a permission removed in a later release) are silently
+        // dropped — the role simply doesn't grant that permission anymore.
+        return [.. names
+            .Where(static n => Enum.TryParse<Permission>(n, ignoreCase: false, out _))
+            .Select(static n => Enum.Parse<Permission>(n, ignoreCase: false))];
     }
 }
