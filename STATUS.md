@@ -5,6 +5,17 @@
 
 ## Active milestone
 
+**M6 — Authentication pipeline + basic RBAC** (in progress; PR 6A landed)
+
+Four sequenced PRs:
+
+- [x] **PR 6A — auth domain + contracts**: `Permission` enum (60 values), `User` + `Role` entities, `SystemRoles` templates (Viewer / Editor / Approver / Admin), `IFeatlyUserResolver` (in `Featly.AspNetCore`) / `IFeatlyPermissionChecker` / `ResolvedUser` contracts, `IUserStore` + `IRoleStore` with InMemory + SQLite implementations + migration. `Role.Permissions` persists as JSON array of enum names (stable across enum re-orderings).
+- [ ] **PR 6B — ApiKey + Argon2id + auth filters**: `ApiKey` entity hashed with Argon2id (Konscious.Security.Cryptography), `IApiKeyStore` + providers, `IFeatlyDashboardAuthorizationFilter` + built-in `FeatlyBasicAuthFilter` + `FeatlyLoopbackAuthFilter`. Legacy `AdminApiKey`/`SdkApiKey` keep working alongside the new store until v0.1.0.
+- [ ] **PR 6C — Permission enforcement + bootstrap admin**: every admin endpoint enforces the matching `Permission`; the four system roles seed on first boot; `AuthorizationSettings.BootstrapAdminIdentifier` + `Open`/`Closed` auto-provision modes.
+- [ ] **PR 6D — Dashboard session real**: cookie-based session login flow replaces the localStorage token paste from M5.
+
+## Previous milestone
+
 **M5 — Embedded dashboard UI** (complete; published as `v0.0.3-preview.1` on NuGet)
 
 ### Goal (M4)

@@ -28,6 +28,12 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on dynamic configs.</summary>
     IConfigStore Configs { get; }
 
+    /// <summary>Persistence operations on users (M6+).</summary>
+    IUserStore Users { get; }
+
+    /// <summary>Persistence operations on roles (M6+).</summary>
+    IRoleStore Roles { get; }
+
     /// <summary>In-process change notification stream feeding SSE.</summary>
     IChangeNotifier Changes { get; }
 }
