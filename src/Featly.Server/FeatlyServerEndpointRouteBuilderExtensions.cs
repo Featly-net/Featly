@@ -35,6 +35,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
              .WithDescription("Liveness probe. Returns 200 if the host process can respond.");
 
         var apiGroup = group.MapGroup("/api");
+        apiGroup.MapAuth();
         apiGroup.MapAdminFlags();
         apiGroup.MapAdminSegments();
         apiGroup.MapAdminConfigs();

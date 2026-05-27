@@ -5,14 +5,14 @@
 
 ## Active milestone
 
-**M6 — Authentication pipeline + basic RBAC** (in progress; PR 6A landed)
+**M6 — Authentication pipeline + basic RBAC** (complete; ready to tag)
 
 Four sequenced PRs:
 
 - [x] **PR 6A — auth domain + contracts**: `Permission` enum (60 values), `User` + `Role` entities, `SystemRoles` templates (Viewer / Editor / Approver / Admin), `IFeatlyUserResolver` (in `Featly.AspNetCore`) / `IFeatlyPermissionChecker` / `ResolvedUser` contracts, `IUserStore` + `IRoleStore` with InMemory + SQLite implementations + migration. `Role.Permissions` persists as JSON array of enum names (stable across enum re-orderings).
 - [x] **PR 6B — ApiKey + Argon2id + auth filters**: `ApiKey` entity (Argon2id hash + 12-char Prefix for indexed lookup + Scope), `IApiKeyStore` with InMemory + SQLite + migration, `ApiKeyHasher` in `Featly.Server.Authentication` (mints / hashes / verifies via Konscious), `IFeatlyDashboardAuthorizationFilter` + built-in `FeatlyBasicAuthFilter` + `FeatlyLoopbackAuthFilter`. Legacy `AdminApiKey` / `SdkApiKey` keep working untouched until v0.1.0.
 - [x] **PR 6C — Permission enforcement + bootstrap admin**: every admin endpoint flows through a per-route `Permission` filter; `AuthBootstrapHostedService` seeds the four system roles on every boot and provisions a bootstrap admin user when `Featly:Authorization:BootstrapAdminIdentifier` is configured; `DefaultFeatlyPermissionChecker` maps bootstrap admin / legacy admin api-key to the `admin` role, everyone else gets `viewer` (full `RoleAssignment`-driven resolution lands in M7). Auto-provision writes a `User` row on first request. Legacy keys keep working — no breaking change.
-- [ ] **PR 6D — Dashboard session real**: cookie-based session login flow replaces the localStorage token paste from M5.
+- [x] **PR 6D — Dashboard cookie session**: new `/api/auth/login|logout|me` endpoints mint an `HttpOnly; SameSite=Strict` cookie session (7-day sliding expiration). The `Admin` policy accepts both Bearer (SDK / scripts) and the dashboard cookie — same endpoints, two surfaces, no breaking change. The dashboard `app.js` now probes `/me` on boot, shows a real sign-in screen, and uses `credentials: 'include'` everywhere. SDK keys are intentionally rejected for dashboard sessions even though they remain valid against `/api/sdk/*`.
 
 ## Previous milestone
 

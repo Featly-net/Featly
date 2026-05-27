@@ -1,15 +1,22 @@
-// Featly dashboard — M5C.
+// Featly dashboard.
 //
-// Adds:
-//   - Dynamic routing for /flags/:key, /configs/:key, /segments/:key.
+// M6 PR 6D replaces the localStorage token-paste with a real cookie session:
+//   - POST /api/auth/login mints an HttpOnly cookie.
+//   - GET  /api/auth/me detects an existing session on boot.
+//   - POST /api/auth/logout clears the cookie.
+//   - All admin/SDK requests use credentials: 'include' so the cookie rides
+//     along automatically.
+//
+// Earlier milestones still apply:
+//   - Dynamic routing for /flags/:key, /configs/:key, /segments/:key (M5C).
 //   - Detail views with edit-in-place: name, description, enabled, variants,
-//     tags, default value (config), default variant (flag).
+//     tags, default value (config), default variant (flag) (M5C).
 //   - Visual rule editor (shared between Flag rules and Config rules) and a
-//     condition editor (also used for Segments).
-//   - PUT to the admin API on save with success / error feedback.
+//     condition editor (also used for Segments) (M5C).
+//   - PUT to the admin API on save with success / error feedback (M5C).
 //   - Refresh-on-focus so a second operator's edits show up when the tab
-//     regains focus. (Full SSE live updates land alongside an admin stream
-//     endpoint in a follow-up.)
+//     regains focus (M5C).
+//   - "Test this context" dry-run panel against the saved entity (M5D).
 //
 // Single-file, no build step, no framework. Sections are marked with banner
 // comments so navigation stays manageable.
@@ -24,7 +31,6 @@
     var mountPath = (meta && meta.getAttribute("content")) || "/featly";
     if (mountPath.endsWith("/")) { mountPath = mountPath.slice(0, -1); }
 
-    var STORAGE_TOKEN_KEY = "featly.adminToken";
     var STORAGE_ENV_KEY = "featly.envKey";
 
     var viewEl = document.getElementById("view");
@@ -32,62 +38,115 @@
     var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav__link"));
     var headerEl = document.querySelector(".app-header");
 
+    // Tracks whether /api/auth/me has confirmed an active session this load.
+    // The cookie itself is HttpOnly so JS can't read it directly — we infer
+    // session state by hitting /me and remembering the result.
+    var session = null;
+
+    var sessionLabel = document.createElement("span");
+    sessionLabel.className = "session-label muted";
+    sessionLabel.hidden = true;
+    if (headerEl) { headerEl.appendChild(sessionLabel); }
+
     var signOutBtn = document.createElement("button");
     signOutBtn.type = "button";
     signOutBtn.className = "btn-link";
     signOutBtn.textContent = "Sign out";
     signOutBtn.hidden = true;
     signOutBtn.addEventListener("click", function () {
-        localStorage.removeItem(STORAGE_TOKEN_KEY);
-        location.reload();
+        // POST /logout clears the cookie server-side; we then reload so the
+        // login screen shows. credentials: 'include' is mandatory — without
+        // it the browser would skip the cookie and the server can't know
+        // which session to expire.
+        fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+            .finally(function () {
+                session = null;
+                location.reload();
+            });
     });
     if (headerEl) { headerEl.appendChild(signOutBtn); }
 
     // ============================================================
     // Auth
     // ============================================================
-    function getToken() { try { return localStorage.getItem(STORAGE_TOKEN_KEY); } catch (_) { return null; } }
-    function setToken(v) { try { localStorage.setItem(STORAGE_TOKEN_KEY, v); } catch (_) {} }
+    function isAuthenticated() { return session !== null; }
 
-    function showAuthPrompt() {
+    function showAuthPrompt(errorText) {
         envSelect.disabled = true;
         signOutBtn.hidden = true;
+        sessionLabel.hidden = true;
         viewEl.innerHTML = [
-            '<h1>Connect to Featly</h1>',
+            '<h1>Sign in to Featly</h1>',
             '<div class="card auth-card">',
-            '  <p>Paste your admin API key to use the dashboard. Look up <code>Featly:Server:AdminApiKey</code> in <code>appsettings.json</code>.</p>',
+            '  <p>Enter an admin API key to start a dashboard session. Look up <code>Featly:Server:AdminApiKey</code> in <code>appsettings.json</code>, or use a key minted via the admin keys endpoint.</p>',
             '  <form id="auth-form" class="auth-form">',
             '    <label for="auth-token">Admin API key</label>',
             '    <input id="auth-token" type="password" autocomplete="off" required spellcheck="false" />',
-            '    <button type="submit" class="btn-primary">Continue</button>',
+            '    <button type="submit" class="btn-primary">Sign in</button>',
+            errorText ? '    <p class="error" id="auth-error">' + esc(errorText) + '</p>' : '',
             '  </form>',
-            '  <p class="muted">Stored in <code>localStorage</code>. M6 replaces this with a real auth flow.</p>',
+            '  <p class="muted">Featly stores your session as an <code>HttpOnly; SameSite=Strict</code> cookie. Nothing is written to <code>localStorage</code>.</p>',
             '</div>',
         ].join("\n");
         document.getElementById("auth-form").addEventListener("submit", function (e) {
             e.preventDefault();
             var v = document.getElementById("auth-token").value.trim();
             if (!v) { return; }
-            setToken(v);
-            boot();
+            login(v);
         });
+    }
+
+    function login(apiKey) {
+        fetch("/api/auth/login", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ apiKey: apiKey }),
+        }).then(function (res) {
+            if (res.status === 401) {
+                showAuthPrompt("That key didn't match any admin credential.");
+                return;
+            }
+            if (!res.ok) {
+                return res.text().then(function (t) {
+                    showAuthPrompt(t || ("Login failed (" + res.status + ")."));
+                });
+            }
+            return res.json().then(function (me) {
+                session = me;
+                boot();
+            });
+        }).catch(function (err) {
+            showAuthPrompt(err && err.message ? err.message : "Network error.");
+        });
+    }
+
+    function probeSession() {
+        // GET /me returns 200 + identity if the cookie is valid, 401 if not.
+        return fetch("/api/auth/me", { credentials: "include" }).then(function (res) {
+            if (res.status === 200) {
+                return res.json().then(function (me) { session = me; return true; });
+            }
+            session = null;
+            return false;
+        }).catch(function () { session = null; return false; });
     }
 
     // ============================================================
     // HTTP
     // ============================================================
     function api(method, path, body) {
-        var token = getToken();
         var url = path.startsWith("http") ? path : "/api" + path;
-        var headers = token ? { "Authorization": "Bearer " + token } : {};
-        var init = { method: method, headers: headers };
+        var headers = {};
+        var init = { method: method, headers: headers, credentials: "include" };
         if (body !== undefined) {
             headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(body);
         }
         return fetch(url, init).then(function (res) {
             if (res.status === 401 || res.status === 403) {
-                var err = new Error("Unauthorized — check your admin token.");
+                session = null;
+                var err = new Error("Session expired — please sign in again.");
                 err.kind = "auth";
                 throw err;
             }
@@ -240,14 +299,14 @@
     window.addEventListener("focus", function () {
         // Refresh-on-focus: re-render the current view so a second operator's
         // edits show up. Cheap, no SSE plumbing yet.
-        if (getToken() && currentEnv) { render(); }
+        if (isAuthenticated() && currentEnv) { render(); }
     });
 
     // ============================================================
     // Views
     // ============================================================
     function render() {
-        if (!getToken()) { showAuthPrompt(); return; }
+        if (!isAuthenticated()) { showAuthPrompt(); return; }
         var route = currentRoute();
         var view = views[route.key];
         if (!view) { views.overview(); return; }
@@ -886,12 +945,16 @@
     // Boot
     // ============================================================
     function boot() {
-        if (!getToken()) { showAuthPrompt(); return; }
+        if (!isAuthenticated()) { showAuthPrompt(); return; }
         signOutBtn.hidden = false;
+        sessionLabel.hidden = false;
+        sessionLabel.textContent = "Signed in as " + (session.displayName || session.identifier);
         loadEnvironments().then(render).catch(function (err) {
             if (err.kind === "auth") { showAuthPrompt(); }
             else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
         });
     }
-    boot();
+    // Probe for an existing session before showing the login screen — a page
+    // refresh shouldn't make the user re-paste their key.
+    probeSession().then(function (ok) { ok ? boot() : showAuthPrompt(); });
 })();

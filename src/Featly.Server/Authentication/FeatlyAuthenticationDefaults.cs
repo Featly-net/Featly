@@ -9,6 +9,18 @@ public static class FeatlyAuthenticationDefaults
     /// <summary>Scheme name for the SDK API bearer token.</summary>
     public const string SdkScheme = "FeatlySdk";
 
+    /// <summary>
+    /// Scheme name for the dashboard cookie session. M6 PR 6D added the
+    /// <c>POST /api/auth/login</c> endpoint that mints this cookie. Listed
+    /// alongside <see cref="AdminScheme"/> in the admin policy so the same
+    /// admin endpoints accept either Bearer (SDK / scripts) or cookie
+    /// (browser).
+    /// </summary>
+    public const string CookieScheme = "FeatlyCookie";
+
+    /// <summary>Cookie name written by the dashboard session.</summary>
+    public const string CookieName = "featly.session";
+
     /// <summary>Claim type identifying which API key scope authenticated the request.</summary>
     public const string ScopeClaim = "featly:scope";
 
