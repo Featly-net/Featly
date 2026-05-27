@@ -15,6 +15,7 @@ internal sealed class SqliteFeatlyStore(
     IConfigStore configs,
     IUserStore users,
     IRoleStore roles,
+    IApiKeyStore apiKeys,
     IChangeNotifier changes) : IFeatlyStore
 {
     public IFlagStore Flags { get; } = flags;
@@ -30,6 +31,8 @@ internal sealed class SqliteFeatlyStore(
     public IUserStore Users { get; } = users;
 
     public IRoleStore Roles { get; } = roles;
+
+    public IApiKeyStore ApiKeys { get; } = apiKeys;
 
     public IChangeNotifier Changes { get; } = changes;
 }
