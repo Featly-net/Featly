@@ -21,10 +21,10 @@ internal static class AdminConfigsEndpoints
     {
         var admin = group.MapGroup("/admin/configs").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
-        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Configs.List");
-        admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Configs.Get");
-        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Configs.Create");
-        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Configs.Update");
+        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Configs.List").RequirePermission(Permission.ConfigRead);
+        admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Configs.Get").RequirePermission(Permission.ConfigRead);
+        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Configs.Create").RequirePermission(Permission.ConfigCreate);
+        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Configs.Update").RequirePermission(Permission.ConfigUpdate);
 
         return group;
     }

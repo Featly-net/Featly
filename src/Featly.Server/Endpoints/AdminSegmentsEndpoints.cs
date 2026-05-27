@@ -20,11 +20,11 @@ internal static class AdminSegmentsEndpoints
     {
         var admin = group.MapGroup("/admin/segments").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
-        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Segments.List");
-        admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Segments.Get");
-        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Segments.Create");
-        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Segments.Update");
-        admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Segments.Delete");
+        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Segments.List").RequirePermission(Permission.SegmentRead);
+        admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Segments.Get").RequirePermission(Permission.SegmentRead);
+        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Segments.Create").RequirePermission(Permission.SegmentCreate);
+        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Segments.Update").RequirePermission(Permission.SegmentUpdate);
+        admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Segments.Delete").RequirePermission(Permission.SegmentArchive);
 
         return group;
     }
