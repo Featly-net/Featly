@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**M4 — Configs with the same engine** (complete; published as `v0.0.2-preview.1` on NuGet)
+**M5 — Embedded dashboard UI** (complete; published as `v0.0.3-preview.1` on NuGet)
 
 ### Goal (M4)
 
