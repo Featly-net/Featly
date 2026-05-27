@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.0.4-preview.1] - 2026-05-27
+
+Ships M6 end-to-end: the auth pipeline that turns Featly's admin surface from a static-token toy into something a team can actually operate. Argon2id-hashed API keys with prefix-indexed lookup, per-permission enforcement on every admin endpoint, a bootstrap-admin escape hatch, and a real cookie-session login for the dashboard. Legacy `AdminApiKey` / `SdkApiKey` keep working untouched until v0.1.0 — no breaking change.
+
 ### Added
 
 - **M6 PR 6D — Dashboard cookie session (closes M6).** Replaces the M5B token-paste login with a real `HttpOnly; SameSite=Strict` cookie session. New endpoints under `/api/auth`: `POST /login` accepts the legacy `AdminApiKey` from configuration or any real `ApiKey` row with `AdminWrite` scope (prefix lookup + Argon2 verify, same path the M6B handler uses); `POST /logout` clears the cookie and returns `204`; `GET /me` reports the current identity (or `401` when there is no session). Login mints a 7-day persistent cookie with sliding expiration; `SecurePolicy=SameAsRequest` keeps local-dev on HTTP working while staying secure under TLS. The cookie scheme is added to the `Admin` authorization policy alongside Bearer, so the same admin endpoints accept either a header (SDK / scripts) or the cookie (browser) — no breaking change. SDK keys are intentionally refused for dashboard sessions even though they remain valid for `/api/sdk/*`. Dashboard `app.js` now calls `/api/auth/me` on boot to detect an existing session, shows a real sign-in form on first load with inline error feedback, and uses `credentials: 'include'` on every fetch. Sign-out posts to `/api/auth/logout` and reloads. New `AuthEndpointsTests` covers login (legacy + new admin keys), SDK-key rejection, bad-request validation, `/me` with and without cookie, logout clearing the cookie, and Bearer-still-works regression. 178 tests passing total. **M6 is complete.**

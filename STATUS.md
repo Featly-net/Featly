@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M6 — Authentication pipeline + basic RBAC** (complete; ready to tag)
+**Between milestones** — M6 closed and shipped as `v0.0.4-preview.1`. M7 (`RoleAssignment` + per-project / per-environment role resolution + admin endpoints for users / api-keys / roles in the dashboard) is the next planned milestone but has not started yet.
+
+## Previous milestone
+
+**M6 — Authentication pipeline + basic RBAC** (complete; published as `v0.0.4-preview.1` on NuGet)
 
 Four sequenced PRs:
 
@@ -14,7 +18,7 @@ Four sequenced PRs:
 - [x] **PR 6C — Permission enforcement + bootstrap admin**: every admin endpoint flows through a per-route `Permission` filter; `AuthBootstrapHostedService` seeds the four system roles on every boot and provisions a bootstrap admin user when `Featly:Authorization:BootstrapAdminIdentifier` is configured; `DefaultFeatlyPermissionChecker` maps bootstrap admin / legacy admin api-key to the `admin` role, everyone else gets `viewer` (full `RoleAssignment`-driven resolution lands in M7). Auto-provision writes a `User` row on first request. Legacy keys keep working — no breaking change.
 - [x] **PR 6D — Dashboard cookie session**: new `/api/auth/login|logout|me` endpoints mint an `HttpOnly; SameSite=Strict` cookie session (7-day sliding expiration). The `Admin` policy accepts both Bearer (SDK / scripts) and the dashboard cookie — same endpoints, two surfaces, no breaking change. The dashboard `app.js` now probes `/me` on boot, shows a real sign-in screen, and uses `credentials: 'include'` everywhere. SDK keys are intentionally rejected for dashboard sessions even though they remain valid against `/api/sdk/*`.
 
-## Previous milestone
+## Milestone before that
 
 **M5 — Embedded dashboard UI** (complete; published as `v0.0.3-preview.1` on NuGet)
 
