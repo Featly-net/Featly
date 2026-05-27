@@ -19,4 +19,9 @@
     <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Argon2id for ApiKey hashing (M6+). -->
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+  </ItemGroup>
+
 </Project>

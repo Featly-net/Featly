@@ -10,7 +10,7 @@
 Four sequenced PRs:
 
 - [x] **PR 6A — auth domain + contracts**: `Permission` enum (60 values), `User` + `Role` entities, `SystemRoles` templates (Viewer / Editor / Approver / Admin), `IFeatlyUserResolver` (in `Featly.AspNetCore`) / `IFeatlyPermissionChecker` / `ResolvedUser` contracts, `IUserStore` + `IRoleStore` with InMemory + SQLite implementations + migration. `Role.Permissions` persists as JSON array of enum names (stable across enum re-orderings).
-- [ ] **PR 6B — ApiKey + Argon2id + auth filters**: `ApiKey` entity hashed with Argon2id (Konscious.Security.Cryptography), `IApiKeyStore` + providers, `IFeatlyDashboardAuthorizationFilter` + built-in `FeatlyBasicAuthFilter` + `FeatlyLoopbackAuthFilter`. Legacy `AdminApiKey`/`SdkApiKey` keep working alongside the new store until v0.1.0.
+- [x] **PR 6B — ApiKey + Argon2id + auth filters**: `ApiKey` entity (Argon2id hash + 12-char Prefix for indexed lookup + Scope), `IApiKeyStore` with InMemory + SQLite + migration, `ApiKeyHasher` in `Featly.Server.Authentication` (mints / hashes / verifies via Konscious), `IFeatlyDashboardAuthorizationFilter` + built-in `FeatlyBasicAuthFilter` + `FeatlyLoopbackAuthFilter`. Legacy `AdminApiKey` / `SdkApiKey` keep working untouched until v0.1.0.
 - [ ] **PR 6C — Permission enforcement + bootstrap admin**: every admin endpoint enforces the matching `Permission`; the four system roles seed on first boot; `AuthorizationSettings.BootstrapAdminIdentifier` + `Open`/`Closed` auto-provision modes.
 - [ ] **PR 6D — Dashboard session real**: cookie-based session login flow replaces the localStorage token paste from M5.
 

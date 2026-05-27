@@ -56,6 +56,7 @@ public static class SqliteStorageServiceCollectionExtensions
         services.TryAddSingleton<IConfigStore, SqliteConfigStore>();
         services.TryAddSingleton<IUserStore, SqliteUserStore>();
         services.TryAddSingleton<IRoleStore, SqliteRoleStore>();
+        services.TryAddSingleton<IApiKeyStore, SqliteApiKeyStore>();
 
         services.TryAddSingleton<SqliteFeatlyStore>();
         services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<SqliteFeatlyStore>());
