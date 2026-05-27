@@ -18,7 +18,7 @@ internal static class AdminEnvironmentsEndpoints
     {
         var admin = group.MapGroup("/admin/environments").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
-        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Environments.List");
+        admin.MapGet("/", ListAsync).WithName("Featly.Admin.Environments.List").RequirePermission(Permission.EnvironmentRead);
 
         return group;
     }

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Featly.Authorization;
 using Featly.Server.Authentication;
 using Featly.Server.Hosting;
 using Microsoft.AspNetCore.Authentication;
@@ -58,7 +59,17 @@ public static class FeatlyServerServiceCollectionExtensions
                 .AddAuthenticationSchemes(FeatlyAuthenticationDefaults.SdkScheme)
                 .RequireAuthenticatedUser());
 
+        // Authorization options (Featly:Authorization). Drives bootstrap admin
+        // provisioning and (in M7+) auto-provision mode.
+        services
+            .AddOptions<FeatlyAuthorizationOptions>()
+            .BindConfiguration(FeatlyAuthorizationOptions.SectionName);
+
+        services.TryAddSingleton<IFeatlyPermissionChecker, DefaultFeatlyPermissionChecker>();
+        services.TryAddSingleton<ApiKeyHasher>();
+
         services.AddHostedService<DefaultProjectBootstrapHostedService>();
+        services.AddHostedService<AuthBootstrapHostedService>();
 
         // Configure minimal API JSON to accept string enum values
         // (e.g. "Boolean" instead of 0) — the dashboard, curl examples,

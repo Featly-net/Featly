@@ -56,6 +56,7 @@ public static class SystemRoles
 
     private static Role Viewer() => new()
     {
+        Id = Guid.NewGuid(),
         Key = ViewerKey,
         Name = "Viewer",
         Description = "Read-only access to flags, configs, segments, experiments, environments, projects, users, roles, audit, settings.",
@@ -65,6 +66,7 @@ public static class SystemRoles
 
     private static Role Editor() => new()
     {
+        Id = Guid.NewGuid(),
         Key = EditorKey,
         Name = "Editor",
         Description = "Viewer + create / update on Flag, Config, Segment, Experiment, plus ChangeCreate.",
@@ -82,6 +84,7 @@ public static class SystemRoles
 
     private static Role Approver() => new()
     {
+        Id = Guid.NewGuid(),
         Key = ApproverKey,
         Name = "Approver",
         Description = "Editor + ChangeApprove, ChangeReject, ChangeApply.",
@@ -99,6 +102,7 @@ public static class SystemRoles
 
     private static Role Admin() => new()
     {
+        Id = Guid.NewGuid(),
         Key = AdminKey,
         Name = "Admin",
         Description = "Full access — every Featly permission. Includes governance (users, roles, settings, webhooks, environment lock).",

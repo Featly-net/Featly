@@ -34,8 +34,8 @@ internal static class AdminPreviewEndpoints
     {
         var admin = group.MapGroup("/admin/preview").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
-        admin.MapPost("/flags/{key}", PreviewFlagAsync).WithName("Featly.Admin.Preview.Flag");
-        admin.MapPost("/configs/{key}", PreviewConfigAsync).WithName("Featly.Admin.Preview.Config");
+        admin.MapPost("/flags/{key}", PreviewFlagAsync).WithName("Featly.Admin.Preview.Flag").RequirePermission(Permission.FlagRead);
+        admin.MapPost("/configs/{key}", PreviewConfigAsync).WithName("Featly.Admin.Preview.Config").RequirePermission(Permission.ConfigRead);
 
         return group;
     }

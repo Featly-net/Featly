@@ -18,10 +18,10 @@ internal static class AdminFlagsEndpoints
     {
         var admin = group.MapGroup("/admin/flags").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
-        admin.MapGet("/", ListFlagsAsync).WithName("Featly.Admin.Flags.List");
-        admin.MapGet("/{key}", GetFlagAsync).WithName("Featly.Admin.Flags.Get");
-        admin.MapPost("/", CreateFlagAsync).WithName("Featly.Admin.Flags.Create");
-        admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update");
+        admin.MapGet("/", ListFlagsAsync).WithName("Featly.Admin.Flags.List").RequirePermission(Permission.FlagRead);
+        admin.MapGet("/{key}", GetFlagAsync).WithName("Featly.Admin.Flags.Get").RequirePermission(Permission.FlagRead);
+        admin.MapPost("/", CreateFlagAsync).WithName("Featly.Admin.Flags.Create").RequirePermission(Permission.FlagCreate);
+        admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update").RequirePermission(Permission.FlagUpdate);
 
         return group;
     }
