@@ -3,7 +3,9 @@ using Featly.Authorization;
 using Featly.Server.Authentication;
 using Featly.Server.Hosting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,11 +51,41 @@ public static class FeatlyServerServiceCollectionExtensions
                 opts => opts.Scope = "AdminWrite")
             .AddScheme<FeatlyApiKeyAuthenticationOptions, FeatlyApiKeyAuthenticationHandler>(
                 FeatlyAuthenticationDefaults.SdkScheme,
-                opts => opts.Scope = "SdkRead");
+                opts => opts.Scope = "SdkRead")
+            // Dashboard cookie session. HttpOnly + SameSite=Strict so an XSS in
+            // the host can't read the cookie and a cross-site request can't
+            // ride along. SecurePolicy=SameAsRequest keeps the local-dev story
+            // simple (no HTTPS yet) while staying secure under TLS in prod.
+            // Returning 401/403 instead of redirecting to a login URL keeps the
+            // API JSON-shaped — the dashboard JS shows its own login screen.
+            .AddCookie(FeatlyAuthenticationDefaults.CookieScheme, opts =>
+            {
+                opts.Cookie.Name = FeatlyAuthenticationDefaults.CookieName;
+                opts.Cookie.HttpOnly = true;
+                opts.Cookie.SameSite = SameSiteMode.Strict;
+                opts.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                opts.Cookie.IsEssential = true;
+                opts.ExpireTimeSpan = TimeSpan.FromDays(7);
+                opts.SlidingExpiration = true;
+                opts.Events.OnRedirectToLogin = ctx =>
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                };
+                opts.Events.OnRedirectToAccessDenied = ctx =>
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                };
+            });
 
         services.AddAuthorizationBuilder()
+            // Admin endpoints accept either Bearer (admin API key, used by SDK
+            // clients and curl scripts) or the dashboard cookie session.
             .AddPolicy(FeatlyAuthenticationDefaults.AdminPolicy, policy => policy
-                .AddAuthenticationSchemes(FeatlyAuthenticationDefaults.AdminScheme)
+                .AddAuthenticationSchemes(
+                    FeatlyAuthenticationDefaults.AdminScheme,
+                    FeatlyAuthenticationDefaults.CookieScheme)
                 .RequireAuthenticatedUser())
             .AddPolicy(FeatlyAuthenticationDefaults.SdkPolicy, policy => policy
                 .AddAuthenticationSchemes(FeatlyAuthenticationDefaults.SdkScheme)

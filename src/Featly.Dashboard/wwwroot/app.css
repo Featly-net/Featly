@@ -428,6 +428,28 @@ p:last-child { margin-bottom: 0; }
     outline-offset: 1px;
 }
 
+/* Header session label: shown after sign-in. */
+.session-label {
+    margin-left: auto;
+    font-size: 0.8125rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+/* Inline error message inside the login form. Smaller and inline-block-y
+   compared to the page-level .error block below (which sits between sections). */
+.auth-form .error {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, #dc2626 10%, transparent);
+    color: #dc2626;
+    font-size: 0.8125rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    .auth-form .error { color: #fca5a5; }
+}
+
 /* Error block */
 .error {
     padding: var(--space-4);
