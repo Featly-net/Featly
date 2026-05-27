@@ -29,8 +29,12 @@
         FlagType/ConfigType enum members named String, Int, Long, Double, Decimal,
         Bool, etc. directly to end users via the dashboard, API, and config files —
         renaming them would obscure intent for a feature-management product.
+      CA1711: "Identifier ends in suffix that should be reserved (Permission)."
+        Suppressed because Permission is the domain concept, not the .NET
+        SecurityPermission-style suffix the rule is guarding against. Renaming
+        the enum would obscure intent across roles, RBAC, audit and the dashboard.
     -->
-    <NoWarn>$(NoWarn);NU1507;CA1720</NoWarn>
+    <NoWarn>$(NoWarn);NU1507;CA1720;CA1711</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Label="Deterministic builds">

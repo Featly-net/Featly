@@ -15,6 +15,8 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         Environments = new InMemoryEnvironmentStore();
         Segments = new InMemorySegmentStore();
         Configs = new InMemoryConfigStore();
+        Users = new InMemoryUserStore();
+        Roles = new InMemoryRoleStore();
         Changes = new InProcessChangeNotifier();
     }
 
@@ -32,6 +34,12 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IConfigStore Configs { get; }
+
+    /// <inheritdoc />
+    public IUserStore Users { get; }
+
+    /// <inheritdoc />
+    public IRoleStore Roles { get; }
 
     /// <inheritdoc />
     public IChangeNotifier Changes { get; }

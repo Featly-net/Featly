@@ -8,7 +8,9 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added
+
+- **M6 PR 6A — auth domain + contracts.** Lays the groundwork for the real auth pipeline. New `Permission` enum (60 values covering Flag/Config/Segment/Experiment/Environment/Project/ApiKey/User/Role/Group/ApprovalPolicy/Audit/Webhook/Change/Settings). `User` and `Role` entities in `Featly.Abstractions`. `SystemRoles` helper that produces the four immutable templates (`Viewer`, `Editor`, `Approver`, `Admin`) on demand — same source of truth used by the M6 PR 6C seed step, the dashboard role list, and tests. `ResolvedUser` + `IFeatlyPermissionChecker` interfaces in `Featly.Abstractions`; `IFeatlyUserResolver` in `Featly.AspNetCore` (it takes `HttpContext`, which the contract assembly does not depend on). `IUserStore` + `IRoleStore` on the storage facade with InMemory and SQLite implementations. SQLite migration `AddUsersAndRoles` adds `Users` and `Roles` tables; `Role.Permissions` persists as a JSON array of enum *names* so future enum re-orderings don't silently shuffle saved role contents. 9 new SQLite tests (`SqliteUserStoreTests`, `SqliteRoleStoreTests`). 152 tests passing.
 
 ## [0.0.3-preview.1] - 2026-05-27
 
