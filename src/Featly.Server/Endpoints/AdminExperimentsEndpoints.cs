@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Featly.Server.Experiments;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -89,6 +90,7 @@ internal static class AdminExperimentsEndpoints
     private static async Task<IResult> CreateAsync(
         ExperimentWriteRequest body,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct)
@@ -127,6 +129,7 @@ internal static class AdminExperimentsEndpoints
         var experiment = body.ToEntity(environment.Id);
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ExperimentCreated, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/experiments/{experiment.Key}?env={environment.Key}", experiment);
     }
@@ -135,7 +138,9 @@ internal static class AdminExperimentsEndpoints
         string key,
         ExperimentWriteRequest body,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         string? env,
+        ClaimsPrincipal user,
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -171,11 +176,18 @@ internal static class AdminExperimentsEndpoints
 
         await store.Experiments.UpsertAsync(environment.Id, existing, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ExperimentUpdated, "Experiment", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }
 
-    private static async Task<IResult> StartAsync(string key, StorageFacade store, string? env, CancellationToken ct)
+    private static async Task<IResult> StartAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -199,11 +211,18 @@ internal static class AdminExperimentsEndpoints
         experiment.StoppedAt = null;
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ExperimentStarted, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Ok(experiment);
     }
 
-    private static async Task<IResult> StopAsync(string key, StorageFacade store, string? env, CancellationToken ct)
+    private static async Task<IResult> StopAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -230,6 +249,7 @@ internal static class AdminExperimentsEndpoints
         experiment.StoppedAt = DateTimeOffset.UtcNow;
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ExperimentStopped, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Ok(experiment);
     }

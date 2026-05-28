@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Approval;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -141,6 +142,7 @@ internal static class AdminChangesEndpoints
         Guid id,
         DecisionWriteRequest body,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -193,6 +195,18 @@ internal static class AdminChangesEndpoints
         }
 
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+
+        if (change.Status == ChangeStatus.Approved)
+        {
+            await events.PublishAsync(FeatlyEventTypes.ChangeApproved, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+                new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
+        }
+        else if (change.Status == ChangeStatus.Rejected)
+        {
+            await events.PublishAsync(FeatlyEventTypes.ChangeRejected, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+                new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
+        }
+
         return Results.Ok(new { change, evaluation });
     }
 
@@ -200,6 +214,7 @@ internal static class AdminChangesEndpoints
         Guid id,
         StorageFacade store,
         ChangeApplicationService applier,
+        IFeatlyEventPublisher events,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -235,6 +250,8 @@ internal static class AdminChangesEndpoints
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
         await ChangeStaleness.MarkSiblingsStaleAsync(store, change, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = false }, ct).ConfigureAwait(false);
         return Results.Ok(change);
     }
 
@@ -243,6 +260,7 @@ internal static class AdminChangesEndpoints
         BypassRequest body,
         StorageFacade store,
         ChangeApplicationService applier,
+        IFeatlyEventPublisher events,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -281,6 +299,8 @@ internal static class AdminChangesEndpoints
         change.AppliedAt = DateTimeOffset.UtcNow;
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = true }, ct).ConfigureAwait(false);
         return Results.Ok(change);
     }
 

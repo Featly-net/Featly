@@ -102,6 +102,13 @@ public static class FeatlyServerServiceCollectionExtensions
         services.TryAddSingleton<Approval.ChangeApplicationService>();
         services.TryAddSingleton<Approval.ChangeGate>();
 
+        // Domain-event backbone (M10): the publisher fans events out to every
+        // registered consumer. The audit recorder is the first consumer; 10C
+        // adds the webhook dispatcher. Consumers use Add (not TryAdd) so both
+        // register.
+        services.TryAddSingleton<Events.IFeatlyEventPublisher, Events.FeatlyEventPublisher>();
+        services.AddSingleton<Events.IFeatlyEventConsumer, Events.AuditRecorder>();
+
         services.AddHostedService<DefaultProjectBootstrapHostedService>();
         services.AddHostedService<AuthBootstrapHostedService>();
 

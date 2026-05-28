@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Approval;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -62,6 +63,7 @@ internal static class AdminConfigsEndpoints
         ConfigWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -99,6 +101,7 @@ internal static class AdminConfigsEndpoints
         var config = body.ToEntity(environment.Id, actor);
         await store.Configs.UpsertAsync(environment.Id, config, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, config.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ConfigCreated, "Config", config.Key, environment.Id, user, config, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/configs/{config.Key}?env={environment.Key}", config);
     }
@@ -108,6 +111,7 @@ internal static class AdminConfigsEndpoints
         ConfigWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -156,6 +160,7 @@ internal static class AdminConfigsEndpoints
 
         await store.Configs.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ConfigUpdated, "Config", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }
