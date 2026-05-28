@@ -99,6 +99,7 @@ public static class FeatlyServerServiceCollectionExtensions
 
         services.TryAddSingleton<IFeatlyPermissionChecker, DefaultFeatlyPermissionChecker>();
         services.TryAddSingleton<ApiKeyHasher>();
+        services.TryAddSingleton<Approval.ChangeApplicationService>();
 
         services.AddHostedService<DefaultProjectBootstrapHostedService>();
         services.AddHostedService<AuthBootstrapHostedService>();
