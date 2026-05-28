@@ -34,6 +34,9 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on roles (M6+).</summary>
     IRoleStore Roles { get; }
 
+    /// <summary>Persistence operations on role assignments (M7+).</summary>
+    IRoleAssignmentStore RoleAssignments { get; }
+
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 
