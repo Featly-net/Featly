@@ -5,7 +5,14 @@
 
 ## Active milestone
 
-**Between milestones** — M9 closed and shipped as `v0.0.7-preview.1`. M10 (Webhooks + audit polish: outbound webhooks on flag/config/experiment changes, richer audit log) is the next planned milestone but has not started yet.
+**M10 — Webhooks + audit polish** (in progress)
+
+Outbound webhooks (persisted delivery queue with retry/backoff + HMAC-SHA256 signing) and a richer audit log, both fed by a shared internal domain-event publisher covering flag/config/segment/experiment mutations, M8 approval decisions, and M7 RBAC changes. Four sequenced PRs:
+
+- [x] **PR 10A — domain + storage**: `WebhookEndpoint`, `WebhookDelivery` (+ status enum), `AuditEntry`, `FeatlyDomainEvent` (+ `FeatlyEventTypes` constants); `IWebhookStore` / `IWebhookDeliveryStore` / `IAuditStore` on the facade with InMemory + SQLite + migration `AddWebhooksAndAudit`. 3 new SQLite round-trips, 281 passing total.
+- [ ] **PR 10B — event backbone + audit**: `IFeatlyEventPublisher` + audit recorder; wire mutation endpoints (flags/configs/segments/experiments + `ChangeApplicationService` + RBAC) to publish; `GET /api/admin/audit` with filters (`AuditRead`).
+- [ ] **PR 10C — webhook engine**: `/api/admin/webhooks` CRUD; `WebhookDispatcher` enqueues to matching endpoints; background worker drains with exponential backoff → dead-letter, signing with HMAC-SHA256 (`X-Featly-Signature`); send-test-event endpoint.
+- [ ] **PR 10D — dashboard**: Webhooks management (list/create/edit/delete + delivery status + redeliver) and Audit log screen with filters.
 
 ## Previous milestone
 
