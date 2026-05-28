@@ -23,6 +23,9 @@ internal sealed class SqliteFeatlyStore(
     IExperimentStore experiments,
     IEventStore events,
     IAssignmentStore assignments,
+    IWebhookStore webhooks,
+    IWebhookDeliveryStore webhookDeliveries,
+    IAuditStore audit,
     IApiKeyStore apiKeys,
     IChangeNotifier changes) : IFeatlyStore
 {
@@ -55,6 +58,12 @@ internal sealed class SqliteFeatlyStore(
     public IEventStore Events { get; } = events;
 
     public IAssignmentStore Assignments { get; } = assignments;
+
+    public IWebhookStore Webhooks { get; } = webhooks;
+
+    public IWebhookDeliveryStore WebhookDeliveries { get; } = webhookDeliveries;
+
+    public IAuditStore Audit { get; } = audit;
 
     public IApiKeyStore ApiKeys { get; } = apiKeys;
 

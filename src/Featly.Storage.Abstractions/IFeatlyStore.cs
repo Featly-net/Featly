@@ -58,6 +58,15 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on sticky experiment assignments (M9+).</summary>
     IAssignmentStore Assignments { get; }
 
+    /// <summary>Persistence operations on registered webhook endpoints (M10+).</summary>
+    IWebhookStore Webhooks { get; }
+
+    /// <summary>The persisted webhook delivery queue (M10+).</summary>
+    IWebhookDeliveryStore WebhookDeliveries { get; }
+
+    /// <summary>Append-only audit log (M10+).</summary>
+    IAuditStore Audit { get; }
+
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 

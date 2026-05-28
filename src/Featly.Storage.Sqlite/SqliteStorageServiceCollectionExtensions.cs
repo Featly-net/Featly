@@ -64,6 +64,9 @@ public static class SqliteStorageServiceCollectionExtensions
         services.TryAddSingleton<IExperimentStore, SqliteExperimentStore>();
         services.TryAddSingleton<IEventStore, SqliteEventStore>();
         services.TryAddSingleton<IAssignmentStore, SqliteAssignmentStore>();
+        services.TryAddSingleton<IWebhookStore, SqliteWebhookStore>();
+        services.TryAddSingleton<IWebhookDeliveryStore, SqliteWebhookDeliveryStore>();
+        services.TryAddSingleton<IAuditStore, SqliteAuditStore>();
         services.TryAddSingleton<IApiKeyStore, SqliteApiKeyStore>();
 
         services.TryAddSingleton<SqliteFeatlyStore>();

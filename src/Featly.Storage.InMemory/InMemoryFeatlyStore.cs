@@ -25,6 +25,9 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         Experiments = new InMemoryExperimentStore();
         Events = new InMemoryEventStore();
         Assignments = new InMemoryAssignmentStore();
+        Webhooks = new InMemoryWebhookStore();
+        WebhookDeliveries = new InMemoryWebhookDeliveryStore();
+        Audit = new InMemoryAuditStore();
         ApiKeys = new InMemoryApiKeyStore();
         Changes = new InProcessChangeNotifier();
     }
@@ -73,6 +76,15 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IAssignmentStore Assignments { get; }
+
+    /// <inheritdoc />
+    public IWebhookStore Webhooks { get; }
+
+    /// <inheritdoc />
+    public IWebhookDeliveryStore WebhookDeliveries { get; }
+
+    /// <inheritdoc />
+    public IAuditStore Audit { get; }
 
     /// <inheritdoc />
     public IApiKeyStore ApiKeys { get; }

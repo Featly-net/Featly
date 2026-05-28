@@ -43,6 +43,12 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Assignment> Assignments => Set<Assignment>();
 
+    public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
+
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -65,6 +71,9 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ExperimentConfiguration());
         modelBuilder.ApplyConfiguration(new EventConfiguration());
         modelBuilder.ApplyConfiguration(new AssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookEndpointConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookDeliveryConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
     }
 }
