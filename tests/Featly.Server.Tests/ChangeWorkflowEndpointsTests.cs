@@ -36,7 +36,7 @@ public class ChangeWorkflowEndpointsTests
         using var host = await BuildHostAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
-        var (project, env) = await DefaultProjectEnvAsync(store, ct);
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
 
         // Policy: 1 approval, author can't approve own change.
         await store.ApprovalPolicies.UpsertAsync(new ApprovalPolicy
