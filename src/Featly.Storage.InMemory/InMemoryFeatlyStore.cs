@@ -17,6 +17,7 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         Configs = new InMemoryConfigStore();
         Users = new InMemoryUserStore();
         Roles = new InMemoryRoleStore();
+        RoleAssignments = new InMemoryRoleAssignmentStore();
         ApiKeys = new InMemoryApiKeyStore();
         Changes = new InProcessChangeNotifier();
     }
@@ -41,6 +42,9 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IRoleStore Roles { get; }
+
+    /// <inheritdoc />
+    public IRoleAssignmentStore RoleAssignments { get; }
 
     /// <inheritdoc />
     public IApiKeyStore ApiKeys { get; }

@@ -27,6 +27,8 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Role> Roles => Set<Role>();
 
+    public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -41,6 +43,7 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ConfigConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
     }
 }
