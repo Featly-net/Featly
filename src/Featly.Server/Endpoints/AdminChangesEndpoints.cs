@@ -89,7 +89,7 @@ internal static class AdminChangesEndpoints
             EnvironmentId = environment.Id,
             Action = body.Action,
             ProposedState = body.ProposedState.Clone(),
-            CurrentState = await CaptureCurrentStateAsync(store, body.EntityType, body.EntityKey, environment.Id, ct).ConfigureAwait(false),
+            CurrentState = await ChangeStaleness.CaptureAsync(store, body.EntityType, body.EntityKey, environment.Id, ct).ConfigureAwait(false),
             AuthorUserId = author.Id,
             AuthorMessage = body.Message,
             Status = ChangeStatus.Pending,
@@ -213,6 +213,15 @@ internal static class AdminChangesEndpoints
             return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be applied." });
         }
 
+        // Stale check: the underlying entity must not have changed since propose.
+        if (await ChangeStaleness.IsStaleAsync(store, change, ct).ConfigureAwait(false))
+        {
+            change.Status = ChangeStatus.Stale;
+            change.UpdatedAt = DateTimeOffset.UtcNow;
+            await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+            return Results.Conflict(new { error = "The target entity changed since this change was proposed. Re-propose to rebase.", status = "Stale" });
+        }
+
         var actor = principal.Identity?.Name ?? "anonymous";
         var applied = await applier.ApplyAsync(change, actor, ct).ConfigureAwait(false);
         if (!applied)
@@ -225,6 +234,7 @@ internal static class AdminChangesEndpoints
         change.AppliedAt = DateTimeOffset.UtcNow;
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+        await ChangeStaleness.MarkSiblingsStaleAsync(store, change, ct).ConfigureAwait(false);
         return Results.Ok(change);
     }
 
@@ -281,23 +291,6 @@ internal static class AdminChangesEndpoints
         Required = true,
         MinApprovals = 1,
     };
-
-    private static async Task<JsonElement?> CaptureCurrentStateAsync(
-        StorageFacade store, string entityType, string entityKey, Guid environmentId, CancellationToken ct)
-    {
-        object? current = entityType switch
-        {
-            "Flag" => await store.Flags.GetAsync(environmentId, entityKey, ct).ConfigureAwait(false),
-            "Config" => await store.Configs.GetAsync(environmentId, entityKey, ct).ConfigureAwait(false),
-            "Segment" => await store.Segments.GetAsync(environmentId, entityKey, ct).ConfigureAwait(false),
-            _ => null,
-        };
-        if (current is null)
-        {
-            return null;
-        }
-        return JsonSerializer.SerializeToElement(current, current.GetType());
-    }
 
     private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
     {

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Featly.Server.Approval;
 using Featly.Server.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -60,9 +61,13 @@ internal static class AdminConfigsEndpoints
     private static async Task<IResult> CreateAsync(
         ConfigWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -83,6 +88,13 @@ internal static class AdminConfigsEndpoints
             return Results.Conflict(new { error = $"Config '{body.Key}' already exists in environment '{environment.Key}'." });
         }
 
+        var gated = await gate.InterceptAsync("Config", body.Key, environment, ChangeAction.Create,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
+        }
+
         var actor = ResolveActor(user);
         var config = body.ToEntity(environment.Id, actor);
         await store.Configs.UpsertAsync(environment.Id, config, actor, ct).ConfigureAwait(false);
@@ -95,9 +107,13 @@ internal static class AdminConfigsEndpoints
         string key,
         ConfigWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -121,6 +137,13 @@ internal static class AdminConfigsEndpoints
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
             return Results.BadRequest(new { error = "Cannot rename a config via PUT. Body key must match URL key." });
+        }
+
+        var gated = await gate.InterceptAsync("Config", key, environment, ChangeAction.Update,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
         }
 
         var actor = ResolveActor(user);
