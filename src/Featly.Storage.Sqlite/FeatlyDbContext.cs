@@ -37,6 +37,12 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<ApprovalPolicy> ApprovalPolicies => Set<ApprovalPolicy>();
 
+    public DbSet<Experiment> Experiments => Set<Experiment>();
+
+    public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -56,6 +62,9 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new RoleUpgradeRequestConfiguration());
         modelBuilder.ApplyConfiguration(new PendingChangeConfiguration());
         modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
+        modelBuilder.ApplyConfiguration(new ExperimentConfiguration());
+        modelBuilder.ApplyConfiguration(new EventConfiguration());
+        modelBuilder.ApplyConfiguration(new AssignmentConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
     }
 }

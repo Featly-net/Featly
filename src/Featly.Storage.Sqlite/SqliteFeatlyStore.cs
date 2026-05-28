@@ -20,6 +20,9 @@ internal sealed class SqliteFeatlyStore(
     IRoleUpgradeRequestStore roleUpgradeRequests,
     IPendingChangeStore pendingChanges,
     IApprovalPolicyStore approvalPolicies,
+    IExperimentStore experiments,
+    IEventStore events,
+    IAssignmentStore assignments,
     IApiKeyStore apiKeys,
     IChangeNotifier changes) : IFeatlyStore
 {
@@ -46,6 +49,12 @@ internal sealed class SqliteFeatlyStore(
     public IPendingChangeStore PendingChanges { get; } = pendingChanges;
 
     public IApprovalPolicyStore ApprovalPolicies { get; } = approvalPolicies;
+
+    public IExperimentStore Experiments { get; } = experiments;
+
+    public IEventStore Events { get; } = events;
+
+    public IAssignmentStore Assignments { get; } = assignments;
 
     public IApiKeyStore ApiKeys { get; } = apiKeys;
 
