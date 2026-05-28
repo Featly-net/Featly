@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.0.7-preview.1] - 2026-05-28
+
+Ships M9 end-to-end: experiments / A-B testing. An `Experiment` is layered on an existing flag (by key) with a set of conversion metric keys, an optional sticky-assignment toggle, and a start/stop window. While an experiment is active the SDK automatically emits an `Exposure` event whenever it evaluates the underlying flag, and applications track conversions via `IFeatlyClient.Events.TrackAsync`; events batch through a non-blocking channel and flush to `POST /api/sdk/events`. The server aggregates the raw event rows on read into per-variant exposure counts and per-metric conversion rates (`GET /api/admin/experiments/{key}/analytics`), and the embedded dashboard grows an Experiments screen with a list, a detail view, Start/Stop controls, and CSS-only bar charts. Sticky experiments pin a subject to the first variant it saw so a mid-flight weight change doesn't migrate already-exposed subjects. Everything is additive and opt-in — no breaking change.
+
 ### Added
 
 - **M9 PR 9D — Dashboard Experiments list + detail + analytics charts (closes M9).** The experimentation feature becomes operable from the embedded dashboard. New **Experiments** nav screen lists the environment's experiments (key, name, underlying flag, running/stopped/draft status, metric count, started date). The **detail view** shows the experiment's metadata (name, hypothesis, flag link, sticky flag, metric keys, window), a **Start / Stop / Restart** control wired to the 9B lifecycle endpoints, and an **analytics** panel rendered from `GET /api/admin/experiments/{key}/analytics`: an "exposures by variant" bar chart plus one conversion-rate bar chart per metric key (per-variant rate with the converting/exposed counts), with an empty-state when no exposures have been recorded yet. Pure front-end (`app.js` / `app.css` / `index.html`); no API changes. Bar charts are CSS-only (no chart library) to keep the dashboard dependency-free. **M9 is complete.** No breaking change.
