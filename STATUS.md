@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M8 — Approval workflow** (complete; ready to tag)
+**Between milestones** — M8 closed and shipped as `v0.0.6-preview.1`. M9 (Experiments / A-B testing: layered experiments on flags, exposure events, custom event tracking, basic analytics) is the next planned milestone but has not started yet.
+
+## Previous milestone
+
+**M8 — Approval workflow** (complete; published as `v0.0.6-preview.1` on NuGet)
 
 Four sequenced PRs:
 
@@ -14,7 +18,7 @@ Four sequenced PRs:
 - [x] **PR 8C — gate integration + stale + dryRun + emergency**: `ChangeGate` intercepts flag/config/segment POST/PUT — returns `202` + `PendingChange` when the env policy requires approval; `?dryRun` reports without mutating; `?emergency=true&reason=` applies immediately with an audit record; `ChangeStaleness` refuses stale applies (`409`) and marks sibling open changes stale. 6 new tests.
 - [x] **PR 8D — dashboard Inbox + CR detail + policy editor**: unified Inbox (pending changes + role upgrade requests); change-detail with current/proposed JSON diff, comments, approvals list, and Approve/Reject/Apply/Bypass buttons; per-environment Approvals policy editor. Smoke-validated via the embedded dashboard.
 
-## Previous milestone
+## Milestone before that
 
 **M7 — Custom RBAC + Projects** (complete; published as `v0.0.5-preview.1` on NuGet)
 
