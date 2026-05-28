@@ -33,8 +33,13 @@
         Suppressed because Permission is the domain concept, not the .NET
         SecurityPermission-style suffix the rule is guarding against. Renaming
         the enum would obscure intent across roles, RBAC, audit and the dashboard.
+      CA1716: "Rename type Event so it no longer conflicts with the reserved VB
+        keyword 'Event'." Suppressed because Event is the telemetry domain
+        concept (ARCHITECTURE.md section 16) surfaced across the SDK (IEventClient,
+        exposure/custom events), the ingest API and the dashboard. Renaming it
+        would obscure intent for a feature-management product that is .NET-first.
     -->
-    <NoWarn>$(NoWarn);NU1507;CA1720;CA1711</NoWarn>
+    <NoWarn>$(NoWarn);NU1507;CA1720;CA1711;CA1716</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Label="Deterministic builds">

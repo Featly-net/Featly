@@ -22,6 +22,9 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         RoleUpgradeRequests = new InMemoryRoleUpgradeRequestStore();
         PendingChanges = new InMemoryPendingChangeStore();
         ApprovalPolicies = new InMemoryApprovalPolicyStore();
+        Experiments = new InMemoryExperimentStore();
+        Events = new InMemoryEventStore();
+        Assignments = new InMemoryAssignmentStore();
         ApiKeys = new InMemoryApiKeyStore();
         Changes = new InProcessChangeNotifier();
     }
@@ -61,6 +64,15 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IApprovalPolicyStore ApprovalPolicies { get; }
+
+    /// <inheritdoc />
+    public IExperimentStore Experiments { get; }
+
+    /// <inheritdoc />
+    public IEventStore Events { get; }
+
+    /// <inheritdoc />
+    public IAssignmentStore Assignments { get; }
 
     /// <inheritdoc />
     public IApiKeyStore ApiKeys { get; }

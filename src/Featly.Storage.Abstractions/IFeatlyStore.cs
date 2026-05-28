@@ -49,6 +49,15 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on per-environment approval policies (M8+).</summary>
     IApprovalPolicyStore ApprovalPolicies { get; }
 
+    /// <summary>Persistence operations on experiments (M9+).</summary>
+    IExperimentStore Experiments { get; }
+
+    /// <summary>Append-only telemetry event store (M9+).</summary>
+    IEventStore Events { get; }
+
+    /// <summary>Persistence operations on sticky experiment assignments (M9+).</summary>
+    IAssignmentStore Assignments { get; }
+
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 

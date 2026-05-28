@@ -5,7 +5,14 @@
 
 ## Active milestone
 
-**Between milestones** — M8 closed and shipped as `v0.0.6-preview.1`. M9 (Experiments / A-B testing: layered experiments on flags, exposure events, custom event tracking, basic analytics) is the next planned milestone but has not started yet.
+**M9 — Experiments / A-B testing** (in progress)
+
+Layered experiments on flags, automatic exposure events, custom event tracking, and basic per-variant analytics. Four sequenced PRs:
+
+- [x] **PR 9A — Experiment/Event/Assignment domain + storage**: 3 entities (`Experiment` layered on a flag by `FlagKey` with a metric-keys list, sticky toggle, and a started/stopped window + computed `IsActive`; append-only `Event` with Exposure/Custom type and a JsonElement properties bag; first-write-wins `Assignment`); `IExperimentStore` + `IEventStore` + `IAssignmentStore` on the facade with InMemory + SQLite + migration `AddExperiments`. Analytics aggregate over raw event rows on read. 6 new SQLite store round-trips, 256 passing total.
+- [ ] **PR 9B — server**: `/api/admin/experiments` CRUD + start/stop; `/api/sdk/events` batch ingest; analytics endpoint (per-variant exposure counts + conversion rates); experiments in the SDK config snapshot.
+- [ ] **PR 9C — SDK**: `IEventClient` + auto exposure emission (batched) + `TrackAsync` + sticky-assignment reads.
+- [ ] **PR 9D — dashboard**: Experiments list + detail with per-variant bar charts.
 
 ## Previous milestone
 
