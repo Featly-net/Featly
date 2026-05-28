@@ -70,8 +70,18 @@ internal sealed class DefaultFeatlyPermissionChecker(
         var userRow = await store.Users.GetByIdentifierAsync(user.Identifier, ct).ConfigureAwait(false);
         if (userRow is not null && !userRow.Disabled)
         {
+            // Expand the user into the set of assignee ids: the user itself plus
+            // every group it belongs to. A group assignment grants its role to
+            // all members (ARCHITECTURE.md §11).
+            var assigneeIds = new List<Guid> { userRow.Id };
+            var groups = await store.Groups.ListForMemberAsync(userRow.Id, ct).ConfigureAwait(false);
+            foreach (var group in groups)
+            {
+                assigneeIds.Add(group.Id);
+            }
+
             var assignments = await store.RoleAssignments
-                .ListForAssigneesAsync([userRow.Id], ct)
+                .ListForAssigneesAsync(assigneeIds, ct)
                 .ConfigureAwait(false);
 
             foreach (var roleId in MatchingRoleIds(assignments, effectiveProjectId, environmentId))

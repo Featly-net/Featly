@@ -2,9 +2,9 @@ namespace Featly;
 
 /// <summary>
 /// Associates a <see cref="Role"/> with an assignee (a <see cref="User"/> or a
-/// <c>UserGroup</c>) in the scope of a <see cref="Project"/> and, optionally,
-/// a single <see cref="Environment"/>. The polymorphic join table at the heart
-/// of Featly's RBAC (ARCHITECTURE.md §11).
+/// <see cref="UserGroup"/>) in the scope of a <see cref="Project"/> and,
+/// optionally, a single <see cref="Environment"/>. The polymorphic join table
+/// at the heart of Featly's RBAC (ARCHITECTURE.md §11).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +19,7 @@ namespace Featly;
 /// M7 PR 7A introduces direct <see cref="AssigneeType.User"/> assignments and
 /// the resolver that unions them. Group assignments
 /// (<see cref="AssigneeType.Group"/>) are resolved in M7 PR 7B once
-/// <c>UserGroup</c> lands.
+/// <see cref="UserGroup"/> lands.
 /// </para>
 /// </remarks>
 public sealed class RoleAssignment
@@ -27,10 +27,10 @@ public sealed class RoleAssignment
     /// <summary>Stable row id.</summary>
     public Guid Id { get; init; }
 
-    /// <summary>Whether <see cref="AssigneeId"/> points at a <see cref="User"/> or a <c>UserGroup</c>.</summary>
+    /// <summary>Whether <see cref="AssigneeId"/> points at a <see cref="User"/> or a <see cref="UserGroup"/>.</summary>
     public required AssigneeType AssigneeType { get; init; }
 
-    /// <summary>Row id of the assigned <see cref="User"/> or <c>UserGroup</c>, per <see cref="AssigneeType"/>.</summary>
+    /// <summary>Row id of the assigned <see cref="User"/> or <see cref="UserGroup"/>, per <see cref="AssigneeType"/>.</summary>
     public required Guid AssigneeId { get; init; }
 
     /// <summary>Project this assignment scopes to.</summary>
@@ -58,6 +58,6 @@ public enum AssigneeType
     /// <summary>The assignee is a single <see cref="User"/>.</summary>
     User,
 
-    /// <summary>The assignee is a <c>UserGroup</c>; every member inherits the role.</summary>
+    /// <summary>The assignee is a <see cref="UserGroup"/>; every member inherits the role.</summary>
     Group,
 }
