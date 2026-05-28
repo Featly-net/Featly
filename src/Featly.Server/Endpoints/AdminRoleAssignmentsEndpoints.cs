@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -51,6 +52,7 @@ internal static class AdminRoleAssignmentsEndpoints
     private static async Task<IResult> CreateAsync(
         RoleAssignmentWriteRequest body,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -103,12 +105,21 @@ internal static class AdminRoleAssignmentsEndpoints
             AssignedByUserId = await ResolveActorUserIdAsync(store, principal, ct).ConfigureAwait(false),
         };
         await store.RoleAssignments.CreateAsync(assignment, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.RoleAssigned, "RoleAssignment", assignment.Id.ToString(),
+            assignment.EnvironmentId, principal,
+            new { assignment.AssigneeType, assignment.AssigneeId, assignment.RoleId, assignment.ProjectId }, ct).ConfigureAwait(false);
         return Results.Created($"/api/admin/role-assignments/{assignment.Id}", assignment);
     }
 
-    private static async Task<IResult> DeleteAsync(Guid id, StorageFacade store, CancellationToken ct)
+    private static async Task<IResult> DeleteAsync(
+        Guid id,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
     {
         await store.RoleAssignments.DeleteAsync(id, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.RoleUnassigned, "RoleAssignment", id.ToString(), null, principal, null, ct).ConfigureAwait(false);
         return Results.NoContent();
     }
 

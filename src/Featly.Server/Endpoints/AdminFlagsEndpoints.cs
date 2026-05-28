@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Approval;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -62,6 +63,7 @@ internal static class AdminFlagsEndpoints
         FlagWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -102,6 +104,7 @@ internal static class AdminFlagsEndpoints
         var flag = body.ToEntity(environment.Id, actor);
         await store.Flags.UpsertAsync(environment.Id, flag, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, flag.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.FlagCreated, "Flag", flag.Key, environment.Id, user, flag, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/flags/{flag.Key}?env={environment.Key}", flag);
     }
@@ -111,6 +114,7 @@ internal static class AdminFlagsEndpoints
         FlagWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -161,6 +165,7 @@ internal static class AdminFlagsEndpoints
 
         await store.Flags.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.FlagUpdated, "Flag", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }

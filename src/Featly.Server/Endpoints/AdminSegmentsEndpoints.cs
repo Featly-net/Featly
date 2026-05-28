@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Approval;
 using Featly.Server.Authentication;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -63,6 +64,7 @@ internal static class AdminSegmentsEndpoints
         SegmentWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -100,6 +102,7 @@ internal static class AdminSegmentsEndpoints
         var segment = body.ToEntity(environment.Id, actor);
         await store.Segments.UpsertAsync(environment.Id, segment, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, segment.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SegmentCreated, "Segment", segment.Key, environment.Id, user, segment, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/segments/{segment.Key}?env={environment.Key}", segment);
     }
@@ -109,6 +112,7 @@ internal static class AdminSegmentsEndpoints
         SegmentWriteRequest body,
         StorageFacade store,
         ChangeGate gate,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct,
@@ -154,6 +158,7 @@ internal static class AdminSegmentsEndpoints
 
         await store.Segments.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SegmentUpdated, "Segment", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }
@@ -161,6 +166,7 @@ internal static class AdminSegmentsEndpoints
     private static async Task<IResult> DeleteAsync(
         string key,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         string? env,
         ClaimsPrincipal user,
         CancellationToken ct)
@@ -179,6 +185,7 @@ internal static class AdminSegmentsEndpoints
         var actor = ResolveActor(user);
         await store.Segments.DeleteAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SegmentDeleted, "Segment", key, environment.Id, user, null, ct).ConfigureAwait(false);
 
         return Results.NoContent();
     }

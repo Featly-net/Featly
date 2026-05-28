@@ -49,6 +49,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
         apiGroup.MapAdminChanges();
         apiGroup.MapAdminApprovalPolicies();
         apiGroup.MapAdminExperiments();
+        apiGroup.MapAdminAudit();
         apiGroup.MapSdkEndpoints();
         apiGroup.MapSdkEvents();
 
