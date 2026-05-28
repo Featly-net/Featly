@@ -250,6 +250,8 @@
         { match: /^\/configs\/?$/,       key: "configList",   params: function () { return {}; } },
         { match: /^\/segments\/(.+)$/,   key: "segmentDetail",params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
         { match: /^\/segments\/?$/,      key: "segmentList",  params: function () { return {}; } },
+        { match: /^\/experiments\/(.+)$/, key: "experimentDetail", params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
+        { match: /^\/experiments\/?$/,   key: "experimentList", params: function () { return {}; } },
         { match: /^\/users\/(.+)$/,      key: "userDetail",   params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/users\/?$/,         key: "userList",     params: function () { return {}; } },
         { match: /^\/roles\/?$/,         key: "roleList",     params: function () { return {}; } },
@@ -281,6 +283,7 @@
         if (key.indexOf("flag") === 0) { return "/flags"; }
         if (key.indexOf("config") === 0) { return "/configs"; }
         if (key.indexOf("segment") === 0) { return "/segments"; }
+        if (key.indexOf("experiment") === 0) { return "/experiments"; }
         if (key.indexOf("user") === 0) { return "/users"; }
         if (key.indexOf("role") === 0) { return "/roles"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
@@ -347,6 +350,8 @@
         flagDetail:    function (p) { renderFlagDetail(p.key); },
         configDetail:  function (p) { renderConfigDetail(p.key); },
         segmentDetail: function (p) { renderSegmentDetail(p.key); },
+        experimentList:   function () { renderExperimentList(); },
+        experimentDetail: function (p) { renderExperimentDetail(p.key); },
         userList:    function () { renderUserList(); },
         userDetail:  function (p) { renderUserDetail(p.id); },
         inbox:        function () { renderInbox(); },
@@ -774,6 +779,154 @@
                     + '<tbody>' + rows + '</tbody></table></div>';
             })
             .catch(handleErrOnView("Roles"));
+    }
+
+    // ============================================================
+    // Experiments (M9): list, detail with analytics + bar charts
+    // ============================================================
+    function experimentStatus(exp) {
+        if (exp.isActive) { return '<span class="preview-reason preview-reason--TargetingMatch">running</span>'; }
+        if (exp.stoppedAt) { return '<span class="preview-reason preview-reason--Disabled">stopped</span>'; }
+        return '<span class="preview-reason preview-reason--Default">draft</span>';
+    }
+
+    function renderExperimentList() {
+        if (!currentEnv) {
+            viewEl.innerHTML = '<h1>Experiments</h1><div class="placeholder"><p>No environment selected yet.</p></div>';
+            return;
+        }
+        viewEl.innerHTML = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        api("GET", "/admin/experiments?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = Array.isArray(rows) ? rows : [];
+                var heading = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>'
+                    + '<p class="muted">A/B experiments layered on a flag. Start one to begin collecting exposures; track conversions via <code>IEventClient.TrackAsync</code>.</p>';
+                if (rows.length === 0) {
+                    viewEl.innerHTML = heading + '<div class="placeholder"><p>No experiments in this environment yet.</p><p class="muted">Create one via <code>POST /api/admin/experiments</code>.</p></div>';
+                    return;
+                }
+                var body = rows.map(function (e) {
+                    return '<tr>'
+                        + '<td><a data-link="/experiments/' + encodeURIComponent(e.key) + '">' + code(e.key) + '</a></td>'
+                        + '<td>' + esc(e.name) + '</td>'
+                        + '<td>' + code(e.flagKey) + '</td>'
+                        + '<td>' + experimentStatus(e) + '</td>'
+                        + '<td>' + (e.metricKeys || []).length + '</td>'
+                        + '<td>' + (e.startedAt ? formatDate(e.startedAt) : '<span class="muted">—</span>') + '</td>'
+                        + '</tr>';
+                }).join("");
+                viewEl.innerHTML = heading
+                    + '<div class="table-wrap"><table class="table">'
+                    + '<thead><tr><th>Key</th><th>Name</th><th>Flag</th><th>Status</th><th>Metrics</th><th>Started</th></tr></thead>'
+                    + '<tbody>' + body + '</tbody></table></div>';
+            })
+            .catch(handleErrOnView("Experiments"));
+    }
+
+    function renderExperimentDetail(key) {
+        if (!currentEnv) { return; }
+        viewEl.innerHTML = detailLoadingShell("Experiment", key);
+        var envQ = "?env=" + encodeURIComponent(currentEnv.key);
+        Promise.all([
+            api("GET", "/admin/experiments/" + encodeURIComponent(key) + envQ),
+            api("GET", "/admin/experiments/" + encodeURIComponent(key) + "/analytics" + envQ).catch(function () { return null; }),
+        ]).then(function (res) {
+            var exp = res[0];
+            var analytics = res[1];
+            var startStop = exp.isActive
+                ? '<button type="button" class="btn-ghost" data-exp="stop">Stop experiment</button>'
+                : '<button type="button" class="btn-primary" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + ' experiment</button>';
+
+            viewEl.innerHTML = [
+                '<a data-link="/experiments" class="back-link">← Experiments</a>',
+                '<h1>' + code(exp.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+                '<div class="card"><dl class="preview-result__dl">',
+                '  <dt>Name</dt><dd>' + esc(exp.name) + '</dd>',
+                exp.hypothesis ? '  <dt>Hypothesis</dt><dd>' + esc(exp.hypothesis) + '</dd>' : '',
+                '  <dt>Flag</dt><dd><a data-link="/flags/' + encodeURIComponent(exp.flagKey) + '">' + code(exp.flagKey) + '</a></dd>',
+                '  <dt>Status</dt><dd>' + experimentStatus(exp) + '</dd>',
+                '  <dt>Sticky</dt><dd>' + (exp.stickyAssignments ? "yes — subjects keep their first variant" : "no") + '</dd>',
+                '  <dt>Metric keys</dt><dd>' + ((exp.metricKeys || []).length ? (exp.metricKeys).map(function (m) { return code(m); }).join(" ") : '<span class="muted">none</span>') + '</dd>',
+                '  <dt>Started</dt><dd>' + (exp.startedAt ? formatDate(exp.startedAt) : '<span class="muted">—</span>') + '</dd>',
+                '  <dt>Stopped</dt><dd>' + (exp.stoppedAt ? formatDate(exp.stoppedAt) : '<span class="muted">—</span>') + '</dd>',
+                '</dl>',
+                '<div class="cr-actions">' + startStop + '<span class="save-msg" id="exp-msg"></span></div>',
+                '</div>',
+                '<h2>Analytics</h2>',
+                renderExperimentAnalytics(exp, analytics),
+            ].join("\n");
+
+            wireExperimentDetail(exp);
+        }).catch(handleErrOnView("Experiment: " + key));
+    }
+
+    function renderExperimentAnalytics(exp, a) {
+        if (!a || !a.variants || a.variants.length === 0) {
+            return '<div class="placeholder"><p>No exposures recorded yet.</p>'
+                + '<p class="muted">' + (exp.isActive ? "Evaluate the flag from an SDK client to start collecting data." : "Start the experiment to begin collecting exposures.") + '</p></div>';
+        }
+
+        var metricKeys = exp.metricKeys || [];
+        var maxExposed = a.variants.reduce(function (mx, v) { return Math.max(mx, v.exposedSubjects || 0); }, 0) || 1;
+
+        // Exposures by variant.
+        var exposureBars = a.variants.map(function (v) {
+            var pct = Math.round(((v.exposedSubjects || 0) / maxExposed) * 100);
+            return barRow(v.variantKey, pct, (v.exposedSubjects || 0) + " subject(s)", "bar--exposure");
+        }).join("");
+
+        var sections = [
+            '<div class="card">',
+            '<div class="muted exp-total">' + a.totalExposedSubjects + ' subject(s) · ' + a.totalExposureEvents + ' exposure event(s)</div>',
+            '<h3 class="preview-h3">Exposures by variant</h3>',
+            '<div class="bar-chart">' + exposureBars + '</div>',
+            '</div>',
+        ];
+
+        // One conversion-rate chart per metric.
+        metricKeys.forEach(function (metric) {
+            var rows = a.variants.map(function (v) {
+                var m = (v.metrics || []).find(function (x) { return x.metricKey === metric; });
+                var rate = m ? m.conversionRate : 0;
+                var pct = Math.round(rate * 1000) / 10; // one decimal
+                var convs = m ? m.conversions : 0;
+                return barRow(v.variantKey, Math.min(pct, 100), pct + "% (" + convs + "/" + (v.exposedSubjects || 0) + ")", "bar--conversion");
+            }).join("");
+            sections.push(
+                '<div class="card">'
+                + '<h3 class="preview-h3">Conversion rate — ' + code(metric) + '</h3>'
+                + '<div class="bar-chart">' + rows + '</div>'
+                + '</div>');
+        });
+
+        return sections.join("\n");
+    }
+
+    function barRow(label, pct, valueText, modifier) {
+        var width = Math.max(0, Math.min(100, pct));
+        return '<div class="bar-row">'
+            + '<div class="bar-row__label">' + esc(label) + '</div>'
+            + '<div class="bar-row__track"><div class="bar ' + modifier + '" style="width:' + width + '%" role="img" aria-label="' + esc(label + ": " + valueText) + '"></div></div>'
+            + '<div class="bar-row__value">' + esc(valueText) + '</div>'
+            + '</div>';
+    }
+
+    function wireExperimentDetail(exp) {
+        var msg = document.getElementById("exp-msg");
+        Array.prototype.slice.call(document.querySelectorAll("[data-exp]")).forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var action = btn.getAttribute("data-exp");
+                btn.disabled = true;
+                setMessageOn(msg, "loading", action === "start" ? "Starting…" : "Stopping…");
+                api("POST", "/admin/experiments/" + encodeURIComponent(exp.key) + "/" + action + "?env=" + encodeURIComponent(currentEnv.key))
+                    .then(function () { renderExperimentDetail(exp.key); })
+                    .catch(function (err) {
+                        btn.disabled = false;
+                        if (err.kind === "auth") { showAuthPrompt(); return; }
+                        setMessageOn(msg, "error", err.message);
+                    });
+            });
+        });
     }
 
     // ============================================================

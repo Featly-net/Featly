@@ -868,3 +868,58 @@ p:last-child { margin-bottom: 0; }
 @media (max-width: 800px) {
     .cr-diff { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Experiments (M9): analytics bar charts
+   ============================================================ */
+.exp-total {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-3);
+}
+.bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+.bar-row {
+    display: grid;
+    grid-template-columns: 8rem 1fr 9rem;
+    align-items: center;
+    gap: var(--space-3);
+}
+.bar-row__label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bar-row__track {
+    background: var(--color-bg-muted);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    height: 1.25rem;
+}
+.bar {
+    height: 100%;
+    border-radius: var(--radius-sm);
+    min-width: 2px;
+    transition: width 0.2s ease;
+}
+.bar--exposure { background: #2563eb; }
+.bar--conversion { background: #16a34a; }
+.bar-row__value {
+    font-size: 0.8125rem;
+    color: var(--color-fg-muted);
+    text-align: right;
+    white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+    .bar--exposure { background: #60a5fa; }
+    .bar--conversion { background: #4ade80; }
+}
+
+@media (max-width: 800px) {
+    .bar-row { grid-template-columns: 6rem 1fr 7rem; gap: var(--space-2); }
+}
