@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M9 — Experiments / A-B testing** (complete; not yet released)
+**Between milestones** — M9 closed and shipped as `v0.0.7-preview.1`. M10 (Webhooks + audit polish: outbound webhooks on flag/config/experiment changes, richer audit log) is the next planned milestone but has not started yet.
+
+## Previous milestone
+
+**M9 — Experiments / A-B testing** (complete; published as `v0.0.7-preview.1` on NuGet)
 
 Layered experiments on flags, automatic exposure events, custom event tracking, and basic per-variant analytics. Four sequenced PRs:
 
@@ -14,7 +18,7 @@ Layered experiments on flags, automatic exposure events, custom event tracking, 
 - [x] **PR 9C — SDK**: `IEventClient` (`IFeatlyClient.Events`) + `TrackAsync`; non-blocking `IEventSink` (bounded channel, drop-on-full) drained by a background `FeatlyEventFlushService` batching to `/api/sdk/events`; automatic first-exposure emission from the flag client (O(1) coverage check, allocation-free when no experiment); process-local sticky pinning that overrides the value after a weight change. No-op until `UseServer()`. 9 new tests, 278 passing total.
 - [x] **PR 9D — dashboard**: Experiments nav screen (list), detail view with Start/Stop/Restart and a CSS-only analytics panel — exposures-by-variant bar chart + per-metric conversion-rate bars from `GET /api/admin/experiments/{key}/analytics`. Closes M9.
 
-## Previous milestone
+## Milestone before that
 
 **M8 — Approval workflow** (complete; published as `v0.0.6-preview.1` on NuGet)
 
