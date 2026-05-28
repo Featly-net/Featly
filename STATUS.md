@@ -5,14 +5,14 @@
 
 ## Active milestone
 
-**M8 — Approval workflow** (in progress; PR 8A landed)
+**M8 — Approval workflow** (complete; ready to tag)
 
 Four sequenced PRs:
 
 - [x] **PR 8A — domain + storage + policy engine**: 5 entities (`PendingChange`, `ChangeApproval`, `ChangeComment`, `ApprovalPolicy`, `ApproverRule`) + enums; `IPendingChangeStore` + `IApprovalPolicyStore` with InMemory + SQLite + migration `AddApprovalWorkflow`; pure `ApprovalPolicyEvaluator` (MinApprovals + mandatory rules + self-approval, membership injected as a delegate). 16 new tests.
 - [x] **PR 8B — change lifecycle endpoints + policy CRUD**: `/api/admin/changes` (propose/list/get/comment/approve/apply/bypass) with per-route permissions; `ChangeApplicationService` (deserializes proposed state → Flag/Config/Segment store) + `ApproverMatcher` (role/group membership for the evaluator); `/api/admin/approval-policies/{env}` GET/PUT/DELETE. 7 new tests.
 - [x] **PR 8C — gate integration + stale + dryRun + emergency**: `ChangeGate` intercepts flag/config/segment POST/PUT — returns `202` + `PendingChange` when the env policy requires approval; `?dryRun` reports without mutating; `?emergency=true&reason=` applies immediately with an audit record; `ChangeStaleness` refuses stale applies (`409`) and marks sibling open changes stale. 6 new tests.
-- [ ] **PR 8D — dashboard Inbox + CR detail + policy editor**: unified Inbox (pending changes + role upgrade requests), CR detail with diff view + comments + approver status, per-environment policy editor.
+- [x] **PR 8D — dashboard Inbox + CR detail + policy editor**: unified Inbox (pending changes + role upgrade requests); change-detail with current/proposed JSON diff, comments, approvals list, and Approve/Reject/Apply/Bypass buttons; per-environment Approvals policy editor. Smoke-validated via the embedded dashboard.
 
 ## Previous milestone
 

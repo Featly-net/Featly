@@ -253,6 +253,9 @@
         { match: /^\/users\/(.+)$/,      key: "userDetail",   params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/users\/?$/,         key: "userList",     params: function () { return {}; } },
         { match: /^\/roles\/?$/,         key: "roleList",     params: function () { return {}; } },
+        { match: /^\/inbox\/(.+)$/,      key: "changeDetail", params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
+        { match: /^\/inbox\/?$/,         key: "inbox",        params: function () { return {}; } },
+        { match: /^\/approvals\/?$/,     key: "approvals",    params: function () { return {}; } },
         { match: /^\/settings\/?$/,      key: "settings",     params: function () { return {}; } },
     ];
 
@@ -280,6 +283,8 @@
         if (key.indexOf("segment") === 0) { return "/segments"; }
         if (key.indexOf("user") === 0) { return "/users"; }
         if (key.indexOf("role") === 0) { return "/roles"; }
+        if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
+        if (key === "approvals") { return "/approvals"; }
         if (key === "settings") { return "/settings"; }
         return "/";
     }
@@ -344,6 +349,9 @@
         segmentDetail: function (p) { renderSegmentDetail(p.key); },
         userList:    function () { renderUserList(); },
         userDetail:  function (p) { renderUserDetail(p.id); },
+        inbox:        function () { renderInbox(); },
+        changeDetail: function (p) { renderChangeDetail(p.id); },
+        approvals:    function () { renderApprovalsEditor(); },
         roleList:    function () { renderRoleList(); },
         settings: function () {
             viewEl.innerHTML = '<h1>Settings</h1><div class="placeholder"><p>Environment defaults, approval policy, webhook configuration, audit retention.</p><p class="muted">M6+ unlocks the editor.</p></div>';
@@ -766,6 +774,190 @@
                     + '<tbody>' + rows + '</tbody></table></div>';
             })
             .catch(handleErrOnView("Roles"));
+    }
+
+    // ============================================================
+    // Approval workflow (M8): Inbox, change detail, policy editor
+    // ============================================================
+    function renderInbox() {
+        viewEl.innerHTML = '<h1>Inbox</h1><div class="card"><p class="muted">Loading…</p></div>';
+        Promise.all([
+            api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
+            api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
+        ]).then(function (res) {
+            var changes = Array.isArray(res[0]) ? res[0] : [];
+            var upgrades = Array.isArray(res[1]) ? res[1] : [];
+
+            var changeRows = changes.map(function (c) {
+                return '<tr>'
+                    + '<td><a data-link="/inbox/' + encodeURIComponent(c.id) + '">' + badge(c.entityType) + ' ' + code(c.entityKey) + '</a></td>'
+                    + '<td>' + esc(c.action) + '</td>'
+                    + '<td>' + (c.approvals || []).length + ' approval(s)</td>'
+                    + '<td>' + formatDate(c.createdAt) + '</td>'
+                    + '</tr>';
+            }).join("");
+
+            var upgradeRows = upgrades.map(function (u) {
+                return '<tr><td>' + code(truncate(u.userId, 8)) + '</td><td>' + esc(u.justification || "—") + '</td><td>' + formatDate(u.createdAt) + '</td></tr>';
+            }).join("");
+
+            viewEl.innerHTML = [
+                '<h1>Inbox</h1>',
+                '<h2>Pending changes <span class="muted">(' + changes.length + ')</span></h2>',
+                changeRows
+                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Entity</th><th>Action</th><th>Approvals</th><th>Proposed</th></tr></thead><tbody>' + changeRows + '</tbody></table></div>'
+                    : '<div class="placeholder"><p>No pending changes.</p></div>',
+                '<h2>Role upgrade requests <span class="muted">(' + upgrades.length + ')</span></h2>',
+                upgradeRows
+                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Justification</th><th>Filed</th></tr></thead><tbody>' + upgradeRows + '</tbody></table></div>'
+                    : '<div class="placeholder"><p>No pending role upgrade requests.</p></div>',
+            ].join("\n");
+        }).catch(handleErrOnView("Inbox"));
+    }
+
+    function renderChangeDetail(id) {
+        viewEl.innerHTML = '<a data-link="/inbox" class="back-link">← Inbox</a><h1>Change</h1><div class="card"><p class="muted">Loading…</p></div>';
+        api("GET", "/admin/changes/" + encodeURIComponent(id))
+            .then(function (c) {
+                var actions = changeActionButtons(c);
+                var comments = (c.comments || []).map(function (m) {
+                    return '<div class="cr-comment"><div class="muted">' + code(truncate(m.authorUserId, 8)) + ' · ' + formatDate(m.at) + '</div><div>' + esc(m.body) + '</div></div>';
+                }).join("");
+                var approvals = (c.approvals || []).map(function (a) {
+                    return '<li>' + badge(a.decision) + ' ' + code(truncate(a.approverUserId, 8)) + (a.comment ? ' — ' + esc(a.comment) : '') + '</li>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<a data-link="/inbox" class="back-link">← Inbox</a>',
+                    '<h1>' + badge(c.entityType) + ' ' + code(c.entityKey) + '</h1>',
+                    '<div class="card"><dl class="preview-result__dl">',
+                    '  <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
+                    '  <dt>Status</dt><dd>' + '<span class="preview-reason preview-reason--' + esc(c.status) + '">' + esc(c.status) + '</span>' + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</dd>',
+                    '  <dt>Author</dt><dd>' + code(truncate(c.authorUserId, 8)) + '</dd>',
+                    c.authorMessage ? '  <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
+                    '</dl></div>',
+                    '<h2>Diff</h2>',
+                    '<div class="cr-diff">',
+                    '  <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
+                    '  <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
+                    '</div>',
+                    approvals ? '<h2>Approvals</h2><ul class="cr-approvals">' + approvals + '</ul>' : '',
+                    '<h2>Comments</h2>',
+                    '<div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
+                    '<form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn-ghost btn-small">Comment</button></form>',
+                    '<h2>Decision</h2>',
+                    '<div class="cr-actions">' + actions + '<span class="save-msg" id="cr-msg"></span></div>',
+                ].join("\n");
+                wireChangeDetail(c);
+            })
+            .catch(handleErrOnView("Change"));
+    }
+
+    function changeActionButtons(c) {
+        var buttons = [];
+        if (c.status === "Pending") {
+            buttons.push('<button type="button" class="btn-primary" data-cr="approve">Approve</button>');
+            buttons.push('<button type="button" class="btn-ghost" data-cr="reject">Reject</button>');
+        }
+        if (c.status === "Approved") {
+            buttons.push('<button type="button" class="btn-primary" data-cr="apply">Apply</button>');
+        }
+        if (c.status === "Pending" || c.status === "Approved") {
+            buttons.push('<button type="button" class="btn-ghost" data-cr="bypass">Emergency bypass</button>');
+        }
+        return buttons.join(" ") || '<span class="muted">No actions available (' + esc(c.status) + ').</span>';
+    }
+
+    function wireChangeDetail(c) {
+        var msg = document.getElementById("cr-msg");
+        document.getElementById("cr-comment-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var body = document.getElementById("cr-comment").value.trim();
+            if (!body) { return; }
+            api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/comments", { body: body })
+                .then(function () { renderChangeDetail(c.id); })
+                .catch(crErr(msg));
+        });
+        Array.prototype.slice.call(document.querySelectorAll("[data-cr]")).forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var action = btn.getAttribute("data-cr");
+                if (action === "approve") {
+                    api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/approvals", { decision: "Approve" })
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                } else if (action === "reject") {
+                    var reason = window.prompt("Reason for rejection (optional):") || "";
+                    api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/approvals", { decision: "Reject", comment: reason })
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                } else if (action === "apply") {
+                    api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/apply")
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                } else if (action === "bypass") {
+                    var why = window.prompt("Emergency bypass reason (required):");
+                    if (!why) { return; }
+                    api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/bypass", { reason: why })
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                }
+            });
+        });
+    }
+
+    function crErr(msg) {
+        return function (err) {
+            if (err.kind === "auth") { showAuthPrompt(); return; }
+            if (msg) { msg.className = "save-msg save-msg--error"; msg.textContent = err.message; }
+        };
+    }
+
+    function prettyJson(value) {
+        if (value === null || value === undefined) { return "(none)"; }
+        try { return JSON.stringify(value, null, 2); } catch (_) { return String(value); }
+    }
+
+    function renderApprovalsEditor() {
+        if (!currentEnv) {
+            viewEl.innerHTML = '<h1>Approvals</h1><div class="placeholder"><p>No environment selected.</p></div>';
+            return;
+        }
+        var envKey = currentEnv.key;
+        viewEl.innerHTML = '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        api("GET", "/admin/approval-policies/" + encodeURIComponent(envKey))
+            .then(function (p) {
+                var rules = (p.approverRules || []).map(function (r) {
+                    return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' min ' + (r.minFromThisRule || 1) + '</li>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1>',
+                    '<p class="muted">When approval is required, mutations to this environment become pending changes that need sign-off before they apply.</p>',
+                    '<form id="policy-form" class="editor">',
+                    field("Require approval", '<label class="check"><input type="checkbox" name="required"' + (p.required ? " checked" : "") + ' /> Mutations require approval</label>'),
+                    field("Minimum approvals", '<input name="minApprovals" type="number" min="1" value="' + esc(p.minApprovals || 1) + '" />'),
+                    field("Self-approval", '<label class="check"><input type="checkbox" name="self"' + (p.authorCanApproveOwnChange ? " checked" : "") + ' /> Author may approve their own change</label>'),
+                    field("Emergency bypass", '<label class="check"><input type="checkbox" name="bypass"' + (p.allowEmergencyBypass ? " checked" : "") + ' /> Allow emergency bypass</label>'),
+                    '<div class="editor__footer"><button type="submit" class="btn-primary">Save policy</button><span class="save-msg" id="policy-msg"></span></div>',
+                    '</form>',
+                    rules ? '<h2>Approver rules</h2><ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted">No structured approver rules — a flat minimum-approvals count applies.</p>',
+                ].join("\n");
+                document.getElementById("policy-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target.elements;
+                    var pmsg = document.getElementById("policy-msg");
+                    setMessageOn(pmsg, "loading", "Saving…");
+                    api("PUT", "/admin/approval-policies/" + encodeURIComponent(envKey), {
+                        required: f["required"].checked,
+                        minApprovals: parseInt(f["minApprovals"].value, 10) || 1,
+                        authorCanApproveOwnChange: f["self"].checked,
+                        allowEmergencyBypass: f["bypass"].checked,
+                        approverRules: p.approverRules || [],
+                    }).then(function () { setMessageOn(pmsg, "success", "Saved."); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(pmsg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Approvals"));
+    }
+
+    function setMessageOn(slot, kind, text) {
+        if (!slot) { return; }
+        slot.className = "save-msg save-msg--" + kind;
+        slot.textContent = text;
     }
 
     // ============================================================

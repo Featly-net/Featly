@@ -813,3 +813,58 @@ p:last-child { margin-bottom: 0; }
     .grid-2 { grid-template-columns: 1fr; }
     .variant-row, .condition-row, .split-row { grid-template-columns: 1fr; }
 }
+
+/* Approval workflow (M8): inbox, change detail, policy editor */
+.cr-diff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+}
+.cr-json {
+    background: var(--color-bg-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 24rem;
+}
+.cr-comments {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+.cr-comment {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.875rem;
+}
+.cr-approvals {
+    margin: 0 0 var(--space-3);
+    padding-left: var(--space-4);
+    display: grid;
+    gap: var(--space-1);
+}
+.cr-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    flex-wrap: wrap;
+}
+.cr-actions input {
+    flex: 1 1 16rem;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+@media (max-width: 800px) {
+    .cr-diff { grid-template-columns: 1fr; }
+}
