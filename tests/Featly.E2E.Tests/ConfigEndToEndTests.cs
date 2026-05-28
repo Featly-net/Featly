@@ -162,9 +162,13 @@ public class ConfigEndToEndTests
         services.AddSingleton<IConfigClient>(sp => new ConfigClient(
             sp.GetRequiredService<FeatlySnapshotCache>(),
             sp.GetRequiredService<IFeatlyContextAccessor>()));
+        services.AddSingleton<IEventClient>(sp => new EventClient(
+            new NullEventSink(),
+            sp.GetRequiredService<IFeatlyContextAccessor>()));
         services.AddSingleton<IFeatlyClient>(sp => new FeatlyClient(
             sp.GetRequiredService<IFlagClient>(),
-            sp.GetRequiredService<IConfigClient>()));
+            sp.GetRequiredService<IConfigClient>(),
+            sp.GetRequiredService<IEventClient>()));
 
         services.AddHttpClient<FeatlyHttpClient>(client =>
         {
