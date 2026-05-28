@@ -139,6 +139,84 @@ public class DefaultPermissionCheckerTests
     }
 
     [Fact]
+    public async Task User_inherits_role_from_group_assignment()
+    {
+        using var host = await BuildHostAsync(autoProvisionMode: "Closed"); // isolate the group grant
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var checker = host.Services.GetRequiredService<IFeatlyPermissionChecker>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (userId, projectId) = await SeedUserAndProjectAsync(store, "ivan@example.com", ct);
+
+        // Ivan belongs to the "security" group; the group (not Ivan directly)
+        // is assigned the editor role.
+        var group = new UserGroup
+        {
+            Id = Guid.NewGuid(),
+            Key = "security",
+            Name = "Security",
+            MemberUserIds = [userId],
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        await store.Groups.UpsertAsync(group, ct);
+
+        var editor = await store.Roles.GetByKeyAsync(SystemRoles.EditorKey, ct);
+        await store.RoleAssignments.CreateAsync(new RoleAssignment
+        {
+            Id = Guid.NewGuid(),
+            AssigneeType = AssigneeType.Group,
+            AssigneeId = group.Id,
+            ProjectId = projectId,
+            EnvironmentId = null,
+            RoleId = editor!.Id,
+            AssignedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        var ivan = new ResolvedUser("ivan@example.com", "Ivan");
+        // Closed mode + no direct assignment, but the group grants editor.
+        (await checker.HasAsync(ivan, Guid.Empty, null, Permission.FlagCreate, ct)).Should().BeTrue();
+        (await checker.HasAsync(ivan, Guid.Empty, null, Permission.RoleCreate, ct)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Non_member_does_not_inherit_group_role()
+    {
+        using var host = await BuildHostAsync(autoProvisionMode: "Closed");
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var checker = host.Services.GetRequiredService<IFeatlyPermissionChecker>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (memberId, projectId) = await SeedUserAndProjectAsync(store, "judy@example.com", ct);
+        await SeedUserAndProjectAsync(store, "outsider@example.com", ct);
+
+        var group = new UserGroup
+        {
+            Id = Guid.NewGuid(),
+            Key = "admins",
+            Name = "Admins",
+            MemberUserIds = [memberId],
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        await store.Groups.UpsertAsync(group, ct);
+        var admin = await store.Roles.GetByKeyAsync(SystemRoles.AdminKey, ct);
+        await store.RoleAssignments.CreateAsync(new RoleAssignment
+        {
+            Id = Guid.NewGuid(),
+            AssigneeType = AssigneeType.Group,
+            AssigneeId = group.Id,
+            ProjectId = projectId,
+            EnvironmentId = null,
+            RoleId = admin!.Id,
+            AssignedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        var member = new ResolvedUser("judy@example.com", "Judy");
+        var outsider = new ResolvedUser("outsider@example.com", "Outsider");
+        (await checker.HasAsync(member, Guid.Empty, null, Permission.RoleCreate, ct)).Should().BeTrue();
+        (await checker.HasAsync(outsider, Guid.Empty, null, Permission.RoleCreate, ct)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Open_mode_gives_unassigned_user_the_viewer_floor()
     {
         using var host = await BuildHostAsync(); // AutoProvisionMode defaults to Open
