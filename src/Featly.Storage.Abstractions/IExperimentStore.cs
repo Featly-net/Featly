@@ -23,4 +23,11 @@ public interface IExperimentStore
 
     /// <summary>Deletes an experiment by key. Idempotent for a missing key.</summary>
     Task DeleteAsync(Guid environmentId, string key, CancellationToken ct);
+
+    /// <summary>
+    /// Most recent <see cref="Experiment.UpdatedAt"/> in the environment, or
+    /// <c>null</c> when there are none — folded into the SDK snapshot ETag so a
+    /// started/stopped experiment invalidates cached snapshots.
+    /// </summary>
+    Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct);
 }

@@ -51,7 +51,8 @@ internal static class SdkEndpoints
         var flagsMostRecent = await store.Flags.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
         var segmentsMostRecent = await store.Segments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
         var configsMostRecent = await store.Configs.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var mostRecent = Latest(Latest(flagsMostRecent, segmentsMostRecent), configsMostRecent);
+        var experimentsMostRecent = await store.Experiments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
+        var mostRecent = Latest(Latest(Latest(flagsMostRecent, segmentsMostRecent), configsMostRecent), experimentsMostRecent);
         var etag = ComputeEtag(environment.Id, mostRecent);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
@@ -66,13 +67,17 @@ internal static class SdkEndpoints
         var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
         var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
         var configs = await store.Configs.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        // Only active experiments ship in the snapshot — the SDK emits an
+        // exposure whenever it evaluates a flag that an active experiment covers.
+        var experiments = await store.Experiments.ListActiveAsync(environment.Id, ct).ConfigureAwait(false);
         var snapshot = new ConfigSnapshot(
             EnvironmentId: environment.Id,
             EnvironmentKey: environment.Key,
             At: DateTimeOffset.UtcNow,
             Flags: flags,
             Segments: segments,
-            Configs: configs);
+            Configs: configs,
+            Experiments: experiments);
 
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = MediaTypeNames.Application.Json;
