@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M7 — Custom RBAC + Projects** (complete; ready to tag)
+**Between milestones** — M7 closed and shipped as `v0.0.5-preview.1`. M8 (Approval workflow: PendingChange / ChangeApproval / ApprovalPolicy, the Inbox, diff view, emergency bypass) is the next planned milestone but has not started yet.
+
+## Previous milestone
+
+**M7 — Custom RBAC + Projects** (complete; published as `v0.0.5-preview.1` on NuGet)
 
 Four sequenced PRs:
 
@@ -14,7 +18,7 @@ Four sequenced PRs:
 - [x] **PR 7C — Custom roles + admin endpoints**: four admin endpoint groups (`users`, `roles`, `groups`, `role-assignments`) with per-route permission enforcement; custom roles via `cloneFromSystemRole` (union of template + explicit perms); system roles immutable (409 on reserved-key create, 403 on update/delete). 11 new tests.
 - [x] **PR 7D — RoleUpgradeRequest + Effective Access + dashboard**: `RoleUpgradeRequest` entity + store (InMemory + SQLite + migration `AddRoleUpgradeRequests`); file/list/approve/reject endpoints (approve mints the `RoleAssignment`); `GET /api/admin/users/{id}/effective-access` resolves the permission union + contributing roles; dashboard Users + Roles screens with an effective-access view. 12 new tests. 222 passing total.
 
-## Previous milestone
+## Milestone before that
 
 **M6 — Authentication pipeline + basic RBAC** (complete; published as `v0.0.4-preview.1` on NuGet)
 
