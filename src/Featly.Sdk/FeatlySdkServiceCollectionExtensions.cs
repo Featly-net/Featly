@@ -25,15 +25,26 @@ public static class FeatlySdkServiceCollectionExtensions
 
         services.TryAddSingleton<FeatlySnapshotCache>();
         services.TryAddSingleton<IFeatlyContextAccessor, NoOpFeatlyContextAccessor>();
+
+        // Telemetry sink: no-op until UseServer() swaps in the channel-backed
+        // sink and its flush service, so a server-less SDK truly does nothing.
+        services.TryAddSingleton<IEventSink, NullEventSink>();
+        services.TryAddSingleton<ExperimentExposureProcessor>();
+
         services.TryAddSingleton<IFlagClient>(sp => new FlagClient(
             sp.GetRequiredService<FeatlySnapshotCache>(),
-            sp.GetRequiredService<IFeatlyContextAccessor>()));
+            sp.GetRequiredService<IFeatlyContextAccessor>(),
+            sp.GetRequiredService<ExperimentExposureProcessor>()));
         services.TryAddSingleton<IConfigClient>(sp => new ConfigClient(
             sp.GetRequiredService<FeatlySnapshotCache>(),
             sp.GetRequiredService<IFeatlyContextAccessor>()));
+        services.TryAddSingleton<IEventClient>(sp => new EventClient(
+            sp.GetRequiredService<IEventSink>(),
+            sp.GetRequiredService<IFeatlyContextAccessor>()));
         services.TryAddSingleton<IFeatlyClient>(sp => new FeatlyClient(
             sp.GetRequiredService<IFlagClient>(),
-            sp.GetRequiredService<IConfigClient>()));
+            sp.GetRequiredService<IConfigClient>(),
+            sp.GetRequiredService<IEventClient>()));
 
         return new FeatlyClientBuilder(services);
     }
@@ -91,6 +102,14 @@ public static class FeatlySdkServiceCollectionExtensions
         });
 
         builder.Services.AddHostedService<FeatlyConfigSyncService>();
+
+        // Swap the no-op telemetry sink for the channel-backed one and start the
+        // background flusher now that there is a server to upload events to.
+        builder.Services.RemoveAll<IEventSink>();
+        builder.Services.AddSingleton<ChannelEventSink>();
+        builder.Services.AddSingleton<IEventSink>(sp => sp.GetRequiredService<ChannelEventSink>());
+        builder.Services.AddHostedService<FeatlyEventFlushService>();
+
         return builder;
     }
 

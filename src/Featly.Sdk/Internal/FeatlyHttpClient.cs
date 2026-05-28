@@ -57,6 +57,29 @@ internal sealed class FeatlyHttpClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Uploads a batch of telemetry events to <c>POST /api/sdk/events</c>.
+    /// Throws on a non-success status so the caller can decide whether to retry.
+    /// </summary>
+    public async Task SendEventsAsync(
+        string? environmentKey,
+        IReadOnlyList<QueuedEvent> events,
+        CancellationToken ct)
+    {
+        var path = string.IsNullOrEmpty(environmentKey)
+            ? "/api/sdk/events"
+            : $"/api/sdk/events?env={Uri.EscapeDataString(environmentKey)}";
+
+        var payload = new EventBatchPayload(events);
+        using var response = await httpClient
+            .PostAsJsonAsync(path, payload, s_jsonOptions, ct)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Wire shape matching the server's <c>EventBatchRequest</c>.</summary>
+    private sealed record EventBatchPayload(IReadOnlyList<QueuedEvent> Events);
+
+    /// <summary>
     /// Opens the SSE stream and returns the underlying response stream.
     /// Caller owns the lifetime.
     /// </summary>

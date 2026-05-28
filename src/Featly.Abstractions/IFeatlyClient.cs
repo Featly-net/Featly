@@ -15,4 +15,7 @@ public interface IFeatlyClient
 
     /// <summary>Client surface for resolving dynamic configuration values.</summary>
     IConfigClient Configs { get; }
+
+    /// <summary>Client surface for tracking custom telemetry events (M9+).</summary>
+    IEventClient Events { get; }
 }
