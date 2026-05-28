@@ -18,6 +18,8 @@ internal sealed class SqliteFeatlyStore(
     IRoleAssignmentStore roleAssignments,
     IUserGroupStore groups,
     IRoleUpgradeRequestStore roleUpgradeRequests,
+    IPendingChangeStore pendingChanges,
+    IApprovalPolicyStore approvalPolicies,
     IApiKeyStore apiKeys,
     IChangeNotifier changes) : IFeatlyStore
 {
@@ -40,6 +42,10 @@ internal sealed class SqliteFeatlyStore(
     public IUserGroupStore Groups { get; } = groups;
 
     public IRoleUpgradeRequestStore RoleUpgradeRequests { get; } = roleUpgradeRequests;
+
+    public IPendingChangeStore PendingChanges { get; } = pendingChanges;
+
+    public IApprovalPolicyStore ApprovalPolicies { get; } = approvalPolicies;
 
     public IApiKeyStore ApiKeys { get; } = apiKeys;
 

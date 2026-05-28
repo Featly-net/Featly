@@ -5,7 +5,14 @@
 
 ## Active milestone
 
-**Between milestones** — M7 closed and shipped as `v0.0.5-preview.1`. M8 (Approval workflow: PendingChange / ChangeApproval / ApprovalPolicy, the Inbox, diff view, emergency bypass) is the next planned milestone but has not started yet.
+**M8 — Approval workflow** (in progress; PR 8A landed)
+
+Four sequenced PRs:
+
+- [x] **PR 8A — domain + storage + policy engine**: 5 entities (`PendingChange`, `ChangeApproval`, `ChangeComment`, `ApprovalPolicy`, `ApproverRule`) + enums; `IPendingChangeStore` + `IApprovalPolicyStore` with InMemory + SQLite + migration `AddApprovalWorkflow`; pure `ApprovalPolicyEvaluator` (MinApprovals + mandatory rules + self-approval, membership injected as a delegate). 16 new tests.
+- [ ] **PR 8B — change lifecycle endpoints + policy CRUD**: `/api/admin/changes` (list/get/comment/approve/apply/bypass) + propose; per-environment approval-policy CRUD.
+- [ ] **PR 8C — gate integration + stale + dryRun + emergency**: transparent gating (mutations create a `PendingChange` when the env policy requires it), stale detection, `?dryRun`, `?emergency`.
+- [ ] **PR 8D — dashboard Inbox + CR detail + policy editor**: unified Inbox (pending changes + role upgrade requests), CR detail with diff view + comments + approver status, per-environment policy editor.
 
 ## Previous milestone
 
