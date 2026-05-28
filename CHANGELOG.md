@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.0.6-preview.1] - 2026-05-28
+
+Ships M8 end-to-end: the change-approval workflow. Per-environment `ApprovalPolicy` (with structured `ApproverRule`s — specific user, any-from-role, any-from-group, each optionally mandatory) gates mutations: when approval is required, ordinary flag/config/segment `POST`/`PUT` become a `PendingChange` (202) reviewed through an Approve/Reject/Apply lifecycle, with comments, a current-vs-proposed diff, stale detection when the entity moves underneath, `?dryRun` previews, and `?emergency=true&reason=` bypass with an audit trail. The embedded dashboard grows an Inbox, a change-request detail view, and a per-environment policy editor. Environments without a required policy are unaffected — mutations apply directly as before, so there is no breaking change.
+
 ### Added
 
 - **M8 PR 8D — Dashboard Inbox + change-request detail + approval policy editor (closes M8).** The approval workflow becomes operable from the embedded dashboard. New **Inbox** screen unifies pending changes and pending role-upgrade requests; clicking a change opens a **detail view** with a side-by-side current/proposed JSON diff, the comment thread, the approvals list, and inline action buttons — Approve, Reject (with reason), Apply, and Emergency bypass (with reason) — wired to the M8 PR 8B/8C endpoints, plus a comment box. New **Approvals** screen is a per-environment policy editor: toggle "require approval", set the minimum-approvals count, self-approval, and emergency-bypass, with the structured approver rules listed read-only. All actions use `credentials: 'include'` and re-render on success. Pure front-end (`app.js` / `app.css` / `index.html`); no API changes. Smoke-validated end to end via the embedded dashboard (policy load/save, Inbox sections, change-detail diff + status badge). 250 tests passing total. **M8 is complete.** No breaking change.
