@@ -109,6 +109,16 @@ public static class FeatlyServerServiceCollectionExtensions
         services.TryAddSingleton<Events.IFeatlyEventPublisher, Events.FeatlyEventPublisher>();
         services.AddSingleton<Events.IFeatlyEventConsumer, Events.AuditRecorder>();
 
+        // Webhooks (M10 10C): the dispatcher is the second event consumer; a
+        // background worker drains the persisted delivery queue with retry +
+        // HMAC signing.
+        services
+            .AddOptions<Webhooks.WebhookOptions>()
+            .BindConfiguration(Webhooks.WebhookOptions.SectionName);
+        services.AddSingleton<Events.IFeatlyEventConsumer, Webhooks.WebhookDispatcher>();
+        services.AddHttpClient(Webhooks.WebhookDeliveryWorker.HttpClientName);
+        services.AddHostedService<Webhooks.WebhookDeliveryWorker>();
+
         services.AddHostedService<DefaultProjectBootstrapHostedService>();
         services.AddHostedService<AuthBootstrapHostedService>();
 
