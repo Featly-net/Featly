@@ -33,6 +33,10 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<RoleUpgradeRequest> RoleUpgradeRequests => Set<RoleUpgradeRequest>();
 
+    public DbSet<PendingChange> PendingChanges => Set<PendingChange>();
+
+    public DbSet<ApprovalPolicy> ApprovalPolicies => Set<ApprovalPolicy>();
+
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -50,6 +54,8 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
         modelBuilder.ApplyConfiguration(new UserGroupConfiguration());
         modelBuilder.ApplyConfiguration(new RoleUpgradeRequestConfiguration());
+        modelBuilder.ApplyConfiguration(new PendingChangeConfiguration());
+        modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
     }
 }

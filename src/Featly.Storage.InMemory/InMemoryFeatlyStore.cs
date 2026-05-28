@@ -20,6 +20,8 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         RoleAssignments = new InMemoryRoleAssignmentStore();
         Groups = new InMemoryUserGroupStore();
         RoleUpgradeRequests = new InMemoryRoleUpgradeRequestStore();
+        PendingChanges = new InMemoryPendingChangeStore();
+        ApprovalPolicies = new InMemoryApprovalPolicyStore();
         ApiKeys = new InMemoryApiKeyStore();
         Changes = new InProcessChangeNotifier();
     }
@@ -53,6 +55,12 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IRoleUpgradeRequestStore RoleUpgradeRequests { get; }
+
+    /// <inheritdoc />
+    public IPendingChangeStore PendingChanges { get; }
+
+    /// <inheritdoc />
+    public IApprovalPolicyStore ApprovalPolicies { get; }
 
     /// <inheritdoc />
     public IApiKeyStore ApiKeys { get; }

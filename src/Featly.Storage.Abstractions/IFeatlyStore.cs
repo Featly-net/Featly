@@ -43,6 +43,12 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on role upgrade requests (M7+).</summary>
     IRoleUpgradeRequestStore RoleUpgradeRequests { get; }
 
+    /// <summary>Persistence operations on pending changes / approvals (M8+).</summary>
+    IPendingChangeStore PendingChanges { get; }
+
+    /// <summary>Persistence operations on per-environment approval policies (M8+).</summary>
+    IApprovalPolicyStore ApprovalPolicies { get; }
+
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 
