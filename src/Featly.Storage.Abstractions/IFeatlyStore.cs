@@ -40,6 +40,9 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on user groups (M7+).</summary>
     IUserGroupStore Groups { get; }
 
+    /// <summary>Persistence operations on role upgrade requests (M7+).</summary>
+    IRoleUpgradeRequestStore RoleUpgradeRequests { get; }
+
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 
