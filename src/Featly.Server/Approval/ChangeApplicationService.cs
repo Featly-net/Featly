@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Featly.Server.Endpoints;
 using ChangeNotification = Featly.Storage.ChangeNotification;
 using StorageFacade = Featly.Storage.IFeatlyStore;
@@ -15,10 +14,7 @@ namespace Featly.Server.Approval;
 /// </summary>
 internal sealed class ChangeApplicationService(StorageFacade store)
 {
-    private static readonly JsonSerializerOptions s_json = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter(allowIntegerValues: true) },
-    };
+    private static readonly JsonSerializerOptions s_json = ChangeJson.Options;
 
     /// <summary>Entity types this service knows how to apply.</summary>
     public static bool IsSupported(string entityType)

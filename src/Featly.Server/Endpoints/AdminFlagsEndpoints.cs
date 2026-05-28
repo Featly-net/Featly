@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Featly.Server.Approval;
 using Featly.Server.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -60,9 +61,13 @@ internal static class AdminFlagsEndpoints
     private static async Task<IResult> CreateFlagAsync(
         FlagWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -83,6 +88,16 @@ internal static class AdminFlagsEndpoints
             return Results.Conflict(new { error = $"Flag '{body.Key}' already exists in environment '{environment.Key}'." });
         }
 
+        // Approval gate: when the environment requires approval, this returns a
+        // 202 PendingChange (or applies via emergency bypass) instead of a
+        // direct create. dryRun never mutates.
+        var gated = await gate.InterceptAsync("Flag", body.Key, environment, ChangeAction.Create,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
+        }
+
         var actor = ResolveActor(user);
         var flag = body.ToEntity(environment.Id, actor);
         await store.Flags.UpsertAsync(environment.Id, flag, actor, ct).ConfigureAwait(false);
@@ -95,9 +110,13 @@ internal static class AdminFlagsEndpoints
         string key,
         FlagWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -121,6 +140,13 @@ internal static class AdminFlagsEndpoints
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
             return Results.BadRequest(new { error = "Cannot rename a flag via PUT. Body key must match URL key." });
+        }
+
+        var gated = await gate.InterceptAsync("Flag", key, environment, ChangeAction.Update,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
         }
 
         var actor = ResolveActor(user);

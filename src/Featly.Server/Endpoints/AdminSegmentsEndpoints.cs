@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text.Json;
+using Featly.Server.Approval;
 using Featly.Server.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -60,9 +62,13 @@ internal static class AdminSegmentsEndpoints
     private static async Task<IResult> CreateAsync(
         SegmentWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -83,6 +89,13 @@ internal static class AdminSegmentsEndpoints
             return Results.Conflict(new { error = $"Segment '{body.Key}' already exists in environment '{environment.Key}'." });
         }
 
+        var gated = await gate.InterceptAsync("Segment", body.Key, environment, ChangeAction.Create,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
+        }
+
         var actor = ResolveActor(user);
         var segment = body.ToEntity(environment.Id, actor);
         await store.Segments.UpsertAsync(environment.Id, segment, actor, ct).ConfigureAwait(false);
@@ -95,9 +108,13 @@ internal static class AdminSegmentsEndpoints
         string key,
         SegmentWriteRequest body,
         StorageFacade store,
+        ChangeGate gate,
         string? env,
         ClaimsPrincipal user,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool dryRun = false,
+        bool emergency = false,
+        string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(body);
 
@@ -121,6 +138,13 @@ internal static class AdminSegmentsEndpoints
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
             return Results.BadRequest(new { error = "Cannot rename a segment via PUT. Body key must match URL key." });
+        }
+
+        var gated = await gate.InterceptAsync("Segment", key, environment, ChangeAction.Update,
+            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
+        if (gated.Outcome == GateOutcome.Handled)
+        {
+            return gated.Response!;
         }
 
         var actor = ResolveActor(user);
