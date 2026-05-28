@@ -11,7 +11,7 @@ Four sequenced PRs:
 
 - [x] **PR 7A — RoleAssignment domain + storage + real resolution**: `RoleAssignment` polymorphic entity (User/Group, project + optional-environment wildcard) + `AssigneeType` enum; `IRoleAssignmentStore` with InMemory + SQLite + migration `AddRoleAssignments`; `DefaultFeatlyPermissionChecker` rewritten to union matching-assignment roles. Legacy api-keys + bootstrap admin keep a hardcoded shortcut; unassigned users fall back per `AutoProvisionMode` (Open → viewer floor, Closed → deny). 15 new tests.
 - [x] **PR 7B — UserGroup + group-based resolution**: `UserGroup` entity + inline membership + `IUserGroupStore` (InMemory + SQLite + migration `AddUserGroups`, membership as JSON array via `PrimitiveCollection`); checker expands a user into its groups and unions direct + group assignments. 6 new tests.
-- [ ] **PR 7C — Custom roles + admin endpoints**: clone-of-system custom roles with `RoleCreate/RoleUpdate/RoleDelete` enforcement; admin CRUD endpoints for users / roles / groups / role assignments.
+- [x] **PR 7C — Custom roles + admin endpoints**: four admin endpoint groups (`users`, `roles`, `groups`, `role-assignments`) with per-route permission enforcement; custom roles via `cloneFromSystemRole` (union of template + explicit perms); system roles immutable (409 on reserved-key create, 403 on update/delete). 11 new tests.
 - [ ] **PR 7D — RoleUpgradeRequest + Effective Access + dashboard**: upgrade-request flow with admin shortcut; Effective Access view; dashboard Users/Roles screens and assignment editor.
 
 ## Previous milestone
