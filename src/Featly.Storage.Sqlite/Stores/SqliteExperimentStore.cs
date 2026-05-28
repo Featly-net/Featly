@@ -86,4 +86,15 @@ internal sealed class SqliteExperimentStore(IDbContextFactory<FeatlyDbContext> c
         db.Experiments.Remove(existing);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    public async Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        // UpdatedAt is persisted as UTC ticks (long), so MAX runs in SQL.
+        return await db.Experiments.AsNoTracking()
+            .Where(e => e.EnvironmentId == environmentId)
+            .Select(e => (DateTimeOffset?)e.UpdatedAt)
+            .MaxAsync(ct)
+            .ConfigureAwait(false);
+    }
 }
