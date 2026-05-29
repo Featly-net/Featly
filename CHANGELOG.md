@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.0.9-preview.1] - 2026-05-29
+
+Ships M11 (the OpenFeature provider) plus the M10 polish. `Featly.OpenFeature.Provider` now implements the OpenFeature spec by delegating to `IFlagClient`, so a vendor-neutral consumer evaluates Featly flags through `Api.Instance.GetClient()` with no Featly type at the call site (flags only — dynamic configs stay on `IConfigClient`); a runnable `OpenFeature.Sample` and `docs/OPENFEATURE.md` show the wiring. The M10 polish closes the webhooks/audit milestone's remaining UI surface: a ReadOnly environment lock/unlock (API + dashboard Settings, audited) and the full audit-log filter form. Everything is additive and opt-in — no breaking change.
+
 ### Added
 
 - **M11 PR 11B — OpenFeature sample + docs (closes M11).** New `samples/OpenFeature.Sample`: a minimal web API that wires the Featly SDK, registers the provider once (`await Api.Instance.SetProviderAsync(new FeatlyOpenFeatureProvider(featly))`), and serves a flag read entirely through the OpenFeature client (`Api.Instance.GetClient().GetBooleanDetailsAsync(...)`) — no Featly type at the call site, demonstrating vendor-neutral consumption. New `docs/OPENFEATURE.md` covers install, one-time wiring, evaluating with context, the value-type and reason/error mapping tables, and the explicit out-of-scope note (configs stay on `IConfigClient`). Validated end-to-end against a running server: provider reports as `Featly`, a `user.country=BR` rule resolves through OpenFeature to `TARGETING_MATCH`/variant `on`, and the no-context path returns the default. **M11 is complete.** No breaking change.
