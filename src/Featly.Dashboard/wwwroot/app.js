@@ -592,6 +592,94 @@
     if (globalSearchBtn) { globalSearchBtn.addEventListener("click", openPalette); }
 
     // ============================================================
+    // Notifications popover (bell): pending approvals + role-upgrade
+    // requests, reusing the same admin endpoints as the Inbox.
+    // ============================================================
+    var notifPop = null, notifOpen = false;
+    function ensureNotifPop() {
+        if (notifPop) { return notifPop; }
+        notifPop = document.createElement("div");
+        notifPop.className = "notif-pop";
+        document.body.appendChild(notifPop);
+        document.addEventListener("mousedown", function (e) {
+            if (!notifOpen) { return; }
+            var bell = document.getElementById("notif-btn");
+            if (notifPop.contains(e.target) || (bell && bell.contains(e.target))) { return; }
+            closeNotif();
+        });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && notifOpen) { closeNotif(); } });
+        return notifPop;
+    }
+    function closeNotif() { if (notifPop) { notifPop.classList.remove("open"); } notifOpen = false; }
+    function openNotif() {
+        if (!isAuthenticated()) { return; }
+        ensureNotifPop();
+        notifPop.innerHTML = '<div class="notif-head">Notifications</div><div class="notif-list"><div class="notif-empty">Loading…</div></div>';
+        notifPop.classList.add("open");
+        notifOpen = true;
+        fetchNotifications().then(function (d) { if (notifOpen) { renderNotifPop(d.changes, d.upgrades); } });
+    }
+    function toggleNotif() { if (notifOpen) { closeNotif(); } else { openNotif(); } }
+    function fetchNotifications() {
+        return Promise.all([
+            api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
+            api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
+        ]).then(function (res) {
+            return { changes: Array.isArray(res[0]) ? res[0] : [], upgrades: Array.isArray(res[1]) ? res[1] : [] };
+        }).catch(function () { return { changes: [], upgrades: [] }; });
+    }
+    function renderNotifPop(changes, upgrades) {
+        var total = changes.length + upgrades.length;
+        var parts = ['<div class="notif-head">Notifications <span class="count">' + total + '</span></div>', '<div class="notif-list">'];
+        if (!total) {
+            parts.push('<div class="notif-empty">You’re all caught up.</div>');
+        } else {
+            if (changes.length) {
+                parts.push('<div class="notif-section">Awaiting approval</div>');
+                changes.forEach(function (c) {
+                    parts.push('<div class="notif-item" data-go="/inbox/' + encodeURIComponent(c.id) + '">'
+                        + '<span class="ic"><span class="ti-slot" data-ti="git-pull-request"></span></span>'
+                        + '<span class="t"><span class="mono">' + esc(c.entityKey || c.action || "change") + '</span>'
+                        + '<span class="sub">' + esc((c.action || "") + " · " + truncate(c.authorUserId || "", 8)) + '</span></span>'
+                        + '</div>');
+                });
+            }
+            if (upgrades.length) {
+                parts.push('<div class="notif-section">Role upgrade requests</div>');
+                upgrades.forEach(function (u) {
+                    parts.push('<div class="notif-item" data-go="/inbox">'
+                        + '<span class="ic"><span class="ti-slot" data-ti="user-shield"></span></span>'
+                        + '<span class="t"><span class="mono">' + esc(truncate(u.userId || "", 12)) + '</span>'
+                        + '<span class="sub">' + esc(truncate(u.justification || "no justification", 48)) + '</span></span>'
+                        + '</div>');
+                });
+            }
+        }
+        parts.push('</div><div class="notif-foot"><a class="btn outline xs" data-go="/inbox" href="' + esc(mountPath) + '/inbox">Open Inbox</a></div>');
+        notifPop.innerHTML = parts.join("");
+        hydrateIcons(notifPop);
+        Array.prototype.slice.call(notifPop.querySelectorAll("[data-go]")).forEach(function (el) {
+            el.addEventListener("click", function (e) { e.preventDefault(); closeNotif(); navigate(el.getAttribute("data-go")); });
+        });
+        updateNotifBadge(total);
+    }
+    function updateNotifBadge(total) {
+        var bell = document.getElementById("notif-btn");
+        if (!bell) { return; }
+        var dot = bell.querySelector(".dot-count");
+        if (total > 0) {
+            if (!dot) { dot = document.createElement("span"); dot.className = "dot-count"; bell.appendChild(dot); }
+            dot.textContent = total > 9 ? "9+" : String(total);
+        } else if (dot) { dot.remove(); }
+    }
+    function refreshNotifBadge() {
+        if (!isAuthenticated()) { return; }
+        fetchNotifications().then(function (d) { updateNotifBadge(d.changes.length + d.upgrades.length); });
+    }
+    var notifBtn = document.getElementById("notif-btn");
+    if (notifBtn) { notifBtn.addEventListener("click", function (e) { e.stopPropagation(); toggleNotif(); }); }
+
+    // ============================================================
     // Views
     // ============================================================
     function render() {
@@ -2550,6 +2638,7 @@
         if (sbUserName) { sbUserName.textContent = who; }
         if (sbUserRole) { sbUserRole.textContent = session.identifier || "Admin"; }
         if (sbAvatar) { sbAvatar.textContent = (who.charAt(0) || "F"); }
+        refreshNotifBadge();
         loadEnvironments().then(render).catch(function (err) {
             if (err.kind === "auth") { showAuthPrompt(); }
             else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
