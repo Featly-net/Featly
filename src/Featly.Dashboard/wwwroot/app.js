@@ -85,7 +85,7 @@
             '  <form id="auth-form" class="auth-form">',
             '    <label for="auth-token">Admin API key</label>',
             '    <input id="auth-token" type="password" autocomplete="off" required spellcheck="false" />',
-            '    <button type="submit" class="btn-primary">Sign in</button>',
+            '    <button type="submit" class="btn primary">Sign in</button>',
             errorText ? '    <p class="error" id="auth-error">' + esc(errorText) + '</p>' : '',
             '  </form>',
             '  <p class="muted">Featly stores your session as an <code>HttpOnly; SameSite=Strict</code> cookie. Nothing is written to <code>localStorage</code>.</p>',
@@ -799,9 +799,7 @@
     }
 
     function detailLoadingShell(kind, key) {
-        return '<a data-link="/' + kind.toLowerCase() + 's" class="back-link">← ' + kind + 's</a>'
-            + '<h1>' + esc(key) + '</h1>'
-            + '<div class="card"><p class="muted">Loading…</p></div>';
+        return listPageShell(kind, key ? esc(key) : "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
     }
 
     function auditFooter(entity) {
@@ -1121,7 +1119,7 @@
     }
 
     function renderUserDetail(identifier) {
-        viewEl.innerHTML = '<a data-link="/users" class="back-link">← Users</a><h1>' + esc(identifier) + '</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("User", esc(identifier), '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/users/" + encodeURIComponent(identifier)),
             api("GET", "/admin/users/" + encodeURIComponent(identifier) + "/effective-access"),
@@ -1192,40 +1190,45 @@
     // Experiments (M9): list, detail with analytics + bar charts
     // ============================================================
     function experimentStatus(exp) {
-        if (exp.isActive) { return '<span class="preview-reason preview-reason--TargetingMatch">running</span>'; }
-        if (exp.stoppedAt) { return '<span class="preview-reason preview-reason--Disabled">stopped</span>'; }
-        return '<span class="preview-reason preview-reason--Default">draft</span>';
+        if (exp.isActive) { return '<span class="badge success"><span class="dot"></span>running</span>'; }
+        if (exp.stoppedAt) { return '<span class="badge">stopped</span>'; }
+        return '<span class="badge warn">draft</span>';
     }
 
     function renderExperimentList() {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>Experiments</h1><div class="placeholder"><p>No environment selected yet.</p></div>';
-            return;
-        }
-        viewEl.innerHTML = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "A/B experiments layered on a flag. Start one to collect exposures; track conversions via <code>IEventClient.TrackAsync</code>.";
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Experiments"); return; }
+        viewEl.innerHTML = listPageShell("Experiments", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/experiments?env=" + encodeURIComponent(currentEnv.key))
             .then(function (rows) {
                 rows = Array.isArray(rows) ? rows : [];
-                var heading = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>'
-                    + '<p class="muted">A/B experiments layered on a flag. Start one to begin collecting exposures; track conversions via <code>IEventClient.TrackAsync</code>.</p>';
+                var body;
                 if (rows.length === 0) {
-                    viewEl.innerHTML = heading + '<div class="placeholder"><p>No experiments in this environment yet.</p><p class="muted">Create one via <code>POST /api/admin/experiments</code>.</p></div>';
-                    return;
+                    body = '<div class="empty"><p>No experiments in this environment yet.</p></div>';
+                } else {
+                    var trs = rows.map(function (e) {
+                        return '<tr data-key="' + esc(e.key) + '">'
+                            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(e.key) + '</span><span class="cell-name">' + esc(e.name || "") + '</span></div></td>'
+                            + '<td class="mono">' + esc(e.flagKey) + '</td>'
+                            + '<td>' + experimentStatus(e) + '</td>'
+                            + '<td class="num">' + (e.metricKeys || []).length + '</td>'
+                            + '<td class="mono cell-modified">' + (e.startedAt ? formatDate(e.startedAt) : "—") + '</td>'
+                            + '</tr>';
+                    }).join("");
+                    body = '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key / Name</th><th>Flag</th>'
+                        + '<th style="width:90px">Status</th><th style="width:80px">Metrics</th><th style="width:140px">Started</th></tr></thead>'
+                        + '<tbody class="list-tbody">' + trs + '</tbody></table></div>';
                 }
-                var body = rows.map(function (e) {
-                    return '<tr>'
-                        + '<td><a data-link="/experiments/' + encodeURIComponent(e.key) + '">' + code(e.key) + '</a></td>'
-                        + '<td>' + esc(e.name) + '</td>'
-                        + '<td>' + code(e.flagKey) + '</td>'
-                        + '<td>' + experimentStatus(e) + '</td>'
-                        + '<td>' + (e.metricKeys || []).length + '</td>'
-                        + '<td>' + (e.startedAt ? formatDate(e.startedAt) : '<span class="muted">—</span>') + '</td>'
-                        + '</tr>';
-                }).join("");
-                viewEl.innerHTML = heading
-                    + '<div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Key</th><th>Name</th><th>Flag</th><th>Status</th><th>Metrics</th><th>Started</th></tr></thead>'
-                    + '<tbody>' + body + '</tbody></table></div>';
+                viewEl.innerHTML = listPageShell("Experiments", sub, body);
+                hydrateIcons(viewEl);
+                var tb = viewEl.querySelector(".list-tbody");
+                if (tb) {
+                    tb.addEventListener("click", function (e) {
+                        if (e.target.closest("a, button, input")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/experiments/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
             })
             .catch(handleErrOnView("Experiments"));
     }
@@ -1241,35 +1244,35 @@
             var exp = res[0];
             var analytics = res[1];
             var startStop = exp.isActive
-                ? '<button type="button" class="btn-ghost" data-exp="stop">Stop experiment</button>'
-                : '<button type="button" class="btn-primary" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + ' experiment</button>';
+                ? '<button type="button" class="btn outline xs" data-exp="stop">Stop</button>'
+                : '<button type="button" class="btn primary xs" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + '</button>';
 
             viewEl.innerHTML = [
-                '<a data-link="/experiments" class="back-link">← Experiments</a>',
-                '<h1>' + code(exp.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
-                '<div class="card"><dl class="preview-result__dl">',
-                '  <dt>Name</dt><dd>' + esc(exp.name) + '</dd>',
-                exp.hypothesis ? '  <dt>Hypothesis</dt><dd>' + esc(exp.hypothesis) + '</dd>' : '',
-                '  <dt>Flag</dt><dd><a data-link="/flags/' + encodeURIComponent(exp.flagKey) + '">' + code(exp.flagKey) + '</a></dd>',
+                '<div class="page"><div class="page-head"><div class="title-wrap"><h1 class="mono">' + esc(exp.key) + '</h1>',
+                '  <span class="sub">' + esc(exp.name || "") + ' · flag <code>' + esc(exp.flagKey) + '</code> · ' + esc(currentEnv.key) + '</span>',
+                '</div><div class="actions">' + experimentStatus(exp) + startStop + '<span class="save-msg" id="exp-msg"></span></div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <div class="card-pad"><h2>Analytics</h2>' + renderExperimentAnalytics(exp, analytics) + '</div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Setup</h3><dl class="side-dl">',
+                '  <dt>Flag</dt><dd><a class="mono" data-link="/flags/' + encodeURIComponent(exp.flagKey) + '" href="' + esc(mountPath) + '/flags/' + encodeURIComponent(exp.flagKey) + '">' + esc(exp.flagKey) + '</a></dd>',
                 '  <dt>Status</dt><dd>' + experimentStatus(exp) + '</dd>',
-                '  <dt>Sticky</dt><dd>' + (exp.stickyAssignments ? "yes — subjects keep their first variant" : "no") + '</dd>',
-                '  <dt>Metric keys</dt><dd>' + ((exp.metricKeys || []).length ? (exp.metricKeys).map(function (m) { return code(m); }).join(" ") : '<span class="muted">none</span>') + '</dd>',
-                '  <dt>Started</dt><dd>' + (exp.startedAt ? formatDate(exp.startedAt) : '<span class="muted">—</span>') + '</dd>',
-                '  <dt>Stopped</dt><dd>' + (exp.stoppedAt ? formatDate(exp.stoppedAt) : '<span class="muted">—</span>') + '</dd>',
+                '  <dt>Sticky</dt><dd>' + (exp.stickyAssignments ? "yes" : "no") + '</dd>',
+                '  <dt>Metrics</dt><dd>' + (exp.metricKeys || []).length + '</dd>',
+                '  <dt>Started</dt><dd>' + (exp.startedAt ? formatDate(exp.startedAt) : "—") + '</dd>',
+                '  <dt>Stopped</dt><dd>' + (exp.stoppedAt ? formatDate(exp.stoppedAt) : "—") + '</dd>',
                 '</dl>',
-                '<div class="cr-actions">' + startStop + '<span class="save-msg" id="exp-msg"></span></div>',
-                '</div>',
-                '<h2>Analytics</h2>',
-                renderExperimentAnalytics(exp, analytics),
+                exp.hypothesis ? '<p class="muted" style="font-size:11px;margin:10px 0 0">' + esc(exp.hypothesis) + '</p>' : '',
+                '</div></aside></div></div></div>',
             ].join("\n");
 
             wireExperimentDetail(exp);
+            hydrateIcons(viewEl);
         }).catch(handleErrOnView("Experiment: " + key));
     }
 
     function renderExperimentAnalytics(exp, a) {
         if (!a || !a.variants || a.variants.length === 0) {
-            return '<div class="placeholder"><p>No exposures recorded yet.</p>'
+            return '<div class="empty"><p>No exposures recorded yet.</p>'
                 + '<p class="muted">' + (exp.isActive ? "Evaluate the flag from an SDK client to start collecting data." : "Start the experiment to begin collecting exposures.") + '</p></div>';
         }
 
@@ -1397,8 +1400,14 @@
         }).catch(handleErrOnView("Inbox"));
     }
 
+    function crStatusBadge(status) {
+        var s = String(status == null ? "" : status);
+        var v = (s === "Approved" || s === "Applied") ? " success" : (s === "Rejected" ? " danger" : (s === "Pending" ? " warn" : ""));
+        return '<span class="badge' + v + '">' + esc(s || "—") + '</span>';
+    }
+
     function renderChangeDetail(id) {
-        viewEl.innerHTML = '<a data-link="/inbox" class="back-link">← Inbox</a><h1>Change</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Change request", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/changes/" + encodeURIComponent(id))
             .then(function (c) {
                 var actions = changeActionButtons(c);
@@ -1409,25 +1418,31 @@
                     return '<li>' + badge(a.decision) + ' ' + code(truncate(a.approverUserId, 8)) + (a.comment ? ' — ' + esc(a.comment) : '') + '</li>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<a data-link="/inbox" class="back-link">← Inbox</a>',
-                    '<h1>' + badge(c.entityType) + ' ' + code(c.entityKey) + '</h1>',
-                    '<div class="card"><dl class="preview-result__dl">',
-                    '  <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
-                    '  <dt>Status</dt><dd>' + '<span class="preview-reason preview-reason--' + esc(c.status) + '">' + esc(c.status) + '</span>' + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</dd>',
-                    '  <dt>Author</dt><dd>' + code(truncate(c.authorUserId, 8)) + '</dd>',
-                    c.authorMessage ? '  <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
-                    '</dl></div>',
-                    '<h2>Diff</h2>',
-                    '<div class="cr-diff">',
-                    '  <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
-                    '  <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
-                    '</div>',
-                    approvals ? '<h2>Approvals</h2><ul class="cr-approvals">' + approvals + '</ul>' : '',
-                    '<h2>Comments</h2>',
-                    '<div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
-                    '<form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn-ghost btn-small">Comment</button></form>',
-                    '<h2>Decision</h2>',
-                    '<div class="cr-actions">' + actions + '<span class="save-msg" id="cr-msg"></span></div>',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + badge(c.entityType) + ' <span class="mono">' + esc(c.entityKey) + '</span></h1>',
+                    '  <span class="sub">' + esc(c.action) + ' · authored by <code>' + esc(truncate(c.authorUserId, 8)) + '</code></span>',
+                    '</div><div class="actions">' + crStatusBadge(c.status) + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <div class="card-pad"><h2>Diff</h2><div class="cr-diff">',
+                    '    <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
+                    '    <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
+                    '  </div></div>',
+                    '  <div class="card-pad"><h2>Comments</h2>',
+                    '    <div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
+                    '    <form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn outline xs">Comment</button></form>',
+                    '  </div>',
+                    '</div><aside class="detail-side">',
+                    '  <div class="side-card"><h3 class="side-h">Decision</h3>',
+                    '    <div class="cr-actions">' + actions + '</div><span class="save-msg" id="cr-msg"></span>',
+                    '  </div>',
+                    '  <div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '    <dt>Status</dt><dd>' + crStatusBadge(c.status) + '</dd>',
+                    '    <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
+                    '    <dt>Entity</dt><dd>' + esc(c.entityType) + '</dd>',
+                    '    <dt>Author</dt><dd><code>' + esc(truncate(c.authorUserId, 8)) + '</code></dd>',
+                    c.authorMessage ? '    <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
+                    '  </dl></div>',
+                    approvals ? '  <div class="side-card"><h3 class="side-h">Approvals</h3><ul class="cr-approvals">' + approvals + '</ul></div>' : '',
+                    '</aside></div></div></div>',
                 ].join("\n");
                 wireChangeDetail(c);
             })
@@ -1437,14 +1452,14 @@
     function changeActionButtons(c) {
         var buttons = [];
         if (c.status === "Pending") {
-            buttons.push('<button type="button" class="btn-primary" data-cr="approve">Approve</button>');
-            buttons.push('<button type="button" class="btn-ghost" data-cr="reject">Reject</button>');
+            buttons.push('<button type="button" class="btn primary xs" data-cr="approve">Approve</button>');
+            buttons.push('<button type="button" class="btn outline xs" data-cr="reject">Reject</button>');
         }
         if (c.status === "Approved") {
-            buttons.push('<button type="button" class="btn-primary" data-cr="apply">Apply</button>');
+            buttons.push('<button type="button" class="btn primary xs" data-cr="apply">Apply</button>');
         }
         if (c.status === "Pending" || c.status === "Approved") {
-            buttons.push('<button type="button" class="btn-ghost" data-cr="bypass">Emergency bypass</button>');
+            buttons.push('<button type="button" class="btn outline xs danger" data-cr="bypass">Emergency bypass</button>');
         }
         return buttons.join(" ") || '<span class="muted">No actions available (' + esc(c.status) + ').</span>';
     }
@@ -1495,28 +1510,28 @@
     }
 
     function renderApprovalsEditor() {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>Approvals</h1><div class="placeholder"><p>No environment selected.</p></div>';
-            return;
-        }
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Approval policy"); return; }
         var envKey = currentEnv.key;
-        viewEl.innerHTML = '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Approval policy", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/approval-policies/" + encodeURIComponent(envKey))
             .then(function (p) {
                 var rules = (p.approverRules || []).map(function (r) {
-                    return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' min ' + (r.minFromThisRule || 1) + '</li>';
+                    return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' · min ' + (r.minFromThisRule || 1) + '</li>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1>',
-                    '<p class="muted">When approval is required, mutations to this environment become pending changes that need sign-off before they apply.</p>',
-                    '<form id="policy-form" class="editor">',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Approval policy</h1>',
+                    '  <span class="sub">When approval is required, mutations to <code>' + esc(envKey) + '</code> become pending changes that need sign-off before they apply.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="policy-form" class="editor card-pad">',
                     field("Require approval", '<label class="check"><input type="checkbox" name="required"' + (p.required ? " checked" : "") + ' /> Mutations require approval</label>'),
                     field("Minimum approvals", '<input name="minApprovals" type="number" min="1" value="' + esc(p.minApprovals || 1) + '" />'),
                     field("Self-approval", '<label class="check"><input type="checkbox" name="self"' + (p.authorCanApproveOwnChange ? " checked" : "") + ' /> Author may approve their own change</label>'),
                     field("Emergency bypass", '<label class="check"><input type="checkbox" name="bypass"' + (p.allowEmergencyBypass ? " checked" : "") + ' /> Allow emergency bypass</label>'),
-                    '<div class="editor__footer"><button type="submit" class="btn-primary">Save policy</button><span class="save-msg" id="policy-msg"></span></div>',
-                    '</form>',
-                    rules ? '<h2>Approver rules</h2><ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted">No structured approver rules — a flat minimum-approvals count applies.</p>',
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save policy</button><span class="save-msg" id="policy-msg"></span></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Approver rules</h3>',
+                    rules ? '<ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted" style="font-size:12px">No structured approver rules — a flat minimum-approvals count applies.</p>',
+                    '</div></aside></div></div></div>',
                 ].join("\n");
                 document.getElementById("policy-form").addEventListener("submit", function (e) {
                     e.preventDefault();
@@ -1546,12 +1561,12 @@
     // Webhooks + Audit log (M10)
     // ============================================================
     function deliveryStatusBadge(status) {
-        var cls = status === "Succeeded" ? "TargetingMatch" : (status === "Dead" ? "NotFound" : "Default");
-        return '<span class="preview-reason preview-reason--' + cls + '">' + esc(status) + '</span>';
+        var v = status === "Succeeded" ? " success" : (status === "Dead" ? " danger" : " warn");
+        return '<span class="badge' + v + '">' + esc(status) + '</span>';
     }
 
     function renderWebhookList() {
-        viewEl.innerHTML = '<h1>Webhooks</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Webhooks", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/webhooks")
             .then(function (hooks) {
                 hooks = Array.isArray(hooks) ? hooks : [];
@@ -1560,24 +1575,26 @@
                     return '<tr>'
                         + '<td><a data-link="/webhooks/' + encodeURIComponent(w.id) + '">' + esc(w.name) + '</a></td>'
                         + '<td>' + code(truncate(w.url, 48)) + '</td>'
-                        + '<td>' + (w.enabled ? '<span class="dot dot--on"></span> on' : '<span class="dot dot--off"></span> off') + '</td>'
+                        + '<td>' + (w.enabled ? '<span class="badge success"><span class="dot"></span>on</span>' : '<span class="badge">off</span>') + '</td>'
                         + '<td>' + types + '</td>'
                         + '</tr>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<h1>Webhooks</h1>',
-                    '<p class="muted">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</p>',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Webhooks</h1>',
+                    '  <span class="sub">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
                     hooks.length
-                        ? '<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                        : '<div class="placeholder"><p>No webhooks yet.</p></div>',
-                    '<h2>New webhook</h2>',
-                    '<form id="wh-form" class="editor">',
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No webhooks yet. Create one on the right.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New webhook</h3>',
+                    '  <form id="wh-form" class="editor">',
                     field("Name", '<input name="name" required placeholder="Slack relay" />'),
                     field("URL", '<input name="url" required placeholder="https://example.com/hook" />'),
                     field("Event types", '<input name="eventTypes" placeholder="flag.updated, change.applied (blank = all)" />'),
                     field("Secret", '<input name="secret" placeholder="(blank = auto-generate)" />'),
-                    '<div class="editor__footer"><button type="submit" class="btn-primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
-                    '</form>',
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
                 ].join("\n");
 
                 document.getElementById("wh-form").addEventListener("submit", function (e) {
@@ -1598,7 +1615,7 @@
     }
 
     function renderWebhookDetail(id) {
-        viewEl.innerHTML = '<a data-link="/webhooks" class="back-link">← Webhooks</a><h1>Webhook</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Webhook", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/webhooks/" + encodeURIComponent(id)),
             api("GET", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries").catch(function () { return []; }),
@@ -1609,33 +1626,41 @@
                 return '<tr>'
                     + '<td>' + code(d.eventType) + '</td>'
                     + '<td>' + deliveryStatusBadge(d.status) + '</td>'
-                    + '<td>' + (d.attemptCount || 0) + '</td>'
-                    + '<td>' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
+                    + '<td class="num">' + (d.attemptCount || 0) + '</td>'
+                    + '<td class="num">' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
                     + '<td class="muted">' + esc(truncate(d.lastError || "", 48)) + '</td>'
                     + '<td>' + formatDate(d.createdAt) + '</td>'
                     + '</tr>';
             }).join("");
 
             viewEl.innerHTML = [
-                '<a data-link="/webhooks" class="back-link">← Webhooks</a>',
-                '<h1>' + esc(w.name) + '</h1>',
-                '<form id="wh-edit" class="editor">',
+                '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(w.name) + '</h1>',
+                '  <span class="sub">' + (w.enabled ? '<span class="badge success"><span class="dot"></span>enabled</span>' : '<span class="badge">disabled</span>') + ' · ' + code(truncate(w.url, 56)) + '</span>',
+                '</div><div class="actions">',
+                '  <button type="button" class="btn outline xs" data-wh="test">Send test event</button>',
+                '  <button type="button" class="btn outline xs danger" data-wh="delete">Delete</button>',
+                '  <span class="save-msg" id="wh-msg"></span>',
+                '</div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <form id="wh-edit" class="editor card-pad">',
                 field("Name", '<input name="name" required value="' + esc(w.name) + '" />'),
                 field("URL", '<input name="url" required value="' + esc(w.url) + '" />'),
                 field("Enabled", '<label class="check"><input type="checkbox" name="enabled"' + (w.enabled ? " checked" : "") + ' /> Deliver events</label>'),
                 field("Event types", '<input name="eventTypes" value="' + esc((w.eventTypes || []).join(", ")) + '" placeholder="(blank = all)" />'),
                 field("Secret", '<input name="secret" value="' + esc(w.secret || "") + '" />'),
-                '<div class="editor__footer">',
-                '  <button type="submit" class="btn-primary">Save</button>',
-                '  <button type="button" class="btn-ghost" data-wh="test">Send test event</button>',
-                '  <button type="button" class="btn-ghost btn-danger" data-wh="delete">Delete</button>',
-                '  <span class="save-msg" id="wh-msg"></span>',
-                '</div>',
-                '</form>',
-                '<h2>Recent deliveries</h2>',
+                '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                '  </form>',
+                '  <div class="card-pad"><h2>Recent deliveries</h2>',
                 deliveryRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
+                    : '<div class="empty"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
+                '  </div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                '  <dt>Status</dt><dd>' + (w.enabled ? "enabled" : "disabled") + '</dd>',
+                '  <dt>Events</dt><dd>' + ((w.eventTypes || []).length ? esc((w.eventTypes).join(", ")) : "all events") + '</dd>',
+                '  <dt>Deliveries</dt><dd>' + deliveries.length + '</dd>',
+                '  <dt>Created</dt><dd>' + (formatDate(w.createdAt) || "—") + '</dd>',
+                '</dl></div></aside></div></div></div>',
             ].join("\n");
 
             var msg = document.getElementById("wh-msg");
@@ -1671,24 +1696,30 @@
     }
 
     function renderSettings() {
-        viewEl.innerHTML = '<h1>Settings</h1><h2>Environments</h2><div id="env-settings"><div class="card"><p class="muted">Loading…</p></div></div>';
+        viewEl.innerHTML = [
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Settings</h1>',
+            '  <span class="sub">Environment-level controls. A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</span>',
+            '</div></div><div class="page-body tight">',
+            '  <h2>Environments</h2>',
+            '  <div id="env-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '</div></div>',
+        ].join("\n");
         api("GET", "/admin/environments").then(function (envs) {
             envs = Array.isArray(envs) ? envs : [];
             var rows = envs.map(function (e) {
                 var frozen = e.readOnly;
                 var action = frozen ? "unlock" : "lock";
                 var label = frozen ? "Unlock" : "Lock (freeze)";
-                var btnClass = frozen ? "btn-primary" : "btn-ghost btn-danger";
+                var btnClass = frozen ? "btn primary xs" : "btn outline xs danger";
                 return '<tr>'
                     + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
                     + '<td>' + esc(e.name) + '</td>'
-                    + '<td>' + (frozen ? '<span class="preview-reason preview-reason--Disabled">read-only</span>' : '<span class="dot dot--on"></span> writable') + '</td>'
-                    + '<td><button type="button" class="' + btnClass + ' btn-small" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
+                    + '<td>' + (frozen ? '<span class="badge danger">read-only</span>' : '<span class="badge success"><span class="dot"></span>writable</span>') + '</td>'
+                    + '<td><button type="button" class="' + btnClass + '" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
                     + '</tr>';
             }).join("");
             document.getElementById("env-settings").innerHTML = [
-                '<p class="muted">A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</p>',
-                '<div class="table-wrap"><table class="table"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                 '<span class="save-msg" id="env-msg"></span>',
             ].join("\n");
 
@@ -1800,7 +1831,7 @@
             }).join("");
             var splitsHtml = '<div class="splits' + (hasSplits ? "" : " hidden") + '">'
                 + ((rule.outcome && rule.outcome.splits) || []).map(renderSplitRow).join("")
-                + '<button type="button" class="btn-ghost btn-small" data-action="add-split">+ Add split</button>'
+                + '<button type="button" class="btn outline xs" data-action="add-split">+ Add split</button>'
                 + '</div>';
             outcomeHtml =
                 '<div class="outcome">'
@@ -1827,7 +1858,7 @@
             + '</div>'
             + '<div class="rule-card__conditions">'
             + '  <div class="conditions-list">' + (rule.conditions || []).map(renderConditionRow).join("") + '</div>'
-            + '  <button type="button" class="btn-ghost btn-small" data-action="add-condition">+ Add condition</button>'
+            + '  <button type="button" class="btn outline xs" data-action="add-condition">+ Add condition</button>'
             + '</div>'
             + outcomeHtml
             + '</div>';
@@ -1945,9 +1976,9 @@
             + '</div>'
             + '<h3 class="preview-h3">Attributes</h3>'
             + '<div class="preview-attrs"></div>'
-            + '<button type="button" class="btn-ghost btn-small" data-action="preview-add-attr">+ Add attribute</button>'
+            + '<button type="button" class="btn outline xs" data-action="preview-add-attr">+ Add attribute</button>'
             + '<div class="preview-actions">'
-            + '  <button type="button" class="btn-primary" data-action="preview-eval">Evaluate</button>'
+            + '  <button type="button" class="btn primary" data-action="preview-eval">Evaluate</button>'
             + '  <span class="preview-msg muted"></span>'
             + '</div>'
             + '<div class="preview-result hidden"></div>'
