@@ -57,4 +57,18 @@ internal sealed class SqliteEnvironmentStore(IDbContextFactory<FeatlyDbContext> 
         db.Environments.Add(environment);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    public async Task<Environment?> SetReadOnlyAsync(Guid id, bool readOnly, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        var existing = await db.Environments.FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return null;
+        }
+
+        existing.ReadOnly = readOnly;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
 }

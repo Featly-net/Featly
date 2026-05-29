@@ -5,7 +5,7 @@
 
 ## Active milestone
 
-**Between milestones** — M10 closed and shipped as `v0.0.8-preview.1`. M11 (OpenFeature provider: `Featly.OpenFeature.Provider` implementing the OpenFeature spec by delegating to `IFeatlyClient`) is the next planned milestone but has not started yet.
+**Between milestones** — M10 closed and shipped as `v0.0.8-preview.1`. A follow-up polish PR (`feat/m10-polish`) adds the ReadOnly environment lock/unlock (API + dashboard Settings) and the full audit-log filter UI; the remaining M10 plan items (webhook circuit breaker, DB-overridable settings, dry-run on non-gated endpoints, audit retention, CLI `env lock`) are recorded in `docs/DEFERRED.md`. M11 (OpenFeature provider: `Featly.OpenFeature.Provider` implementing the OpenFeature spec by delegating to `IFeatlyClient`) is the next planned milestone but has not started yet.
 
 ## Previous milestone
 

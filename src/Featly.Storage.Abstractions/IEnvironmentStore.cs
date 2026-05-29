@@ -19,4 +19,10 @@ public interface IEnvironmentStore
 
     /// <summary>Inserts a new environment. Throws on duplicate <c>(projectId, key)</c>.</summary>
     Task CreateAsync(Environment environment, CancellationToken ct);
+
+    /// <summary>
+    /// Sets the <see cref="Environment.ReadOnly"/> freeze flag on the environment
+    /// matched by id. Returns the updated environment, or <c>null</c> if missing.
+    /// </summary>
+    Task<Environment?> SetReadOnlyAsync(Guid id, bool readOnly, CancellationToken ct);
 }

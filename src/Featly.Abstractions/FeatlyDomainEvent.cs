@@ -94,4 +94,10 @@ public static class FeatlyEventTypes
 
     /// <summary>A role assignment was removed.</summary>
     public const string RoleUnassigned = "role.unassigned";
+
+    /// <summary>An environment was frozen (set ReadOnly).</summary>
+    public const string EnvironmentLocked = "environment.locked";
+
+    /// <summary>An environment was unfrozen (ReadOnly cleared).</summary>
+    public const string EnvironmentUnlocked = "environment.unlocked";
 }

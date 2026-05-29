@@ -366,9 +366,7 @@
         webhookDetail: function (p) { renderWebhookDetail(p.id); },
         auditLog:      function () { renderAuditLog(); },
         roleList:    function () { renderRoleList(); },
-        settings: function () {
-            viewEl.innerHTML = '<h1>Settings</h1><div class="placeholder"><p>Environment defaults, approval policy, webhook configuration, audit retention.</p><p class="muted">M6+ unlocks the editor.</p></div>';
-        },
+        settings: function () { renderSettings(); },
     };
 
     // ---------- List views ----------
@@ -1249,21 +1247,64 @@
         }).catch(handleErrOnView("Webhook"));
     }
 
+    function renderSettings() {
+        viewEl.innerHTML = '<h1>Settings</h1><h2>Environments</h2><div id="env-settings"><div class="card"><p class="muted">Loading…</p></div></div>';
+        api("GET", "/admin/environments").then(function (envs) {
+            envs = Array.isArray(envs) ? envs : [];
+            var rows = envs.map(function (e) {
+                var frozen = e.readOnly;
+                var action = frozen ? "unlock" : "lock";
+                var label = frozen ? "Unlock" : "Lock (freeze)";
+                var btnClass = frozen ? "btn-primary" : "btn-ghost btn-danger";
+                return '<tr>'
+                    + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
+                    + '<td>' + esc(e.name) + '</td>'
+                    + '<td>' + (frozen ? '<span class="preview-reason preview-reason--Disabled">read-only</span>' : '<span class="dot dot--on"></span> writable') + '</td>'
+                    + '<td><button type="button" class="' + btnClass + ' btn-small" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
+                    + '</tr>';
+            }).join("");
+            document.getElementById("env-settings").innerHTML = [
+                '<p class="muted">A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</p>',
+                '<div class="table-wrap"><table class="table"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                '<span class="save-msg" id="env-msg"></span>',
+            ].join("\n");
+
+            Array.prototype.slice.call(document.querySelectorAll("[data-env-action]")).forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var key = btn.getAttribute("data-env-key");
+                    var action = btn.getAttribute("data-env-action");
+                    var msg = document.getElementById("env-msg");
+                    setMessageOn(msg, "loading", action === "lock" ? "Freezing…" : "Unfreezing…");
+                    api("POST", "/admin/environments/" + encodeURIComponent(key) + "/" + action)
+                        .then(function () { return loadEnvironments(); })
+                        .then(function () { renderSettings(); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            });
+        }).catch(handleErrOnView("Settings"));
+    }
+
     function renderAuditLog() {
         viewEl.innerHTML = [
             '<h1>Audit log</h1>',
             '<form id="audit-filter" class="audit-filter">',
             '  <input name="entityType" placeholder="Entity type (e.g. Flag)" />',
+            '  <input name="entityKey" placeholder="Entity key" />',
             '  <input name="actor" placeholder="Actor" />',
+            '  <input name="from" type="date" title="From date" />',
+            '  <input name="to" type="date" title="To date" />',
             '  <button type="submit" class="btn-ghost btn-small">Filter</button>',
             '</form>',
             '<div id="audit-results"><div class="card"><p class="muted">Loading…</p></div></div>',
         ].join("\n");
 
-        function load(entityType, actor) {
+        function load(filters) {
             var qs = [];
-            if (entityType) { qs.push("entityType=" + encodeURIComponent(entityType)); }
-            if (actor) { qs.push("actor=" + encodeURIComponent(actor)); }
+            if (filters.entityType) { qs.push("entityType=" + encodeURIComponent(filters.entityType)); }
+            if (filters.entityKey) { qs.push("entityKey=" + encodeURIComponent(filters.entityKey)); }
+            if (filters.actor) { qs.push("actor=" + encodeURIComponent(filters.actor)); }
+            if (filters.from) { qs.push("from=" + encodeURIComponent(filters.from + "T00:00:00Z")); }
+            if (filters.to) { qs.push("to=" + encodeURIComponent(filters.to + "T23:59:59Z")); }
             var path = "/admin/audit" + (qs.length ? "?" + qs.join("&") : "");
             api("GET", path).then(function (entries) {
                 entries = Array.isArray(entries) ? entries : [];
@@ -1286,9 +1327,16 @@
 
         document.getElementById("audit-filter").addEventListener("submit", function (e) {
             e.preventDefault();
-            load(e.target.entityType.value.trim(), e.target.actor.value.trim());
+            var f = e.target;
+            load({
+                entityType: f.entityType.value.trim(),
+                entityKey: f.entityKey.value.trim(),
+                actor: f.actor.value.trim(),
+                from: f.from.value,
+                to: f.to.value,
+            });
         });
-        load("", "");
+        load({});
     }
 
     function parseCsv(value) {

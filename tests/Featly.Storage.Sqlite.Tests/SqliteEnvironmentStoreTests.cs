@@ -69,4 +69,33 @@ public class SqliteEnvironmentStoreTests
         await duplicate.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*staging*");
     }
+
+    [Fact]
+    public async Task SetReadOnly_persists_the_freeze_flag()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var projectId = Guid.NewGuid();
+        var id = Guid.NewGuid();
+
+        await host.Store.Environments.CreateAsync(new Environment
+        {
+            Id = id,
+            ProjectId = projectId,
+            Key = "production",
+            Name = "Production",
+            CreatedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        var locked = await host.Store.Environments.SetReadOnlyAsync(id, true, ct);
+        locked!.ReadOnly.Should().BeTrue();
+        (await host.Store.Environments.GetByIdAsync(id, ct))!.ReadOnly.Should().BeTrue();
+
+        var unlocked = await host.Store.Environments.SetReadOnlyAsync(id, false, ct);
+        unlocked!.ReadOnly.Should().BeFalse();
+        (await host.Store.Environments.GetByIdAsync(id, ct))!.ReadOnly.Should().BeFalse();
+
+        // Missing id returns null.
+        (await host.Store.Environments.SetReadOnlyAsync(Guid.NewGuid(), true, ct)).Should().BeNull();
+    }
 }

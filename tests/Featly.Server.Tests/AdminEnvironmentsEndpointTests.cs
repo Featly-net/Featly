@@ -60,6 +60,85 @@ public class AdminEnvironmentsEndpointTests
         environments!.Should().ContainSingle(e => e.IsDefault && e.Key == "development");
     }
 
+    [Fact]
+    public async Task Lock_then_unlock_toggles_readonly_and_gates_mutations()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed a flag while writable.
+        (await client.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "ro-demo",
+            name = "RO Demo",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Lock the default environment.
+        var lockResp = await client.PostAsync(new Uri("/api/admin/environments/development/lock", UriKind.Relative), null, ct);
+        lockResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var locked = await lockResp.Content.ReadFromJsonAsync<Environment>(TestJson.Options, cancellationToken: ct);
+        locked!.ReadOnly.Should().BeTrue();
+
+        // A mutation is now rejected with 403.
+        var blocked = await client.PutAsJsonAsync("/api/admin/flags/ro-demo", new
+        {
+            key = "ro-demo",
+            name = "RO Demo edited",
+            type = "Boolean",
+            enabled = false,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct);
+        blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Unlock restores writability.
+        var unlockResp = await client.PostAsync(new Uri("/api/admin/environments/development/unlock", UriKind.Relative), null, ct);
+        unlockResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await unlockResp.Content.ReadFromJsonAsync<Environment>(TestJson.Options, cancellationToken: ct))!.ReadOnly.Should().BeFalse();
+
+        (await client.PutAsJsonAsync("/api/admin/flags/ro-demo", new
+        {
+            key = "ro-demo",
+            name = "RO Demo edited",
+            type = "Boolean",
+            enabled = false,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // The lock/unlock pair is audited.
+        var audit = await client.GetFromJsonAsync<List<AuditEntry>>("/api/admin/audit?entityType=Environment", TestJson.Options, ct);
+        audit!.Select(a => a.Action).Should().Contain([FeatlyEventTypes.EnvironmentLocked, FeatlyEventTypes.EnvironmentUnlocked]);
+    }
+
+    [Fact]
+    public async Task Lock_returns_NotFound_for_unknown_environment()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        var resp = await client.PostAsync(new Uri("/api/admin/environments/ghost/lock", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Lock_rejects_sdk_scope_key()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
+
+        var resp = await client.PostAsync(new Uri("/api/admin/environments/development/lock", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
     private static async Task<IHost> BuildHostAsync()
     {
         var builder = new HostBuilder()
