@@ -109,4 +109,7 @@ public static class FeatlyEventTypes
 
     /// <summary>The first admin was provisioned via the bootstrap endpoint.</summary>
     public const string AdminBootstrapped = "admin.bootstrapped";
+
+    /// <summary>An environment's definitions were imported from a bundle.</summary>
+    public const string ConfigurationImported = "configuration.imported";
 }

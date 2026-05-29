@@ -53,6 +53,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
         apiGroup.MapAdminExperiments();
         apiGroup.MapAdminAudit();
         apiGroup.MapAdminWebhooks();
+        apiGroup.MapAdminExport();
         apiGroup.MapSdkEndpoints();
         apiGroup.MapSdkEvents();
 

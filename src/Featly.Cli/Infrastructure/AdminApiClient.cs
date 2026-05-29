@@ -49,6 +49,30 @@ internal sealed class AdminApiClient(HttpClient http)
         return PostNoContentAsync($"/api/admin/environments/{Uri.EscapeDataString(environmentKey)}/{verb}", ct);
     }
 
+    /// <summary>Exports an environment's definitions as a raw JSON bundle (returned verbatim).</summary>
+    public async Task<string> ExportAsync(string? environmentKey, CancellationToken ct)
+    {
+        var path = "/api/admin/export" + EnvQuery(environmentKey);
+        using var response = await http.GetAsync(new Uri(path, UriKind.Relative), ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Imports a JSON bundle into the target environment. Returns the per-kind counts.</summary>
+    public async Task<ImportResult> ImportAsync(string? environmentKey, string bundleJson, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(bundleJson);
+        var path = "/api/admin/import" + EnvQuery(environmentKey);
+        using var content = new StringContent(bundleJson, System.Text.Encoding.UTF8, "application/json");
+        using var response = await http.PostAsync(new Uri(path, UriKind.Relative), content, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        var result = await response.Content.ReadFromJsonAsync<ImportResult>(JsonOptions, ct).ConfigureAwait(false);
+        return result ?? throw new InvalidOperationException("The server returned an empty import result.");
+    }
+
+    private static string EnvQuery(string? environmentKey) =>
+        string.IsNullOrWhiteSpace(environmentKey) ? "" : $"?env={Uri.EscapeDataString(environmentKey)}";
+
     private async Task<T> PostAsync<T>(string path, object body, CancellationToken ct)
     {
         using var response = await http.PostAsJsonAsync(path, body, JsonOptions, ct).ConfigureAwait(false);
@@ -119,3 +143,6 @@ internal sealed record MintedKey(Guid Id, string Name, string Prefix, string Sco
 
 /// <summary>The bootstrapped first admin. <see cref="Token"/> is the one-time admin key.</summary>
 internal sealed record BootstrappedAdmin(string Identifier, Guid UserId, Guid ApiKeyId, string Token);
+
+/// <summary>Per-kind counts returned by an import.</summary>
+internal sealed record ImportResult(string EnvironmentKey, int Flags, int Configs, int Segments);

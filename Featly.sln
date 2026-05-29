@@ -55,6 +55,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenFeature.Sample", "sampl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Featly.Cli.Tests", "tests\Featly.Cli.Tests\Featly.Cli.Tests.csproj", "{8790891E-9A93-4433-B72A-68FA3154F849}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Centralized.Sample", "samples\Centralized.Sample\Centralized.Sample.csproj", "{33C479C0-7906-46E4-A4F4-7990949A3B89}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -341,6 +343,18 @@ Global
 		{8790891E-9A93-4433-B72A-68FA3154F849}.Release|x64.Build.0 = Release|Any CPU
 		{8790891E-9A93-4433-B72A-68FA3154F849}.Release|x86.ActiveCfg = Release|Any CPU
 		{8790891E-9A93-4433-B72A-68FA3154F849}.Release|x86.Build.0 = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|x64.Build.0 = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Debug|x86.Build.0 = Debug|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|x64.ActiveCfg = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|x64.Build.0 = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|x86.ActiveCfg = Release|Any CPU
+		{33C479C0-7906-46E4-A4F4-7990949A3B89}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -369,5 +383,6 @@ Global
 		{6354952B-3C24-4800-8844-43C873C27219} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{8790891E-9A93-4433-B72A-68FA3154F849} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{33C479C0-7906-46E4-A4F4-7990949A3B89} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal
