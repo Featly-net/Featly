@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M12 — Polish, docs, first release** (in progress; the final milestone). Delivers the `Featly.Cli` global tool, the `Centralized.Sample` (separate-server deployment pattern), the GETTING_STARTED / CONFIGURATION / DEPLOYMENT docs, filled-in ADRs, a security audit pass, and the first public `v0.1.0` tag. Architecture decisions locked: the CLI is **hybrid** (offline `db` commands operate the SQLite file directly; `apikey`/`bootstrap-admin`/`env`/`export`/`import` go through the server's HTTP API so they reuse permission checks + audit + webhooks), and generated API keys bind to a real `User` principal (closing the M8 limitation where an API key was not a real approver identity). Slicing:
+**Releasing `v0.1.0-preview.1`** — the first public preview, packaging all of M12 on top of M1–M11. M12 (the final milestone) is **complete**: all five PRs merged. The preview is cut first; promotion to stable `v0.1.0` follows on a separate go-ahead.
+
+### M12 — Polish, docs, first release (complete)
+
+Delivered the `Featly.Cli` global tool, the `Centralized.Sample` (separate-server deployment pattern), the GETTING_STARTED / CONFIGURATION / DEPLOYMENT docs, filled-in ADRs, a security audit pass, and config export/import. Architecture decisions locked: the CLI is **hybrid** (offline `db` commands operate the SQLite file directly; `apikey`/`bootstrap-admin`/`env`/`export`/`import` go through the server's HTTP API so they reuse permission checks + audit + webhooks), and generated API keys bind to a real `User` principal (closing the M8 limitation where an API key was not a real approver identity). Slicing:
 
 - [x] **PR 12A — CLI scaffold + offline `db` commands**: `featly` command tree on `System.CommandLine`; public `SqliteMigrationRunner` facade in `Featly.Storage.Sqlite` (keeps `FeatlyDbContext` internal); `db migrate`/`status`/`rollback`/`drop` against `--connection-string`/`FEATLY_SQLITE`/default, confirmation-gated destructive ops. New `tests/Featly.Cli.Tests` (10 tests). 315 passing total.
 - [x] **PR 12B — server: user-bound API keys + mint/bootstrap + Bearer auth**: `ApiKey.UserId` (migration `AddApiKeyUserBinding`); Bearer handler now validates persisted keys (prefix + Argon2) and resolves the bound user's identity — closing the M8 limitation. `POST /api/admin/apikeys` (mint, returns token once), `GET` (metadata only), `POST /{id}/revoke`; guarded `POST /api/admin/bootstrap` (first-admin: user + admin role + bound key). 322 passing total.
@@ -13,7 +17,7 @@
 - [x] **PR 12D — export/import + `Centralized.Sample`**: `GET/POST /api/admin/export|import` (flag+config+segment definitions bundle) + CLI `export`/`import`; new `samples/Centralized.Sample` standalone server (3rd deployment pattern). Validated live. 336 passing total.
 - [x] **PR 12E — docs + ADRs + PERFORMANCE.md + security audit (closes M12)**: GETTING_STARTED / CONFIGURATION / DEPLOYMENT guides; all 22 accepted ADRs filled in + linked from ARCHITECTURE.md §22 (incl. ADR-0022 CLI-hybrid, ADR-0023 user-bound keys); refreshed v0.1.0 performance baseline; `docs/SECURITY_AUDIT.md`. Docs-only. 336 tests passing.
 
-**M12 is complete.** All five PRs merged. Next: cut `v0.1.0-preview.1` (preview first; promoted to stable `v0.1.0` on a separate go-ahead) — awaiting a fresh go-ahead per the autonomy grant.
+**M12 is complete.** All five PRs merged; 336 tests passing. Cutting `v0.1.0-preview.1` now (the first public preview); promotion to stable `v0.1.0` follows on a separate go-ahead.
 
 ## Previous milestone
 
