@@ -29,6 +29,28 @@ dotnet run -c Release --project tests/Featly.Engine.Benchmarks -- --filter '*'
 
 Every scenario is at least an order of magnitude below the **10 μs p99 target**. Boolean flag fast path is roughly **270×** under target.
 
+## Baseline (v0.1.0 — first public release)
+
+Re-run before the `v0.1.0` cut to confirm no regression since M3B. The engine's
+hot path was untouched by M4-M12 (configs, RBAC, approvals, experiments,
+webhooks, OpenFeature, and the CLI all sit outside it), and the numbers hold.
+
+- **Date**: 2026-05-29
+- **Runtime**: .NET 10.0.8, X64 RyuJIT (x86-64-v4)
+- **Host**: AMD Ryzen 9 9950X, virtualised (Hyper-V)
+
+| Scenario | Mean | Allocations |
+|---|---:|---:|
+| Boolean flag, no rules (fast path) | **37 ns** | 72 B |
+| 1 rule, 1 `Equals` condition (matches) | **151 ns** | 104 B |
+| 5 rules × 3 conditions, last matches | **734 ns** | 280 B |
+| 50/50 split bucketing | **315 ns** | 232 B |
+| `InSegment` lookup (nested condition) | **261 ns** | 168 B |
+
+Within run-to-run noise of the M3B baseline (same order of magnitude on every
+scenario); no scenario regressed. The deepest realistic targeting path stays
+well under 1 μs — ~13× under the 10 μs p99 target.
+
 ## Reading the numbers
 
 - **Mean** is the arithmetic mean across iterations after outlier removal.

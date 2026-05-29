@@ -43,9 +43,24 @@ M10 plan but deliberately left out:
   yet — the log grows unbounded. Needs the settings subsystem above plus a
   background trimmer. **Deferred** to the settings milestone / M12.
 
-- **`env lock / unlock` via the CLI.** The ReadOnly freeze is reachable from the
-  API and dashboard. The CLI verb waits on `Featly.Cli`, which is an **M12**
-  deliverable — there is no CLI project yet. **Naturally lands in M12.**
+- **`env lock / unlock` via the CLI.** ~~The ReadOnly freeze is reachable from the
+  API and dashboard. The CLI verb waits on `Featly.Cli`.~~ **Shipped in M12 (12C):
+  `featly env lock|unlock <key>`.**
+
+## Security follow-ups (from the v0.1.0 audit)
+
+Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
+
+- **API-key rotation / expiry.** Keys are minted and manually revoked; there is
+  no built-in rotation or automatic expiry.
+- **Request rate limiting.** No built-in throttling on the admin/SDK APIs;
+  operators rely on a reverse proxy for now.
+- **Synchronizer-token CSRF layer.** Dashboard state-changing calls rely on the
+  `SameSite=Strict` cookie; a per-request anti-forgery token is possible future
+  hardening.
+- **Dedicated backup/import permission.** `export`/`import` are gated by
+  `FlagRead` / `FlagCreate`; a dedicated `BackupImport` permission would tighten
+  the gate for bundles carrying configs/segments.
 
 ## Post-1.0 (from PLAN.md "Post-1.0 extensions")
 
