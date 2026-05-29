@@ -13,14 +13,16 @@ namespace Featly.Cli.Tests;
 /// </summary>
 public sealed class DbCommandTests : IDisposable
 {
-    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"featly-cli-{Guid.NewGuid():N}.db");
+    private readonly string _tempDir = Directory.CreateTempSubdirectory("featly-cli").FullName;
 
-    private string ConnectionString => $"Data Source={_dbPath}";
+    private string DbPath => Path.Combine(_tempDir, "test.db");
+
+    private string ConnectionString => $"Data Source={DbPath}";
 
     [Fact]
     public async Task Migrate_on_fresh_database_applies_every_migration()
     {
-        var exitCode = await CliApp.RunAsync(["db", "migrate", "--connection-string", _dbPath]);
+        var exitCode = await CliApp.RunAsync(["db", "migrate", "--connection-string", DbPath]);
 
         exitCode.Should().Be(0);
         var status = await SqliteMigrationRunner.GetStatusAsync(ConnectionString, TestContext.Current.CancellationToken);
@@ -31,9 +33,9 @@ public sealed class DbCommandTests : IDisposable
     [Fact]
     public async Task Migrate_is_idempotent_when_already_up_to_date()
     {
-        (await CliApp.RunAsync(["db", "migrate", "-c", _dbPath])).Should().Be(0);
+        (await CliApp.RunAsync(["db", "migrate", "-c", DbPath])).Should().Be(0);
 
-        var secondRun = await CliApp.RunAsync(["db", "migrate", "-c", _dbPath]);
+        var secondRun = await CliApp.RunAsync(["db", "migrate", "-c", DbPath]);
 
         secondRun.Should().Be(0);
         var status = await SqliteMigrationRunner.GetStatusAsync(ConnectionString, TestContext.Current.CancellationToken);
@@ -43,7 +45,7 @@ public sealed class DbCommandTests : IDisposable
     [Fact]
     public async Task Status_on_fresh_database_reports_all_pending()
     {
-        var exitCode = await CliApp.RunAsync(["db", "status", "-c", _dbPath]);
+        var exitCode = await CliApp.RunAsync(["db", "status", "-c", DbPath]);
 
         exitCode.Should().Be(0);
         var status = await SqliteMigrationRunner.GetStatusAsync(ConnectionString, TestContext.Current.CancellationToken);
@@ -54,9 +56,9 @@ public sealed class DbCommandTests : IDisposable
     [Fact]
     public async Task Rollback_to_initial_reverts_every_migration()
     {
-        await CliApp.RunAsync(["db", "migrate", "-c", _dbPath]);
+        await CliApp.RunAsync(["db", "migrate", "-c", DbPath]);
 
-        var exitCode = await CliApp.RunAsync(["db", "rollback", "0", "-c", _dbPath, "--yes"]);
+        var exitCode = await CliApp.RunAsync(["db", "rollback", "0", "-c", DbPath, "--yes"]);
 
         exitCode.Should().Be(0);
         var status = await SqliteMigrationRunner.GetStatusAsync(ConnectionString, TestContext.Current.CancellationToken);
@@ -67,30 +69,27 @@ public sealed class DbCommandTests : IDisposable
     [Fact]
     public async Task Drop_deletes_the_database_file()
     {
-        await CliApp.RunAsync(["db", "migrate", "-c", _dbPath]);
-        File.Exists(_dbPath).Should().BeTrue();
+        await CliApp.RunAsync(["db", "migrate", "-c", DbPath]);
+        File.Exists(DbPath).Should().BeTrue();
 
-        var exitCode = await CliApp.RunAsync(["db", "drop", "-c", _dbPath, "-y"]);
+        var exitCode = await CliApp.RunAsync(["db", "drop", "-c", DbPath, "-y"]);
 
         exitCode.Should().Be(0);
-        File.Exists(_dbPath).Should().BeFalse();
+        File.Exists(DbPath).Should().BeFalse();
     }
 
     public void Dispose()
     {
-        foreach (var path in new[] { _dbPath, $"{_dbPath}-wal", $"{_dbPath}-shm" })
+        try
         {
-            try
+            if (Directory.Exists(_tempDir))
             {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
+                Directory.Delete(_tempDir, recursive: true);
             }
-            catch (IOException)
-            {
-                // Best-effort cleanup of throwaway test artifacts.
-            }
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup of throwaway test artifacts.
         }
     }
 }
