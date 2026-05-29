@@ -5,12 +5,12 @@
 
 ## Active milestone
 
-**M11 — OpenFeature provider** (in progress)
+**M11 — OpenFeature provider** (complete; not yet released)
 
 `Featly.OpenFeature.Provider` implements the OpenFeature spec by delegating to `IFlagClient` (flags only — configs stay on `IConfigClient`). Two sequenced PRs:
 
 - [x] **PR 11A — provider + mapping + tests**: `FeatlyOpenFeatureProvider : FeatureProvider` (OpenFeature 2.3.0) resolving boolean/string/integer/double/structure via `IFlagClient.EvaluateAsync`; spec-compliant reason + error mapping (`NotFound`→`FlagNotFound`, errors→`General`, default echoed on abnormal); OpenFeature→Featly context translation; JSON→`Value` for structures. New `Featly.OpenFeature.Provider.Tests` (9 tests, incl. end-to-end through the OpenFeature client). 305 passing total.
-- [ ] **PR 11B — sample + docs**: a sample wiring `Api.Instance.SetProviderAsync(new FeatlyOpenFeatureProvider(featly))` and a docs page on adopting OpenFeature with Featly. Closes M11.
+- [x] **PR 11B — sample + docs**: `samples/OpenFeature.Sample` (web API wiring `Api.Instance.SetProviderAsync(...)`, reads flags via the OpenFeature client only) + `docs/OPENFEATURE.md`. Validated end-to-end against a running server. Closes M11.
 
 Carried over (unreleased, rides the next preview): the M10 polish PR (ReadOnly env lock/unlock + full audit filters). Deferred M10 line items are in `docs/DEFERRED.md`.
 

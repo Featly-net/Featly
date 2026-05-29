@@ -51,6 +51,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Featly.Engine.Benchmarks", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Featly.OpenFeature.Provider.Tests", "tests\Featly.OpenFeature.Provider.Tests\Featly.OpenFeature.Provider.Tests.csproj", "{6354952B-3C24-4800-8844-43C873C27219}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenFeature.Sample", "samples\OpenFeature.Sample\OpenFeature.Sample.csproj", "{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -313,6 +315,18 @@ Global
 		{6354952B-3C24-4800-8844-43C873C27219}.Release|x64.Build.0 = Release|Any CPU
 		{6354952B-3C24-4800-8844-43C873C27219}.Release|x86.ActiveCfg = Release|Any CPU
 		{6354952B-3C24-4800-8844-43C873C27219}.Release|x86.Build.0 = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|x64.Build.0 = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Debug|x86.Build.0 = Debug|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|x64.ActiveCfg = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|x64.Build.0 = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|x86.ActiveCfg = Release|Any CPU
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -339,5 +353,6 @@ Global
 		{B32794A3-CA6E-4C6D-9664-E3F15593BCDC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{D4166402-8076-4CBD-88DA-EF96ED463746} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{6354952B-3C24-4800-8844-43C873C27219} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{1EA4D4A6-9275-4A7D-AEDB-1ED9988A70F0} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal
