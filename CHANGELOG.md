@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.0.8-preview.1] - 2026-05-29
+
+Ships M10 end-to-end: outbound webhooks + a richer audit log. A shared internal domain-event publisher fans every consequential action — flag/config/segment/experiment mutations, M8 approval decisions, and M7 RBAC changes — out to two consumers. The first persists each as an immutable `AuditEntry`, queryable through `GET /api/admin/audit` with entity/actor/date filters. The second is the webhook dispatcher: registered `WebhookEndpoint`s subscribe to event types (or all) and an optional environment, and a background worker drains a persisted, restart-surviving delivery queue — signing each body with the endpoint's secret (`X-Featly-Signature: sha256=…`, HMAC-SHA256) and retrying with exponential backoff until success or dead-letter. The embedded dashboard grows Webhooks management (list/create/edit/test/delete + delivery status) and an Audit log screen. Everything is additive and opt-in — no breaking change.
+
 ### Added
 
 - **M10 PR 10D — Dashboard Webhooks management + Audit log (closes M10).** The webhook + audit features become operable from the embedded dashboard. New **Webhooks** screen lists endpoints (name, URL, enabled, subscribed events) with an inline create form (name, URL, optional comma-separated event types, optional secret — blank auto-generates); the detail view edits the endpoint (name/URL/enabled/event-types/secret), **sends a test event**, deletes it, and shows a recent-deliveries table (event, status badge, attempts, last status code, last error). New **Audit log** screen queries `GET /api/admin/audit` with entity-type and actor filters, rendering when / action / entity / actor newest-first. Pure front-end (`app.js` / `app.css` / `index.html`); no API changes. **M10 is complete.** No breaking change.

@@ -5,7 +5,11 @@
 
 ## Active milestone
 
-**M10 — Webhooks + audit polish** (complete; not yet released)
+**Between milestones** — M10 closed and shipped as `v0.0.8-preview.1`. M11 (OpenFeature provider: `Featly.OpenFeature.Provider` implementing the OpenFeature spec by delegating to `IFeatlyClient`) is the next planned milestone but has not started yet.
+
+## Previous milestone
+
+**M10 — Webhooks + audit polish** (complete; published as `v0.0.8-preview.1` on NuGet)
 
 Outbound webhooks (persisted delivery queue with retry/backoff + HMAC-SHA256 signing) and a richer audit log, both fed by a shared internal domain-event publisher covering flag/config/segment/experiment mutations, M8 approval decisions, and M7 RBAC changes. Four sequenced PRs:
 
@@ -14,7 +18,7 @@ Outbound webhooks (persisted delivery queue with retry/backoff + HMAC-SHA256 sig
 - [x] **PR 10C — webhook engine**: `/api/admin/webhooks` CRUD (+ deliveries listing, test-enqueue, auto-generated secret); `WebhookDispatcher` (2nd event consumer) enqueues to endpoints matching type + env; `WebhookDeliveryWorker` drains the queue with exponential backoff → dead-letter, signing HMAC-SHA256 (`X-Featly-Signature`). Tuning binds from `Featly:Webhooks`. 7 new tests, 292 passing total.
 - [x] **PR 10D — dashboard**: Webhooks screen (list + inline create, detail edit, send-test, delete, recent-deliveries table) and Audit log screen (entity-type/actor filters). Closes M10. Front-end only.
 
-## Previous milestone
+## Milestone before that
 
 **M9 — Experiments / A-B testing** (complete; published as `v0.0.7-preview.1` on NuGet)
 
@@ -25,7 +29,7 @@ Layered experiments on flags, automatic exposure events, custom event tracking, 
 - [x] **PR 9C — SDK**: `IEventClient` (`IFeatlyClient.Events`) + `TrackAsync`; non-blocking `IEventSink` (bounded channel, drop-on-full) drained by a background `FeatlyEventFlushService` batching to `/api/sdk/events`; automatic first-exposure emission from the flag client (O(1) coverage check, allocation-free when no experiment); process-local sticky pinning that overrides the value after a weight change. No-op until `UseServer()`. 9 new tests, 278 passing total.
 - [x] **PR 9D — dashboard**: Experiments nav screen (list), detail view with Start/Stop/Restart and a CSS-only analytics panel — exposures-by-variant bar chart + per-metric conversion-rate bars from `GET /api/admin/experiments/{key}/analytics`. Closes M9.
 
-## Milestone before that
+## Milestone before that (M8)
 
 **M8 — Approval workflow** (complete; published as `v0.0.6-preview.1` on NuGet)
 
