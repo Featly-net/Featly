@@ -40,4 +40,14 @@ internal sealed class InMemoryEnvironmentStore : IEnvironmentStore
         _byId[environment.Id] = environment;
         return Task.CompletedTask;
     }
+
+    public Task<Environment?> SetReadOnlyAsync(Guid id, bool readOnly, CancellationToken ct)
+    {
+        if (_byId.TryGetValue(id, out var env))
+        {
+            env.ReadOnly = readOnly;
+            return Task.FromResult<Environment?>(env);
+        }
+        return Task.FromResult<Environment?>(null);
+    }
 }
