@@ -15,7 +15,7 @@ public sealed class DbCommandTests : IDisposable
 {
     private readonly string _tempDir = Directory.CreateTempSubdirectory("featly-cli").FullName;
 
-    private string DbPath => Path.Combine(_tempDir, "test.db");
+    private string DbPath => Path.Join(_tempDir, "test.db");
 
     private string ConnectionString => $"Data Source={DbPath}";
 
