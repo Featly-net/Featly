@@ -795,6 +795,10 @@ p:last-child { margin-bottom: 0; }
 }
 
 .hidden { display: none !important; }
+/* The `hidden` attribute must always win over component display rules
+   (.palette-backdrop / .modal-backdrop / .locked-badge set display:flex, which
+   otherwise overrides the UA [hidden]{display:none} and keeps them visible). */
+[hidden] { display: none !important; }
 
 /* Buttons (rule editor) */
 .btn-ghost {
