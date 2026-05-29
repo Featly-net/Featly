@@ -256,6 +256,7 @@
         "scroll": '<path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
         "settings": '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
         "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+        "chevron-up": '<path d="m18 15-6-6-6 6"/>',
         "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
         "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
@@ -1119,7 +1120,7 @@
             + '<input class="v-key" placeholder="key" value="' + esc(v.key) + '" />'
             + '<input class="v-name" placeholder="name" value="' + esc(v.name) + '" />'
             + '<input class="v-value" placeholder="value (JSON)" value="' + esc(JSON.stringify(v.value)) + '" />'
-            + '<button type="button" class="btn-icon" data-action="remove-variant" aria-label="Remove">×</button>'
+            + '<button type="button" class="icon-btn" data-action="remove-variant" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
 
@@ -1557,17 +1558,17 @@
         viewEl.innerHTML = [
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>API keys</h1>',
             '  <span class="sub">Bearer tokens scoped to <code>' + esc(envKey) + '</code>. The plaintext token is shown exactly once, at creation; only an Argon2id hash is stored.</span>',
-            '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+            '</div></div><div class="page-body">',
             '  <div id="apikey-reveal"></div>',
+            '  <div class="card-pad"><h2>Mint key</h2>',
+            '  <form id="apikey-form" class="row-form">',
+            '    <label class="field"><span class="field__label">Name</span><input name="name" required placeholder="ci-pipeline" /></label>',
+            '    <label class="field"><span class="field__label">Scope</span><select name="scope"><option value="AdminWrite">AdminWrite</option><option value="SdkRead">SdkRead</option></select></label>',
+            '    <label class="field"><span class="field__label">Bind to user</span><input name="user" placeholder="optional identifier, e.g. alice@example.com" /></label>',
+            '    <div class="row-form__action"><button type="submit" class="btn primary">Mint key</button><span class="save-msg" id="apikey-msg"></span></div>',
+            '  </form></div>',
             '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="8" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
-            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Mint key</h3>',
-            '  <form id="apikey-form" class="editor">',
-            field("Name", '<input name="name" required placeholder="ci-pipeline" />'),
-            field("Scope", '<select name="scope"><option value="AdminWrite">AdminWrite</option><option value="SdkRead">SdkRead</option></select>'),
-            field("Bind to user", '<input name="user" placeholder="optional identifier, e.g. alice@example.com" />'),
-            '  <div class="editor__footer"><button type="submit" class="btn primary">Mint key</button><span class="save-msg" id="apikey-msg"></span></div>',
-            '  </form>',
-            '</div></aside></div></div></div>',
+            '</div></div>',
         ].join("\n");
         hydrateIcons(viewEl);
 
@@ -2398,9 +2399,9 @@
             + '  <input class="r-name" placeholder="rule name" value="' + esc(rule.name || "") + '" />'
             + '  <label class="check"><input type="checkbox" class="r-enabled"' + (rule.enabled === false ? "" : " checked") + ' /> enabled</label>'
             + '  <div class="rule-card__buttons">'
-            + '    <button type="button" class="btn-icon" data-action="rule-up" aria-label="Move up">↑</button>'
-            + '    <button type="button" class="btn-icon" data-action="rule-down" aria-label="Move down">↓</button>'
-            + '    <button type="button" class="btn-icon" data-action="rule-remove" aria-label="Remove">×</button>'
+            + '    <button type="button" class="icon-btn" data-action="rule-up" aria-label="Move up">' + icon("chevron-up") + '</button>'
+            + '    <button type="button" class="icon-btn" data-action="rule-down" aria-label="Move down">' + icon("chevron-down") + '</button>'
+            + '    <button type="button" class="icon-btn" data-action="rule-remove" aria-label="Remove">' + icon("x") + '</button>'
             + '  </div>'
             + '</div>'
             + '<div class="rule-card__conditions">'
@@ -2420,7 +2421,7 @@
             + '<select class="c-op">' + opts + '</select>'
             + '<input class="c-value" placeholder="value (JSON or text)" value="' + esc(typeof c.value === "string" ? c.value : JSON.stringify(c.value || "")) + '" />'
             + '<label class="check"><input type="checkbox" class="c-negate"' + (c.negate ? " checked" : "") + ' /> negate</label>'
-            + '<button type="button" class="btn-icon" data-action="remove-condition" aria-label="Remove">×</button>'
+            + '<button type="button" class="icon-btn" data-action="remove-condition" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
 
@@ -2428,7 +2429,7 @@
         return '<div class="split-row">'
             + '<input class="s-variant" placeholder="variant" value="' + esc(s.variantKey || "") + '" />'
             + '<input class="s-weight" type="number" min="0" max="10000" placeholder="weight" value="' + esc(s.weight || 0) + '" />'
-            + '<button type="button" class="btn-icon" data-action="remove-split" aria-label="Remove">×</button>'
+            + '<button type="button" class="icon-btn" data-action="remove-split" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
 
@@ -2537,7 +2538,7 @@
         return '<div class="preview-attr-row">'
             + '<input class="pa-key" placeholder="user.country" value="' + esc(attr.key) + '" />'
             + '<input class="pa-value" placeholder="value (JSON or text)" value="' + esc(attr.value) + '" />'
-            + '<button type="button" class="btn-icon" data-action="preview-remove-attr" aria-label="Remove">×</button>'
+            + '<button type="button" class="icon-btn" data-action="preview-remove-attr" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
 
