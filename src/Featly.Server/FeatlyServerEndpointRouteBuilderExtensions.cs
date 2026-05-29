@@ -36,12 +36,14 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
 
         var apiGroup = group.MapGroup("/api");
         apiGroup.MapAuth();
+        apiGroup.MapBootstrap();
         apiGroup.MapAdminFlags();
         apiGroup.MapAdminSegments();
         apiGroup.MapAdminConfigs();
         apiGroup.MapAdminEnvironments();
         apiGroup.MapAdminPreview();
         apiGroup.MapAdminUsers();
+        apiGroup.MapAdminApiKeys();
         apiGroup.MapAdminRoles();
         apiGroup.MapAdminGroups();
         apiGroup.MapAdminRoleAssignments();

@@ -67,6 +67,38 @@ public class SqliteApiKeyStoreTests
     }
 
     [Fact]
+    public async Task UserId_binding_round_trips()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var bound = new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = "bound key",
+            Prefix = "featly_BOUND",
+            Hash = "argon2id$v=19$m=65536,t=3,p=2$" + Convert.ToBase64String(new byte[16]) + "$" + Convert.ToBase64String(new byte[32]),
+            Scope = ApiKeyScope.AdminWrite,
+            EnvironmentId = envId,
+            UserId = userId,
+            Revoked = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "test",
+        };
+        await host.Store.ApiKeys.CreateAsync(bound, ct);
+
+        var loaded = await host.Store.ApiKeys.GetByIdAsync(bound.Id, ct);
+        loaded!.UserId.Should().Be(userId);
+
+        // An unbound key keeps a null UserId.
+        var unbound = NewKey(envId, "featly_UNBND");
+        await host.Store.ApiKeys.CreateAsync(unbound, ct);
+        (await host.Store.ApiKeys.GetByIdAsync(unbound.Id, ct))!.UserId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task TouchLastUsed_updates_the_timestamp()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

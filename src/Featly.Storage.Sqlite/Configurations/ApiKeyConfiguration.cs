@@ -22,6 +22,7 @@ internal sealed class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
             .HasMaxLength(16);
 
         builder.Property(k => k.EnvironmentId).IsRequired();
+        builder.Property(k => k.UserId);
         builder.Property(k => k.Revoked);
 
         builder.Property(k => k.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
