@@ -261,7 +261,9 @@
         "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
         "moon": '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
         "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-        "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+        "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        "dots": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+        "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -454,7 +456,7 @@
                 '</div>',
             ].join("\n");
         },
-        flagList:    function () { renderList("flags", "Flags", flagCols); },
+        flagList:    function () { renderFlagList(); },
         configList:  function () { renderList("configs", "Configs", configCols); },
         segmentList: function () { renderList("segments", "Segments", segmentCols); },
         flagDetail:    function (p) { renderFlagDetail(p.key); },
@@ -528,6 +530,148 @@
             if (err.kind === "auth") { showAuthPrompt(); return; }
             viewEl.innerHTML = '<h1>' + title + '</h1><div class="error">' + esc(err.message) + '</div>';
         };
+    }
+
+    // ---------- Flags list (redesigned, step 5) ----------
+    // Tab + filter state survives re-renders within a session.
+    var flagListTab = "all";
+
+    function flagTypeBadge(type) {
+        var t = String(type == null ? "" : type);
+        var variant = t === "Boolean" ? " info" : (t === "Json" ? " accent" : "");
+        return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
+    }
+    function flagStatusBadge(f) {
+        return f.enabled
+            ? '<span class="badge success"><span class="dot"></span>on</span>'
+            : '<span class="badge"><span class="dot"></span>off</span>';
+    }
+    function flagTagsCell(f) {
+        var tags = f.tags || [];
+        if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
+        return '<div class="tag-list">' + tags.map(function (t) {
+            return '<span class="tag muted">' + esc(t) + '</span>';
+        }).join("") + '</div>';
+    }
+    function flagRow(f) {
+        return '<tr data-key="' + esc(f.key) + '">'
+            + '<td class="col-check"><input type="checkbox" class="row-check" aria-label="Select ' + esc(f.key) + '" /></td>'
+            + '<td>' + flagStatusBadge(f) + '</td>'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(f.key) + '</span>'
+            + '<span class="cell-name">' + esc(f.name || "") + '</span></div></td>'
+            + '<td>' + flagTypeBadge(f.type) + '</td>'
+            + '<td class="num">' + (f.variants || []).length + '</td>'
+            + '<td>' + flagTagsCell(f) + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(f.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(f.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+
+    function renderFlagList() {
+        if (!currentEnv) {
+            viewEl.innerHTML = '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Flags</h1></div></div>'
+                + '<div class="page-body"><div class="empty"><p>No environment selected yet.</p></div></div></div>';
+            return;
+        }
+        viewEl.innerHTML = flagListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = flagListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireFlagList(rows);
+            })
+            .catch(handleErrOnView("Flags"));
+    }
+
+    function flagListMarkup(all, loading) {
+        var enabled = all.filter(function (f) { return f.enabled; }).length;
+        var tabs = [
+            { k: "all", label: "All flags", n: all.length },
+            { k: "enabled", label: "Enabled", n: enabled },
+            { k: "disabled", label: "Disabled", n: all.length - enabled },
+        ];
+        var tabsHtml = tabs.map(function (t) {
+            return '<button class="tab' + (t.k === flagListTab ? " active" : "") + '" type="button" data-tab="' + t.k + '">'
+                + esc(t.label) + ' <span class="count">' + t.n + '</span></button>';
+        }).join("");
+        var body = loading
+            ? '<div class="empty"><p class="muted">Loading…</p></div>'
+            : [
+                '<div class="filter-bar">',
+                '  <div class="search-input"><span class="ti-slot" data-ti="search"></span>',
+                '    <input id="flag-filter" type="search" placeholder="Filter by key, name, or tag" spellcheck="false" autocomplete="off" />',
+                '    <span class="clear-shortcut">/</span></div>',
+                '</div>',
+                '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+                '  <th style="width:28px"><input type="checkbox" id="flag-check-all" aria-label="Select all" /></th>',
+                '  <th style="width:54px">Status</th><th>Key / Name</th><th style="width:120px">Type</th>',
+                '  <th style="width:84px">Variants</th><th>Tags</th><th style="width:140px">Last modified</th><th style="width:48px"></th>',
+                '</tr></thead><tbody id="flag-tbody">' + all.map(flagRow).join("") + '</tbody></table></div>',
+                '<div class="list-foot"><span id="flag-count">Showing ' + all.length + ' of ' + all.length + ' flags</span>',
+                '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>',
+            ].join("");
+        return [
+            '<div class="page">',
+            '  <div class="page-head"><div class="title-wrap"><h1>Flags</h1>',
+            '    <span class="sub">Boolean and multivariate feature flags evaluated in <code>' + esc(currentEnv.key) + '</code>.</span>',
+            '  </div></div>',
+            '  <div class="tabs">' + tabsHtml + '</div>',
+            '  <div class="page-body tight">' + body + '</div>',
+            '</div>',
+        ].join("");
+    }
+
+    function wireFlagList(all) {
+        var tbody = document.getElementById("flag-tbody");
+        var countEl = document.getElementById("flag-count");
+        var filterInput = document.getElementById("flag-filter");
+        var checkAll = document.getElementById("flag-check-all");
+        if (!tbody) { return; }
+
+        function visibleRows() {
+            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            return all.filter(function (f) {
+                if (flagListTab === "enabled" && !f.enabled) { return false; }
+                if (flagListTab === "disabled" && f.enabled) { return false; }
+                if (q) {
+                    var hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
+                    if (hay.indexOf(q) < 0) { return false; }
+                }
+                return true;
+            });
+        }
+        function repaint() {
+            var rows = visibleRows();
+            tbody.innerHTML = rows.length
+                ? rows.map(flagRow).join("")
+                : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No flags match this filter.</td></tr>';
+            hydrateIcons(tbody);
+            if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " flags"; }
+            if (checkAll) { checkAll.checked = false; }
+        }
+
+        Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (btn) {
+            btn.addEventListener("click", function () {
+                flagListTab = btn.getAttribute("data-tab");
+                Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (b) {
+                    b.classList.toggle("active", b === btn);
+                });
+                repaint();
+            });
+        });
+        if (filterInput) { filterInput.addEventListener("input", repaint); }
+        tbody.addEventListener("click", function (e) {
+            if (e.target.closest("input, button, a")) { return; }
+            var tr = e.target.closest("tr[data-key]");
+            if (tr) { navigate("/flags/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+        });
+        if (checkAll) {
+            checkAll.addEventListener("change", function () {
+                Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
+            });
+        }
     }
 
     // ============================================================
