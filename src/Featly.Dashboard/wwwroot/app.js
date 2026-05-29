@@ -268,7 +268,8 @@
         "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
         "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
         "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
-        "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>'
+        "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+        "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -1781,10 +1782,9 @@
                     '  <span class="sub">' + esc(c.action) + ' · authored by <code>' + esc(truncate(c.authorUserId, 8)) + '</code></span>',
                     '</div><div class="actions">' + crStatusBadge(c.status) + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</div></div>',
                     '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
-                    '  <div class="card-pad"><h2>Diff</h2><div class="cr-diff">',
-                    '    <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
-                    '    <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
-                    '  </div></div>',
+                    '  <div class="card-pad"><h2>Diff</h2>'
+                    + renderDiff(prettyJson(c.currentState), prettyJson(c.proposedState), esc(c.entityType) + " " + esc(c.entityKey))
+                    + '</div>',
                     '  <div class="card-pad"><h2>Comments</h2>',
                     '    <div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
                     '    <form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn outline xs">Comment</button></form>',
@@ -1867,6 +1867,78 @@
         if (value === null || value === undefined) { return "(none)"; }
         try { return JSON.stringify(value, null, 2); } catch (_) { return String(value); }
     }
+
+    // ============================================================
+    // Diff view: line-level LCS diff rendered with the .diff component.
+    // Used by the change review and the audit details modal.
+    // ============================================================
+    function diffLines(a, b) {
+        a = String(a == null ? "" : a).split("\n");
+        b = String(b == null ? "" : b).split("\n");
+        var n = a.length, m = b.length;
+        // LCS length table (bottom-up), then walk it to emit add/del/context.
+        var dp = [];
+        for (var x = 0; x <= n; x++) { dp.push(new Array(m + 1).fill(0)); }
+        for (var i = n - 1; i >= 0; i--) {
+            for (var j = m - 1; j >= 0; j--) {
+                dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            }
+        }
+        var out = [], p = 0, q = 0, oldN = 1, newN = 1;
+        while (p < n && q < m) {
+            if (a[p] === b[q]) { out.push({ t: "ctx", text: a[p], o: oldN++, nn: newN++ }); p++; q++; }
+            else if (dp[p + 1][q] >= dp[p][q + 1]) { out.push({ t: "del", text: a[p], o: oldN++, nn: null }); p++; }
+            else { out.push({ t: "add", text: b[q], o: null, nn: newN++ }); q++; }
+        }
+        while (p < n) { out.push({ t: "del", text: a[p], o: oldN++, nn: null }); p++; }
+        while (q < m) { out.push({ t: "add", text: b[q], o: null, nn: newN++ }); q++; }
+        return out;
+    }
+
+    function renderDiff(oldStr, newStr, title) {
+        var lines = diffLines(oldStr, newStr);
+        var adds = 0, dels = 0;
+        var body = lines.map(function (l) {
+            if (l.t === "add") { adds++; } else if (l.t === "del") { dels++; }
+            var cls = l.t === "add" ? " add" : (l.t === "del" ? " del" : "");
+            var sym = l.t === "add" ? "+" : (l.t === "del" ? "-" : " ");
+            return '<div class="line' + cls + '">'
+                + '<span class="ln">' + (l.o == null ? "" : l.o) + '</span>'
+                + '<span class="ln">' + (l.nn == null ? "" : l.nn) + '</span>'
+                + '<span class="sym">' + sym + '</span>'
+                + '<span class="code">' + esc(l.text) + '</span></div>';
+        }).join("");
+        return '<div class="diff"><div class="file-head">'
+            + (title ? '<span>' + esc(title) + '</span>' : '')
+            + '<span class="stat-add">+' + adds + '</span><span class="stat-del">-' + dels + '</span></div>'
+            + '<div class="body">' + body + '</div></div>';
+    }
+
+    // ============================================================
+    // Modal: built once, appended to <body>. Esc / backdrop close.
+    // ============================================================
+    var modalEl = null;
+    function ensureModal() {
+        if (modalEl) { return modalEl; }
+        modalEl = document.createElement("div");
+        modalEl.className = "modal-backdrop";
+        modalEl.hidden = true;
+        document.body.appendChild(modalEl);
+        modalEl.addEventListener("mousedown", function (e) { if (e.target === modalEl) { closeModal(); } });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && modalEl && !modalEl.hidden) { closeModal(); } });
+        return modalEl;
+    }
+    function openModal(title, bodyHtml, large) {
+        ensureModal();
+        modalEl.innerHTML = '<div class="modal' + (large ? " lg" : "") + '" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">'
+            + '<div class="modal-head"><span class="title">' + esc(title) + '</span>'
+            + '<button class="icon-btn" type="button" data-modal-close aria-label="Close"><span class="ti-slot" data-ti="x"></span></button></div>'
+            + '<div class="modal-body">' + bodyHtml + '</div></div>';
+        modalEl.hidden = false;
+        hydrateIcons(modalEl);
+        modalEl.querySelector("[data-modal-close]").addEventListener("click", closeModal);
+    }
+    function closeModal() { if (modalEl) { modalEl.hidden = true; modalEl.innerHTML = ""; } }
 
     function renderApprovalsEditor() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Approval policy"); return; }
@@ -2141,9 +2213,9 @@
                     resultsEl.innerHTML = '<div class="empty"><p class="muted">No audit entries match.</p></div>';
                     return;
                 }
-                var rows = entries.map(function (a) {
+                var rows = entries.map(function (a, idx) {
                     var warn = /lock|bypass|drop|delete|revoke|bootstrap/i.test(a.action || "");
-                    return '<div class="audit-row' + (warn ? ' warn' : '') + '">'
+                    return '<div class="audit-row' + (warn ? ' warn' : '') + '" data-idx="' + idx + '" role="button" tabindex="0" title="View details" style="cursor:pointer">'
                         + '<span class="ts">' + (formatDate(a.at) || "—") + '</span>'
                         + '<span class="ic"><span class="ti-slot" data-ti="' + auditIcon(a.entityType) + '"></span></span>'
                         + '<span class="desc"><span class="who">' + esc(a.actorIdentifier || "—") + '</span> '
@@ -2153,6 +2225,34 @@
                 }).join("");
                 resultsEl.innerHTML = '<div class="audit-list">' + rows + '</div>';
                 hydrateIcons(resultsEl);
+                function openAuditEntry(idx) {
+                    var a = entries[idx];
+                    if (!a) { return; }
+                    var d = a.data;
+                    var title = (a.action || "Audit entry") + (a.entityKey ? " · " + a.entityKey : "");
+                    var body;
+                    if (d && typeof d === "object" && !Array.isArray(d) &&
+                        (d.before !== undefined || d.after !== undefined || d.currentState !== undefined || d.proposedState !== undefined)) {
+                        var before = d.before !== undefined ? d.before : d.currentState;
+                        var after = d.after !== undefined ? d.after : d.proposedState;
+                        body = renderDiff(prettyJson(before), prettyJson(after), a.entityType ? esc(a.entityType) + " " + esc(a.entityKey || "") : "");
+                    } else {
+                        body = '<pre class="cr-json">' + esc(prettyJson(d === undefined ? null : d)) + '</pre>';
+                    }
+                    var meta = '<dl class="side-dl" style="margin-bottom:12px">'
+                        + '<dt>Actor</dt><dd>' + esc(a.actorIdentifier || "—") + '</dd>'
+                        + '<dt>Action</dt><dd class="mono">' + esc(a.action || "—") + '</dd>'
+                        + '<dt>Entity</dt><dd>' + esc((a.entityType || "—") + (a.entityKey ? " / " + a.entityKey : "")) + '</dd>'
+                        + '<dt>When</dt><dd>' + (formatDate(a.at) || "—") + '</dd>'
+                        + '</dl>';
+                    openModal(title, meta + body, true);
+                }
+                Array.prototype.slice.call(resultsEl.querySelectorAll(".audit-row")).forEach(function (row) {
+                    row.addEventListener("click", function () { openAuditEntry(parseInt(row.getAttribute("data-idx"), 10)); });
+                    row.addEventListener("keydown", function (e) {
+                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditEntry(parseInt(row.getAttribute("data-idx"), 10)); }
+                    });
+                });
             }).catch(handleErrOnView("Audit log"));
         }
 
