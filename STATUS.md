@@ -5,7 +5,14 @@
 
 ## Active milestone
 
-**Between milestones** — M11 closed and shipped as `v0.0.9-preview.1` (which also carried the M10 polish: ReadOnly env lock/unlock + full audit filters). The only remaining milestone is M12 (Polish, docs, first release `v0.1.0`: `Featly.Cli`, the `Centralized.Sample`, the GETTING_STARTED / CONFIGURATION / DEPLOYMENT docs, ADRs, a security audit, and the `v0.1.0` tag) — not started yet.
+**M12 — Polish, docs, first release** (in progress; the final milestone). Delivers the `Featly.Cli` global tool, the `Centralized.Sample` (separate-server deployment pattern), the GETTING_STARTED / CONFIGURATION / DEPLOYMENT docs, filled-in ADRs, a security audit pass, and the first public `v0.1.0` tag. Architecture decisions locked: the CLI is **hybrid** (offline `db` commands operate the SQLite file directly; `apikey`/`bootstrap-admin`/`env`/`export`/`import` go through the server's HTTP API so they reuse permission checks + audit + webhooks), and generated API keys bind to a real `User` principal (closing the M8 limitation where an API key was not a real approver identity). Slicing:
+
+- [x] **PR 12A — CLI scaffold + offline `db` commands**: `featly` command tree on `System.CommandLine`; public `SqliteMigrationRunner` facade in `Featly.Storage.Sqlite` (keeps `FeatlyDbContext` internal); `db migrate`/`status`/`rollback`/`drop` against `--connection-string`/`FEATLY_SQLITE`/default, confirmation-gated destructive ops. New `tests/Featly.Cli.Tests` (10 tests). 315 passing total.
+- [ ] **PR 12B — apikey/bootstrap/env via HTTP + user-bound keys**: server `POST /api/admin/apikeys` (mint bound to a user) + guarded `POST /api/admin/bootstrap`; CLI HTTP admin client + `apikey generate`, `bootstrap-admin`, `env lock`/`unlock`.
+- [ ] **PR 12C — export/import + `Centralized.Sample`**: server admin export/import snapshot endpoints + CLI `export`/`import`; standalone-server sample (3rd deployment pattern).
+- [ ] **PR 12D — docs + ADRs + PERFORMANCE.md + security audit**: GETTING_STARTED / CONFIGURATION / DEPLOYMENT, filled ADRs (ARCHITECTURE.md §22 + CLI/apikey decisions), benchmark results, security audit pass.
+
+Then `v0.1.0-preview.1` is cut (preview first; promoted to stable `v0.1.0` on a separate go-ahead).
 
 ## Previous milestone
 
