@@ -28,6 +28,9 @@ public static class CliApp
         var root = new RootCommand(
             "Featly CLI — operate the Featly SQLite store and server from the command line.");
         root.AddCommand(DbCommand.Build());
+        root.AddCommand(ApiKeyCommand.Build());
+        root.AddCommand(BootstrapAdminCommand.Build());
+        root.AddCommand(EnvCommand.Build());
         return root;
     }
 }
