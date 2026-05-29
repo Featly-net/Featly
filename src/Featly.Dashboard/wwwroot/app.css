@@ -2122,3 +2122,15 @@ p:last-child { margin-bottom: 0; }
 .audit-row .desc .entity { color: var(--fg-muted); }
 .audit-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .audit-filter input { height: 28px; padding: 0 8px; background: var(--bg2); color: var(--fg); border: 0.5px solid var(--border); border-radius: var(--r-md); font-size: 12px; }
+
+/* Detail screens (redesign step 5): 2-column layout + metadata side-card. */
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.detail-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.detail-main .editor { background: var(--color-bg-elevated); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 16px; }
+.detail-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 60px; }
+.side-card { background: var(--color-bg-elevated); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 14px; }
+.side-h { margin: 0 0 10px; font: 500 11px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-faint); }
+.side-dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 12px; align-items: center; }
+.side-dl dt { color: var(--fg-muted); }
+.side-dl dd { margin: 0; text-align: right; }
+@media (max-width: 860px) { .detail-grid { grid-template-columns: 1fr; } .detail-side { position: static; } }

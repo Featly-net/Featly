@@ -817,9 +817,15 @@
             return '<option value="' + esc(v.key) + '"' + (v.key === flag.defaultVariantKey ? " selected" : "") + '>' + esc(v.key) + '</option>';
         }).join("");
 
+        var statusBadge = flag.enabled
+            ? '<span class="badge success"><span class="dot"></span>on</span>'
+            : '<span class="badge"><span class="dot"></span>off</span>';
         viewEl.innerHTML = [
-            '<a data-link="/flags" class="back-link">← Flags</a>',
-            '<h1>' + code(flag.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(flag.key) + '</h1>',
+            '    <span class="sub">' + esc(flag.name || "") + ' · ' + esc(flag.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div><div class="actions">' + statusBadge + '</div>',
+            '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="flag-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(flag.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(flag.description || "") + '</textarea>'),
@@ -831,21 +837,32 @@
             field("Tags", '<input name="tags" value="' + esc((flag.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
             '<h2>Variants</h2>',
             '<div class="variant-list">' + (flag.variants || []).map(renderVariantRow).join("") + '</div>',
-            '<button type="button" class="btn-ghost" data-action="add-variant">+ Add variant</button>',
+            '<button type="button" class="btn outline xs" data-action="add-variant"><span class="ti-slot" data-ti="plus"></span> Add variant</button>',
             '<h2>Rules</h2>',
             renderRulesEditor(flag.rules || [], { kind: "flag", variants: flag.variants || [] }),
-            '<button type="button" class="btn-ghost" data-action="add-rule">+ Add rule</button>',
+            '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save flag</button>',
+            '  <button type="submit" class="btn primary">Save flag</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
             renderPreviewPanel("flag", flag.key),
-            auditFooter(flag),
+            '</div><aside class="detail-side">',
+            '  <div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '    <dt>Status</dt><dd>' + statusBadge + '</dd>',
+            '    <dt>Type</dt><dd>' + esc(flag.type) + '</dd>',
+            '    <dt>Default</dt><dd class="mono">' + esc(flag.defaultVariantKey || "—") + '</dd>',
+            '    <dt>Variants</dt><dd>' + (flag.variants || []).length + '</dd>',
+            '    <dt>Rules</dt><dd>' + (flag.rules || []).length + '</dd>',
+            '    <dt>Created</dt><dd>' + (formatDate(flag.createdAt) || "—") + '</dd>',
+            '    <dt>Updated</dt><dd>' + (formatDate(flag.updatedAt) || "—") + '</dd>',
+            '  </dl></div>',
+            '</aside></div></div></div>',
         ].join("\n");
 
         wireFlagEditor(flag);
         wirePreviewPanel("flag", flag.key);
+        hydrateIcons(viewEl);
     }
 
     function renderVariantRow(v) {
