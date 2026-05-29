@@ -1613,7 +1613,12 @@ p:last-child { margin-bottom: 0; }
 .tbl td .mono { font-family: var(--font-mono); font-size: 12px; }
 .tbl td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
 .tbl td.shrink { width: 1%; white-space: nowrap; }
-.tbl-wrap { border: 0.5px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--bg); }
+.tbl-wrap { border: 0.5px solid var(--border); border-radius: var(--r-lg); overflow: auto; background: var(--bg); }
+
+/* Inline create bar (e.g. API keys mint): fields in a row above a full-width table. */
+.row-form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.row-form .field { flex: 1 1 180px; min-width: 160px; }
+.row-form__action { display: flex; align-items: center; gap: 10px; padding-bottom: 2px; }
 
 /* ------------------------ Inbox cards ------------------------ */
 .inbox-group { display: flex; flex-direction: column; gap: 6px; }
@@ -2165,7 +2170,7 @@ p:last-child { margin-bottom: 0; }
 .cell-keyname { display: flex; flex-direction: column; gap: 2px; }
 .cell-key { font-size: 12.5px; font-weight: 500; }
 .cell-name { font-size: 11px; color: var(--fg-muted); }
-.cell-modified { font-size: 11.5px; color: var(--fg-muted); }
+.cell-modified { font-size: 11.5px; color: var(--fg-muted); white-space: nowrap; }
 .tbl td.col-actions { text-align: right; }
 .tbl td.col-check, .tbl th:first-child { vertical-align: middle; }
 .tbl input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
