@@ -6,55 +6,177 @@
  * any interactive element shows feedback without relying on system defaults.
  */
 
+/* =============================================================================
+   Design tokens (NEW UI) — from design_handoff_featly_ui/featly-tokens.css.
+   Keeps every token NAME the existing markup uses (only values change) and adds
+   the semantic families (success/warn/danger/info/purple), extra surfaces
+   (bg2/bg3/bg4), mono-tuned borders, and diff colors the new screens need.
+
+   Theming: default follows the OS via prefers-color-scheme, AND a theme can be
+   forced with <html data-theme="dark"|"light"> (a manual toggle wires to that).
+
+   ACCENT: kept Featly PURPLE (#7c3aed light / #a78bfa dark) instead of the
+   handoff's teal — the --color-accent*, --color-focus and --accent* aliases are
+   purple; every other token is hue-neutral.
+   ============================================================================ */
+
 :root {
-    color-scheme: light dark;
+  color-scheme: light dark;
 
-    /* Spacing scale */
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-5: 1.5rem;
-    --space-6: 2rem;
+  /* ---- Spacing (kept; values unchanged so existing layout is stable) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
 
-    /* Type */
-    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* New denser scale used by the new components (px-based, tabular UI) */
+  --s-1: 4px;  --s-2: 6px;  --s-3: 8px;  --s-4: 10px; --s-5: 12px;
+  --s-6: 14px; --s-7: 16px; --s-8: 20px; --s-9: 24px; --s-10: 32px;
 
-    /* Layout */
-    --header-height: 3.25rem;
-    --sidebar-width: 14rem;
-    --footer-height: 2.25rem;
-    --radius-sm: 4px;
-    --radius-md: 8px;
+  /* ---- Type ---- */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-    /* Light theme tokens */
-    --color-bg: #fafafa;
-    --color-bg-elevated: #ffffff;
-    --color-bg-muted: #f1f1f3;
-    --color-fg: #18181b;
-    --color-fg-muted: #6b7280;
-    --color-border: #e4e4e7;
-    --color-accent: #7c3aed;
-    --color-accent-hover: #6d28d9;
-    --color-accent-active: #5b21b6;
-    --color-accent-fg: #ffffff;
-    --color-focus: #7c3aed;
+  /* Type scale (new) */
+  --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px;
+  --fs-md: 14px;  --fs-lg: 16px; --fs-xl: 20px; --fs-2xl: 26px; --fs-3xl: 34px;
+
+  /* ---- Layout (kept) ---- */
+  --header-height: 48px;          /* was 3.25rem — new topbar is denser */
+  --sidebar-width: 220px;         /* was 14rem */
+  --sidebar-width-collapsed: 52px;
+  --footer-height: 2.25rem;
+
+  /* ---- Radii (kept names, added scale) ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;               /* was 8px — tighter, more technical */
+  --r-xs: 3px; --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-xl: 12px;
+
+  /* ---- Motion ---- */
+  --t-quick: 120ms ease-out;
+  --t-live: 1.6s ease-in-out;
+
+  /* =========================================================================
+     LIGHT THEME (default when OS is light, or [data-theme="light"])
+     ========================================================================= */
+  --color-bg:          #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-muted:    #f7f7f8;
+  --color-fg:          #0c0c0e;
+  --color-fg-muted:    #5f5f66;
+  --color-border:      rgba(0,0,0,0.09);
+
+  /* Accent — kept Featly PURPLE (handoff default was teal). */
+  --color-accent:        #7c3aed;
+  --color-accent-hover:  #6d28d9;
+  --color-accent-active: #5b21b6;
+  --color-accent-fg:     #ffffff;
+  --color-focus:         #7c3aed;
+
+  /* ---- New design aliases (semantic, framework-agnostic) ---- */
+  --bg:    var(--color-bg);
+  --bg2:   #f7f7f8;
+  --bg3:   #efeff1;
+  --bg4:   #e4e4e7;
+  --fg:        var(--color-fg);
+  --fg-muted:  var(--color-fg-muted);
+  --fg-faint:  #9094a0;
+  --border:        var(--color-border);
+  --border-strong: rgba(0,0,0,0.18);
+  --overlay:   rgba(15,15,18,0.45);
+
+  --accent:        var(--color-accent);
+  --accent-strong: var(--color-accent-hover);
+  --accent-bg:     rgba(124,58,237,0.10);
+  --accent-on:     #ffffff;
+
+  --success-fg: #1f7a2b; --success-bg: rgba(31,122,43,0.10);  --success-dot: #2e9e3d; --success-border: rgba(31,122,43,0.22);
+  --danger-fg:  #b0231f; --danger-bg:  rgba(176,35,31,0.08);  --danger-dot:  #c9302b; --danger-border:  rgba(176,35,31,0.22);
+  --warn-fg:    #8a5a0e; --warn-bg:    rgba(138,90,14,0.09);  --warn-dot:    #b5790d; --warn-border:    rgba(138,90,14,0.22);
+  --info-fg:    #1e5baf; --info-bg:    rgba(30,91,175,0.09);  --info-dot:    #2a6fd0; --info-border:    rgba(30,91,175,0.22);
+  --purple-fg:  #5240b0; --purple-bg:  rgba(82,64,176,0.09);  --purple-dot:  #6a56c9; --purple-border:  rgba(82,64,176,0.22);
+
+  --diff-add-bg: rgba(31,122,43,0.10);  --diff-add-mark: rgba(31,122,43,0.28);
+  --diff-del-bg: rgba(176,35,31,0.09);  --diff-del-mark: rgba(176,35,31,0.28);
 }
 
+/* =========================================================================
+   DARK THEME — applies when OS prefers dark…
+   ========================================================================= */
 @media (prefers-color-scheme: dark) {
-    :root {
-        --color-bg: #0b0b0e;
-        --color-bg-elevated: #15151a;
-        --color-bg-muted: #1d1d23;
-        --color-fg: #f4f4f5;
-        --color-fg-muted: #a1a1aa;
-        --color-border: #2a2a31;
-        --color-accent: #a78bfa;
-        --color-accent-hover: #c4b5fd;
-        --color-accent-active: #ddd6fe;
-        --color-accent-fg: #1a1a1f;
-    }
+  :root {
+    --color-bg:          #0a0a0b;
+    --color-bg-elevated: #121215;
+    --color-bg-muted:    #1a1a1f;
+    --color-fg:          #e8e8ea;
+    --color-fg-muted:    #8a8a93;
+    --color-border:      rgba(255,255,255,0.07);
+
+    /* Accent — kept Featly PURPLE (handoff default was teal). */
+    --color-accent:        #a78bfa;
+    --color-accent-hover:  #c4b5fd;
+    --color-accent-active: #ddd6fe;
+    --color-accent-fg:     #1a1a1f;
+    --color-focus:         #a78bfa;
+
+    --bg2:  #121215;
+    --bg3:  #1a1a1f;
+    --bg4:  #232329;
+    --fg-faint:      #5a5a63;
+    --border-strong: rgba(255,255,255,0.14);
+    --overlay:   rgba(0,0,0,0.55);
+
+    --accent-bg: rgba(167,139,250,0.12);
+    --accent-on: #1a1a1f;
+
+    --success-fg: #74d17b; --success-bg: rgba(116,209,123,0.13); --success-dot: #4fb659; --success-border: rgba(116,209,123,0.30);
+    --danger-fg:  #f07a7a; --danger-bg:  rgba(240,122,122,0.13); --danger-dot:  #db5555; --danger-border:  rgba(240,122,122,0.30);
+    --warn-fg:    #e3b260; --warn-bg:    rgba(227,178,96,0.13);  --warn-dot:    #cb9740; --warn-border:    rgba(227,178,96,0.30);
+    --info-fg:    #7bb0ee; --info-bg:    rgba(123,176,238,0.13); --info-dot:    #5891d6; --info-border:    rgba(123,176,238,0.30);
+    --purple-fg:  #b5a2f0; --purple-bg:  rgba(181,162,240,0.13); --purple-dot:  #8e78d4; --purple-border:  rgba(181,162,240,0.30);
+
+    --diff-add-bg: rgba(116,209,123,0.10); --diff-add-mark: rgba(116,209,123,0.28);
+    --diff-del-bg: rgba(240,122,122,0.10); --diff-del-mark: rgba(240,122,122,0.28);
+  }
+}
+
+/* …and the same dark values when a theme is FORCED via attribute, so a manual
+   light/dark switch can set document.documentElement.dataset.theme. */
+[data-theme="dark"] {
+  --color-bg:          #0a0a0b;
+  --color-bg-elevated: #121215;
+  --color-bg-muted:    #1a1a1f;
+  --color-fg:          #e8e8ea;
+  --color-fg-muted:    #8a8a93;
+  --color-border:      rgba(255,255,255,0.07);
+  --color-accent:        #a78bfa;
+  --color-accent-hover:  #c4b5fd;
+  --color-accent-active: #ddd6fe;
+  --color-accent-fg:     #1a1a1f;
+  --color-focus:         #a78bfa;
+  --bg2:#121215; --bg3:#1a1a1f; --bg4:#232329;
+  --fg-faint:#5a5a63; --border-strong:rgba(255,255,255,0.14); --overlay:rgba(0,0,0,0.55);
+  --accent-bg:rgba(167,139,250,0.12); --accent-on:#1a1a1f;
+  --success-fg:#74d17b; --success-bg:rgba(116,209,123,0.13); --success-dot:#4fb659; --success-border:rgba(116,209,123,0.30);
+  --danger-fg:#f07a7a;  --danger-bg:rgba(240,122,122,0.13);  --danger-dot:#db5555;  --danger-border:rgba(240,122,122,0.30);
+  --warn-fg:#e3b260;    --warn-bg:rgba(227,178,96,0.13);     --warn-dot:#cb9740;    --warn-border:rgba(227,178,96,0.30);
+  --info-fg:#7bb0ee;    --info-bg:rgba(123,176,238,0.13);    --info-dot:#5891d6;    --info-border:rgba(123,176,238,0.30);
+  --purple-fg:#b5a2f0;  --purple-bg:rgba(181,162,240,0.13);  --purple-dot:#8e78d4;  --purple-border:rgba(181,162,240,0.30);
+  --diff-add-bg:rgba(116,209,123,0.10); --diff-add-mark:rgba(116,209,123,0.28);
+  --diff-del-bg:rgba(240,122,122,0.10); --diff-del-mark:rgba(240,122,122,0.28);
+}
+
+/* Force light even if OS is dark. */
+[data-theme="light"] {
+  --color-bg:#ffffff; --color-bg-elevated:#ffffff; --color-bg-muted:#f7f7f8;
+  --color-fg:#0c0c0e; --color-fg-muted:#5f5f66; --color-border:rgba(0,0,0,0.09);
+  --color-accent:#7c3aed; --color-accent-hover:#6d28d9; --color-accent-active:#5b21b6;
+  --color-accent-fg:#ffffff; --color-focus:#7c3aed;
+  --bg2:#f7f7f8; --bg3:#efeff1; --bg4:#e4e4e7;
+  --fg-faint:#9094a0; --border-strong:rgba(0,0,0,0.18); --overlay:rgba(15,15,18,0.45);
+  --accent-bg:rgba(124,58,237,0.10); --accent-on:#ffffff;
 }
 
 /* Reset */
