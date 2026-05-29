@@ -2112,3 +2112,13 @@ p:last-child { margin-bottom: 0; }
 .tbl td.col-actions { text-align: right; }
 .tbl td.col-check, .tbl th:first-child { vertical-align: middle; }
 .tbl input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+
+/* Inbox + Audit log (redesign step 5). */
+.inbox-list { display: flex; flex-direction: column; gap: 18px; }
+.inbox-card[data-cr] { cursor: pointer; }
+.inbox-card .status-line .ti-slot { width: 12px; height: 12px; }
+.audit-list { display: flex; flex-direction: column; }
+.audit-row.warn { background: var(--warn-bg); }
+.audit-row .desc .entity { color: var(--fg-muted); }
+.audit-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.audit-filter input { height: 28px; padding: 0 8px; background: var(--bg2); color: var(--fg); border: 0.5px solid var(--border); border-radius: var(--r-md); font-size: 12px; }

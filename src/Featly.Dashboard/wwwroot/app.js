@@ -263,7 +263,10 @@
         "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
         "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
         "dots": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
-        "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>'
+        "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>',
+        "check": '<path d="M20 6 9 17l-5-5"/>',
+        "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+        "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -1281,39 +1284,61 @@
     // ============================================================
     // Approval workflow (M8): Inbox, change detail, policy editor
     // ============================================================
+    function inboxChangeCard(c) {
+        var approvals = (c.approvals || []).length;
+        var statusLine = approvals + ' approval' + (approvals === 1 ? '' : 's') + ' so far';
+        return '<div class="inbox-card urgent" data-cr="' + esc(c.id) + '">'
+            + '<span class="ic info"><span class="ti-slot" data-ti="git-pull-request"></span></span>'
+            + '<div class="main">'
+            + '  <div class="row1"><span class="title">' + esc(c.action || "Change") + '<span class="key">' + esc(c.entityKey || "") + '</span></span>'
+            + (c.entityType ? '<span class="badge sq">' + esc(c.entityType) + '</span>' : '') + '</div>'
+            + '  <div class="row2"><span>' + code(truncate(c.authorUserId || "—", 8)) + '</span><span class="dot-sep"></span>'
+            + '<span>' + (formatDate(c.createdAt) || "—") + '</span></div>'
+            + '  <div class="status-line"><span class="ti-slot" data-ti="clock"></span>' + esc(statusLine) + '</div>'
+            + '</div>'
+            + '<div class="actions"><a class="btn outline xs" data-link="/inbox/' + encodeURIComponent(c.id) + '">Review</a></div>'
+            + '</div>';
+    }
+    function inboxUpgradeCard(u) {
+        return '<div class="inbox-card mine">'
+            + '<span class="ic purple"><span class="ti-slot" data-ti="user-shield"></span></span>'
+            + '<div class="main">'
+            + '  <div class="row1"><span class="title">Role upgrade<span class="key">' + esc(truncate(u.userId || "", 12)) + '</span></span>'
+            + '<span class="badge warn">pending</span></div>'
+            + '  <div class="row2"><span>' + esc(truncate(u.justification || "No justification", 80)) + '</span><span class="dot-sep"></span>'
+            + '<span>' + (formatDate(u.createdAt) || "—") + '</span></div>'
+            + '</div></div>';
+    }
+    function inboxGroup(label, count, cardsHtml, emptyText) {
+        return '<div class="inbox-group">'
+            + '<div class="inbox-group-head">' + esc(label) + ' <span class="count">' + count + '</span></div>'
+            + (cardsHtml || '<div class="empty" style="padding:18px"><p class="muted">' + esc(emptyText) + '</p></div>')
+            + '</div>';
+    }
     function renderInbox() {
-        viewEl.innerHTML = '<h1>Inbox</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
+            '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
             api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
         ]).then(function (res) {
             var changes = Array.isArray(res[0]) ? res[0] : [];
             var upgrades = Array.isArray(res[1]) ? res[1] : [];
-
-            var changeRows = changes.map(function (c) {
-                return '<tr>'
-                    + '<td><a data-link="/inbox/' + encodeURIComponent(c.id) + '">' + badge(c.entityType) + ' ' + code(c.entityKey) + '</a></td>'
-                    + '<td>' + esc(c.action) + '</td>'
-                    + '<td>' + (c.approvals || []).length + ' approval(s)</td>'
-                    + '<td>' + formatDate(c.createdAt) + '</td>'
-                    + '</tr>';
-            }).join("");
-
-            var upgradeRows = upgrades.map(function (u) {
-                return '<tr><td>' + code(truncate(u.userId, 8)) + '</td><td>' + esc(u.justification || "—") + '</td><td>' + formatDate(u.createdAt) + '</td></tr>';
-            }).join("");
-
-            viewEl.innerHTML = [
-                '<h1>Inbox</h1>',
-                '<h2>Pending changes <span class="muted">(' + changes.length + ')</span></h2>',
-                changeRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Entity</th><th>Action</th><th>Approvals</th><th>Proposed</th></tr></thead><tbody>' + changeRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No pending changes.</p></div>',
-                '<h2>Role upgrade requests <span class="muted">(' + upgrades.length + ')</span></h2>',
-                upgradeRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Justification</th><th>Filed</th></tr></thead><tbody>' + upgradeRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No pending role upgrade requests.</p></div>',
-            ].join("\n");
+            var body = [
+                inboxGroup("Awaiting your approval", changes.length, changes.map(inboxChangeCard).join(""), "Nothing awaiting approval."),
+                inboxGroup("Role upgrade requests", upgrades.length, upgrades.map(inboxUpgradeCard).join(""), "No pending role-upgrade requests."),
+            ].join("");
+            viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
+                '<div class="inbox-list">' + body + '</div>');
+            hydrateIcons(viewEl);
+            var list = viewEl.querySelector(".inbox-list");
+            if (list) {
+                list.addEventListener("click", function (e) {
+                    if (e.target.closest("a, button")) { return; }
+                    var card = e.target.closest(".inbox-card[data-cr]");
+                    if (card) { navigate("/inbox/" + encodeURIComponent(card.getAttribute("data-cr"))); }
+                });
+            }
         }).catch(handleErrOnView("Inbox"));
     }
 
@@ -1627,18 +1652,33 @@
         }).catch(handleErrOnView("Settings"));
     }
 
+    function auditIcon(entityType) {
+        switch (String(entityType == null ? "" : entityType)) {
+            case "Flag": return "flag";
+            case "Config": return "sliders";
+            case "Segment": return "segment";
+            case "Webhook": return "webhook";
+            case "Role": return "shield";
+            case "User": return "user";
+            case "ApiKey": return "user-shield";
+            default: return "scroll";
+        }
+    }
     function renderAuditLog() {
         viewEl.innerHTML = [
-            '<h1>Audit log</h1>',
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Audit log</h1>',
+            '  <span class="sub">Every consequential action, newest first. Filter by entity, actor, or date.</span>',
+            '</div></div><div class="page-body tight">',
             '<form id="audit-filter" class="audit-filter">',
             '  <input name="entityType" placeholder="Entity type (e.g. Flag)" />',
             '  <input name="entityKey" placeholder="Entity key" />',
             '  <input name="actor" placeholder="Actor" />',
             '  <input name="from" type="date" title="From date" />',
             '  <input name="to" type="date" title="To date" />',
-            '  <button type="submit" class="btn-ghost btn-small">Filter</button>',
+            '  <button type="submit" class="btn outline xs">Filter</button>',
             '</form>',
-            '<div id="audit-results"><div class="card"><p class="muted">Loading…</p></div></div>',
+            '<div id="audit-results"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '</div></div>',
         ].join("\n");
 
         function load(filters) {
@@ -1653,18 +1693,21 @@
                 entries = Array.isArray(entries) ? entries : [];
                 var resultsEl = document.getElementById("audit-results");
                 if (entries.length === 0) {
-                    resultsEl.innerHTML = '<div class="placeholder"><p>No audit entries match.</p></div>';
+                    resultsEl.innerHTML = '<div class="empty"><p class="muted">No audit entries match.</p></div>';
                     return;
                 }
                 var rows = entries.map(function (a) {
-                    return '<tr>'
-                        + '<td>' + formatDate(a.at) + '</td>'
-                        + '<td>' + code(a.action) + '</td>'
-                        + '<td>' + badge(a.entityType) + ' ' + (a.entityKey ? code(truncate(a.entityKey, 24)) : '') + '</td>'
-                        + '<td>' + esc(a.actorIdentifier || "—") + '</td>'
-                        + '</tr>';
+                    var warn = /lock|bypass|drop|delete|revoke|bootstrap/i.test(a.action || "");
+                    return '<div class="audit-row' + (warn ? ' warn' : '') + '">'
+                        + '<span class="ts">' + (formatDate(a.at) || "—") + '</span>'
+                        + '<span class="ic"><span class="ti-slot" data-ti="' + auditIcon(a.entityType) + '"></span></span>'
+                        + '<span class="desc"><span class="who">' + esc(a.actorIdentifier || "—") + '</span> '
+                        + code(a.action) + (a.entityKey ? ' <span class="entity">' + esc(truncate(a.entityKey, 32)) + '</span>' : '') + '</span>'
+                        + (a.entityType ? '<span class="env-chip">' + esc(a.entityType) + '</span>' : '')
+                        + '</div>';
                 }).join("");
-                resultsEl.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Action</th><th>Entity</th><th>Actor</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+                resultsEl.innerHTML = '<div class="audit-list">' + rows + '</div>';
+                hydrateIcons(resultsEl);
             }).catch(handleErrOnView("Audit log"));
         }
 
