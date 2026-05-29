@@ -258,6 +258,9 @@
         { match: /^\/inbox\/(.+)$/,      key: "changeDetail", params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/inbox\/?$/,         key: "inbox",        params: function () { return {}; } },
         { match: /^\/approvals\/?$/,     key: "approvals",    params: function () { return {}; } },
+        { match: /^\/webhooks\/(.+)$/,   key: "webhookDetail",params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
+        { match: /^\/webhooks\/?$/,      key: "webhookList",  params: function () { return {}; } },
+        { match: /^\/audit\/?$/,         key: "auditLog",     params: function () { return {}; } },
         { match: /^\/settings\/?$/,      key: "settings",     params: function () { return {}; } },
     ];
 
@@ -288,6 +291,8 @@
         if (key.indexOf("role") === 0) { return "/roles"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
+        if (key.indexOf("webhook") === 0) { return "/webhooks"; }
+        if (key === "auditLog") { return "/audit"; }
         if (key === "settings") { return "/settings"; }
         return "/";
     }
@@ -357,6 +362,9 @@
         inbox:        function () { renderInbox(); },
         changeDetail: function (p) { renderChangeDetail(p.id); },
         approvals:    function () { renderApprovalsEditor(); },
+        webhookList:   function () { renderWebhookList(); },
+        webhookDetail: function (p) { renderWebhookDetail(p.id); },
+        auditLog:      function () { renderAuditLog(); },
         roleList:    function () { renderRoleList(); },
         settings: function () {
             viewEl.innerHTML = '<h1>Settings</h1><div class="placeholder"><p>Environment defaults, approval policy, webhook configuration, audit retention.</p><p class="muted">M6+ unlocks the editor.</p></div>';
@@ -1111,6 +1119,180 @@
         if (!slot) { return; }
         slot.className = "save-msg save-msg--" + kind;
         slot.textContent = text;
+    }
+
+    // ============================================================
+    // Webhooks + Audit log (M10)
+    // ============================================================
+    function deliveryStatusBadge(status) {
+        var cls = status === "Succeeded" ? "TargetingMatch" : (status === "Dead" ? "NotFound" : "Default");
+        return '<span class="preview-reason preview-reason--' + cls + '">' + esc(status) + '</span>';
+    }
+
+    function renderWebhookList() {
+        viewEl.innerHTML = '<h1>Webhooks</h1><div class="card"><p class="muted">Loading…</p></div>';
+        api("GET", "/admin/webhooks")
+            .then(function (hooks) {
+                hooks = Array.isArray(hooks) ? hooks : [];
+                var rows = hooks.map(function (w) {
+                    var types = (w.eventTypes || []).length ? (w.eventTypes).map(code).join(" ") : '<span class="muted">all events</span>';
+                    return '<tr>'
+                        + '<td><a data-link="/webhooks/' + encodeURIComponent(w.id) + '">' + esc(w.name) + '</a></td>'
+                        + '<td>' + code(truncate(w.url, 48)) + '</td>'
+                        + '<td>' + (w.enabled ? '<span class="dot dot--on"></span> on' : '<span class="dot dot--off"></span> off') + '</td>'
+                        + '<td>' + types + '</td>'
+                        + '</tr>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<h1>Webhooks</h1>',
+                    '<p class="muted">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</p>',
+                    hooks.length
+                        ? '<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                        : '<div class="placeholder"><p>No webhooks yet.</p></div>',
+                    '<h2>New webhook</h2>',
+                    '<form id="wh-form" class="editor">',
+                    field("Name", '<input name="name" required placeholder="Slack relay" />'),
+                    field("URL", '<input name="url" required placeholder="https://example.com/hook" />'),
+                    field("Event types", '<input name="eventTypes" placeholder="flag.updated, change.applied (blank = all)" />'),
+                    field("Secret", '<input name="secret" placeholder="(blank = auto-generate)" />'),
+                    '<div class="editor__footer"><button type="submit" class="btn-primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
+                    '</form>',
+                ].join("\n");
+
+                document.getElementById("wh-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("wh-msg");
+                    setMessageOn(msg, "loading", "Creating…");
+                    api("POST", "/admin/webhooks", {
+                        name: f.name.value.trim(),
+                        url: f.url.value.trim(),
+                        secret: f.secret.value.trim() || null,
+                        eventTypes: parseCsv(f.eventTypes.value),
+                    }).then(function (created) { navigate("/webhooks/" + encodeURIComponent(created.id)); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Webhooks"));
+    }
+
+    function renderWebhookDetail(id) {
+        viewEl.innerHTML = '<a data-link="/webhooks" class="back-link">← Webhooks</a><h1>Webhook</h1><div class="card"><p class="muted">Loading…</p></div>';
+        Promise.all([
+            api("GET", "/admin/webhooks/" + encodeURIComponent(id)),
+            api("GET", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries").catch(function () { return []; }),
+        ]).then(function (res) {
+            var w = res[0];
+            var deliveries = Array.isArray(res[1]) ? res[1] : [];
+            var deliveryRows = deliveries.map(function (d) {
+                return '<tr>'
+                    + '<td>' + code(d.eventType) + '</td>'
+                    + '<td>' + deliveryStatusBadge(d.status) + '</td>'
+                    + '<td>' + (d.attemptCount || 0) + '</td>'
+                    + '<td>' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
+                    + '<td class="muted">' + esc(truncate(d.lastError || "", 48)) + '</td>'
+                    + '<td>' + formatDate(d.createdAt) + '</td>'
+                    + '</tr>';
+            }).join("");
+
+            viewEl.innerHTML = [
+                '<a data-link="/webhooks" class="back-link">← Webhooks</a>',
+                '<h1>' + esc(w.name) + '</h1>',
+                '<form id="wh-edit" class="editor">',
+                field("Name", '<input name="name" required value="' + esc(w.name) + '" />'),
+                field("URL", '<input name="url" required value="' + esc(w.url) + '" />'),
+                field("Enabled", '<label class="check"><input type="checkbox" name="enabled"' + (w.enabled ? " checked" : "") + ' /> Deliver events</label>'),
+                field("Event types", '<input name="eventTypes" value="' + esc((w.eventTypes || []).join(", ")) + '" placeholder="(blank = all)" />'),
+                field("Secret", '<input name="secret" value="' + esc(w.secret || "") + '" />'),
+                '<div class="editor__footer">',
+                '  <button type="submit" class="btn-primary">Save</button>',
+                '  <button type="button" class="btn-ghost" data-wh="test">Send test event</button>',
+                '  <button type="button" class="btn-ghost btn-danger" data-wh="delete">Delete</button>',
+                '  <span class="save-msg" id="wh-msg"></span>',
+                '</div>',
+                '</form>',
+                '<h2>Recent deliveries</h2>',
+                deliveryRows
+                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
+                    : '<div class="placeholder"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
+            ].join("\n");
+
+            var msg = document.getElementById("wh-msg");
+            document.getElementById("wh-edit").addEventListener("submit", function (e) {
+                e.preventDefault();
+                var f = e.target;
+                setMessageOn(msg, "loading", "Saving…");
+                api("PUT", "/admin/webhooks/" + encodeURIComponent(id), {
+                    name: f.name.value.trim(),
+                    url: f.url.value.trim(),
+                    enabled: f.enabled.checked,
+                    eventTypes: parseCsv(f.eventTypes.value),
+                    secret: f.secret.value.trim() || null,
+                }).then(function () { setMessageOn(msg, "success", "Saved."); })
+                  .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+            });
+            Array.prototype.slice.call(document.querySelectorAll("[data-wh]")).forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var action = btn.getAttribute("data-wh");
+                    if (action === "test") {
+                        setMessageOn(msg, "loading", "Enqueuing test…");
+                        api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/test")
+                            .then(function () { renderWebhookDetail(id); })
+                            .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                    } else if (action === "delete") {
+                        api("DELETE", "/admin/webhooks/" + encodeURIComponent(id))
+                            .then(function () { navigate("/webhooks"); })
+                            .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                    }
+                });
+            });
+        }).catch(handleErrOnView("Webhook"));
+    }
+
+    function renderAuditLog() {
+        viewEl.innerHTML = [
+            '<h1>Audit log</h1>',
+            '<form id="audit-filter" class="audit-filter">',
+            '  <input name="entityType" placeholder="Entity type (e.g. Flag)" />',
+            '  <input name="actor" placeholder="Actor" />',
+            '  <button type="submit" class="btn-ghost btn-small">Filter</button>',
+            '</form>',
+            '<div id="audit-results"><div class="card"><p class="muted">Loading…</p></div></div>',
+        ].join("\n");
+
+        function load(entityType, actor) {
+            var qs = [];
+            if (entityType) { qs.push("entityType=" + encodeURIComponent(entityType)); }
+            if (actor) { qs.push("actor=" + encodeURIComponent(actor)); }
+            var path = "/admin/audit" + (qs.length ? "?" + qs.join("&") : "");
+            api("GET", path).then(function (entries) {
+                entries = Array.isArray(entries) ? entries : [];
+                var resultsEl = document.getElementById("audit-results");
+                if (entries.length === 0) {
+                    resultsEl.innerHTML = '<div class="placeholder"><p>No audit entries match.</p></div>';
+                    return;
+                }
+                var rows = entries.map(function (a) {
+                    return '<tr>'
+                        + '<td>' + formatDate(a.at) + '</td>'
+                        + '<td>' + code(a.action) + '</td>'
+                        + '<td>' + badge(a.entityType) + ' ' + (a.entityKey ? code(truncate(a.entityKey, 24)) : '') + '</td>'
+                        + '<td>' + esc(a.actorIdentifier || "—") + '</td>'
+                        + '</tr>';
+                }).join("");
+                resultsEl.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Action</th><th>Entity</th><th>Actor</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+            }).catch(handleErrOnView("Audit log"));
+        }
+
+        document.getElementById("audit-filter").addEventListener("submit", function (e) {
+            e.preventDefault();
+            load(e.target.entityType.value.trim(), e.target.actor.value.trim());
+        });
+        load("", "");
+    }
+
+    function parseCsv(value) {
+        return String(value || "").split(",").map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
     }
 
     // ============================================================

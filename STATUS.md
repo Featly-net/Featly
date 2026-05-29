@@ -5,14 +5,14 @@
 
 ## Active milestone
 
-**M10 — Webhooks + audit polish** (in progress)
+**M10 — Webhooks + audit polish** (complete; not yet released)
 
 Outbound webhooks (persisted delivery queue with retry/backoff + HMAC-SHA256 signing) and a richer audit log, both fed by a shared internal domain-event publisher covering flag/config/segment/experiment mutations, M8 approval decisions, and M7 RBAC changes. Four sequenced PRs:
 
 - [x] **PR 10A — domain + storage**: `WebhookEndpoint`, `WebhookDelivery` (+ status enum), `AuditEntry`, `FeatlyDomainEvent` (+ `FeatlyEventTypes` constants); `IWebhookStore` / `IWebhookDeliveryStore` / `IAuditStore` on the facade with InMemory + SQLite + migration `AddWebhooksAndAudit`. 3 new SQLite round-trips, 281 passing total.
 - [x] **PR 10B — event backbone + audit**: `IFeatlyEventPublisher` (fan-out to `IFeatlyEventConsumer`s, failure-isolated) + `AuditRecorder` consumer; all mutation endpoints publish (flags/configs/segments/experiments + change approve/reject/apply + RBAC assign/unassign); `GET /api/admin/audit` with `entityType`/`entityKey`/`actor`/`env`/`from`/`to`/`limit` filters (`AuditRead`). 4 new tests, 285 passing total.
 - [x] **PR 10C — webhook engine**: `/api/admin/webhooks` CRUD (+ deliveries listing, test-enqueue, auto-generated secret); `WebhookDispatcher` (2nd event consumer) enqueues to endpoints matching type + env; `WebhookDeliveryWorker` drains the queue with exponential backoff → dead-letter, signing HMAC-SHA256 (`X-Featly-Signature`). Tuning binds from `Featly:Webhooks`. 7 new tests, 292 passing total.
-- [ ] **PR 10D — dashboard**: Webhooks management (list/create/edit/delete + delivery status + redeliver) and Audit log screen with filters.
+- [x] **PR 10D — dashboard**: Webhooks screen (list + inline create, detail edit, send-test, delete, recent-deliveries table) and Audit log screen (entity-type/actor filters). Closes M10. Front-end only.
 
 ## Previous milestone
 
