@@ -923,3 +923,34 @@ p:last-child { margin-bottom: 0; }
 @media (max-width: 800px) {
     .bar-row { grid-template-columns: 6rem 1fr 7rem; gap: var(--space-2); }
 }
+
+/* ============================================================
+   Webhooks + Audit (M10)
+   ============================================================ */
+.btn-danger {
+    color: #dc2626;
+    border-color: color-mix(in srgb, #dc2626 40%, var(--color-border));
+}
+.btn-danger:hover {
+    background: color-mix(in srgb, #dc2626 10%, transparent);
+    color: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+    .btn-danger { color: #fca5a5; }
+    .btn-danger:hover { color: #fca5a5; }
+}
+
+.audit-filter {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+}
+.audit-filter input {
+    flex: 1 1 12rem;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
