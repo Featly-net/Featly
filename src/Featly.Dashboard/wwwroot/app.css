@@ -2056,3 +2056,36 @@ p:last-child { margin-bottom: 0; }
   color: var(--info-fg);
 }
 .live-banner .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--info-dot); animation: live-dot var(--t-live) infinite; }
+
+
+/* =============================================================================
+   Shell glue (redesign step 3) — minimal rules bridging the new shell markup
+   (index.html: .app grid + .app-content + topbar/sidebar) with the appended
+   component library. Screens still render legacy markup inside #view until the
+   per-screen rewrites (step 5); .app-main keeps its padding meanwhile.
+   ============================================================================ */
+.app-content { display: flex; flex-direction: column; min-width: 0; }
+.app-main { flex: 1 1 auto; }
+
+/* Inline-SVG icon slots (filled by app.js icon()). */
+.ti-slot { display: inline-flex; align-items: center; justify-content: center; }
+.ti { display: block; }
+.sb-item .ti, .sb-item .ti-slot { width: 16px; height: 16px; flex: 0 0 16px; color: var(--fg-faint); }
+.sb-item.active .ti-slot, .sb-item:hover .ti-slot { color: inherit; }
+
+/* Env pill wraps the native <select> so all env-scoping logic stays intact. */
+.env-pill .env-select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  background: transparent; border: 0; color: var(--fg);
+  font: inherit; font-weight: 500; padding: 0 2px 0 0; margin: 0; cursor: pointer;
+}
+.env-pill .env-select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: 3px; }
+.env-pill .env-select:disabled { color: var(--fg-muted); cursor: default; }
+
+/* Small round avatar used in the sidebar foot + topbar account button. */
+.avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 600 11px var(--font-sans); flex: 0 0 26px; text-transform: uppercase;
+}

@@ -35,36 +35,39 @@
 
     var viewEl = document.getElementById("view");
     var envSelect = document.getElementById("env-select");
-    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav__link"));
-    var headerEl = document.querySelector(".app-header");
+    var envPill = document.getElementById("env-pill");
+    var envLock = document.getElementById("env-lock");
+    var crumbsEl = document.getElementById("crumbs");
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".sb-item"));
+
+    // Sidebar account row reflects the session.
+    var sbUserName = document.getElementById("sb-user-name");
+    var sbUserRole = document.getElementById("sb-user-role");
+    var sbAvatar = document.getElementById("sb-avatar");
 
     // Tracks whether /api/auth/me has confirmed an active session this load.
     // The cookie itself is HttpOnly so JS can't read it directly — we infer
     // session state by hitting /me and remembering the result.
     var session = null;
 
-    var sessionLabel = document.createElement("span");
-    sessionLabel.className = "session-label muted";
-    sessionLabel.hidden = true;
-    if (headerEl) { headerEl.appendChild(sessionLabel); }
-
-    var signOutBtn = document.createElement("button");
-    signOutBtn.type = "button";
-    signOutBtn.className = "btn-link";
-    signOutBtn.textContent = "Sign out";
-    signOutBtn.hidden = true;
-    signOutBtn.addEventListener("click", function () {
-        // POST /logout clears the cookie server-side; we then reload so the
-        // login screen shows. credentials: 'include' is mandatory — without
-        // it the browser would skip the cookie and the server can't know
-        // which session to expire.
+    // POST /logout clears the cookie server-side; we then reload so the login
+    // screen shows. credentials:'include' is mandatory — without it the browser
+    // would skip the cookie and the server can't know which session to expire.
+    // (The topbar avatar and the sidebar user row both sign out for now; the My
+    // Account screen lands in a later step.)
+    function signOut() {
         fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-            .finally(function () {
-                session = null;
-                location.reload();
-            });
-    });
-    if (headerEl) { headerEl.appendChild(signOutBtn); }
+            .finally(function () { session = null; location.reload(); });
+    }
+    var accountBtn = document.getElementById("account-btn");
+    if (accountBtn) { accountBtn.addEventListener("click", signOut); }
+    var sbUserEl = document.getElementById("sb-user");
+    if (sbUserEl) {
+        sbUserEl.addEventListener("click", signOut);
+        sbUserEl.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); signOut(); }
+        });
+    }
 
     // ============================================================
     // Auth
@@ -73,8 +76,8 @@
 
     function showAuthPrompt(errorText) {
         envSelect.disabled = true;
-        signOutBtn.hidden = true;
-        sessionLabel.hidden = true;
+        if (sbUserName) { sbUserName.textContent = "Not signed in"; }
+        if (sbUserRole) { sbUserRole.textContent = "—"; }
         viewEl.innerHTML = [
             '<h1>Sign in to Featly</h1>',
             '<div class="card auth-card">',
@@ -188,6 +191,7 @@
             return '<option value="' + esc(e.key) + '"' + sel + '>' + esc(e.name || e.key) + (e.readOnly ? " (read-only)" : "") + '</option>';
         }).join("");
         envSelect.disabled = environments.length === 0;
+        updateEnvPill();
     }
 
     envSelect.addEventListener("change", function () {
@@ -195,6 +199,7 @@
         if (!picked) { return; }
         currentEnv = picked;
         try { localStorage.setItem(STORAGE_ENV_KEY, picked.key); } catch (_) {}
+        updateEnvPill();
         render();
     });
 
@@ -230,6 +235,107 @@
         if (!slot) { return; }
         slot.className = "save-msg save-msg--" + kind;
         slot.textContent = text;
+    }
+
+    // ============================================================
+    // Shell: icons, theme, breadcrumbs, env pill
+    // ============================================================
+    // Inline-SVG icons (Lucide path data). No webfont — see README §6. This is
+    // the shell subset; more icons are added with the per-screen rewrites.
+    var ICONS = {
+        "home": '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+        "inbox": '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+        "flag": '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+        "sliders": '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/>',
+        "segment": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+        "flask": '<path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/>',
+        "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        "shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+        "webhook": '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>',
+        "git-pull-request": '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/>',
+        "scroll": '<path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
+        "settings": '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+        "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+        "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+        "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+        "moon": '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+        "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+        "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+    };
+    function icon(name, size) {
+        size = size || 16;
+        return '<svg class="ti" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            + 'stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + '</svg>';
+    }
+    function hydrateIcons(root) {
+        var slots = (root || document).querySelectorAll("[data-ti]");
+        Array.prototype.forEach.call(slots, function (el) {
+            if (el.getAttribute("data-ti-done") === "1") { return; }
+            el.innerHTML = icon(el.getAttribute("data-ti"));
+            el.setAttribute("data-ti-done", "1");
+        });
+    }
+
+    // Theme: OS default, overridable by a stored choice; the toggle swaps the icon.
+    var THEME_KEY = "featly.theme";
+    function effectiveTheme() {
+        return document.documentElement.getAttribute("data-theme")
+            || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+    function applyThemeIcon() {
+        var slot = document.querySelector("#theme-toggle .ti-slot");
+        if (slot) { slot.innerHTML = icon(effectiveTheme() === "dark" ? "sun" : "moon"); }
+    }
+    function initTheme() {
+        var saved = null;
+        try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
+        if (saved === "dark" || saved === "light") { document.documentElement.setAttribute("data-theme", saved); }
+        var btn = document.getElementById("theme-toggle");
+        if (btn) {
+            btn.addEventListener("click", function () {
+                var next = effectiveTheme() === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-theme", next);
+                try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+                applyThemeIcon();
+            });
+        }
+        applyThemeIcon();
+    }
+
+    // Env pill: colored pip (prod/staging/dev) + LOCKED badge from currentEnv.
+    function updateEnvPill() {
+        if (!envPill) { return; }
+        var key = ((currentEnv && currentEnv.key) || "").toLowerCase();
+        var tone = /prod/.test(key) ? "prod" : (/stag|stg|uat|pre/.test(key) ? "staging" : "dev");
+        envPill.className = "env-pill " + tone;
+        if (envLock) { envLock.hidden = !(currentEnv && currentEnv.readOnly); }
+    }
+
+    // Breadcrumbs: workspace / section [ / detail key ].
+    var SECTION_LABELS = {
+        overview: "Overview", inbox: "Inbox", changeDetail: "Inbox",
+        flagList: "Flags", flagDetail: "Flags", configList: "Configs", configDetail: "Configs",
+        segmentList: "Segments", segmentDetail: "Segments",
+        experimentList: "Experiments", experimentDetail: "Experiments",
+        userList: "Users", userDetail: "Users", roleList: "Roles",
+        approvals: "Approval policies", webhookList: "Webhooks", webhookDetail: "Webhooks",
+        auditLog: "Audit log", settings: "Settings"
+    };
+    function renderCrumbs(route) {
+        if (!crumbsEl) { return; }
+        var section = SECTION_LABELS[route.key] || "Overview";
+        var detail = route.params && (route.params.key || route.params.id);
+        var parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
+        if (detail) {
+            parts.push('<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>');
+            parts.push('<span class="sep">/</span>');
+            parts.push('<span class="crumb current">' + esc(detail) + '</span>');
+        } else {
+            parts.push('<span class="crumb current">' + esc(section) + '</span>');
+        }
+        crumbsEl.innerHTML = parts.join("");
     }
 
     var OPERATORS = [
@@ -329,12 +435,11 @@
         var view = views[route.key];
         if (!view) { views.overview(); return; }
         navLinks.forEach(function (link) {
-            if (link.getAttribute("data-route") === route.navRoute) {
-                link.setAttribute("aria-current", "page");
-            } else {
-                link.removeAttribute("aria-current");
-            }
+            var active = link.getAttribute("data-route") === route.navRoute;
+            link.classList.toggle("active", active);
+            if (active) { link.setAttribute("aria-current", "page"); } else { link.removeAttribute("aria-current"); }
         });
+        renderCrumbs(route);
         document.title = route.key === "overview" ? "Featly" : "Featly — " + route.key.replace(/([A-Z])/g, " $1").trim();
         view(route.params);
     }
@@ -1615,14 +1720,19 @@
     // ============================================================
     function boot() {
         if (!isAuthenticated()) { showAuthPrompt(); return; }
-        signOutBtn.hidden = false;
-        sessionLabel.hidden = false;
-        sessionLabel.textContent = "Signed in as " + (session.displayName || session.identifier);
+        var who = session.displayName || session.identifier || "Signed in";
+        if (sbUserName) { sbUserName.textContent = who; }
+        if (sbUserRole) { sbUserRole.textContent = session.identifier || "Admin"; }
+        if (sbAvatar) { sbAvatar.textContent = (who.charAt(0) || "F"); }
         loadEnvironments().then(render).catch(function (err) {
             if (err.kind === "auth") { showAuthPrompt(); }
             else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
         });
     }
+    // Fill the static shell icons and wire the theme toggle before first paint.
+    hydrateIcons();
+    initTheme();
+
     // Probe for an existing session before showing the login screen — a page
     // refresh shouldn't make the user re-paste their key.
     probeSession().then(function (ok) { ok ? boot() : showAuthPrompt(); });
