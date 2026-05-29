@@ -95,9 +95,14 @@ public class CheckoutController(IFeatlyClient featly) : ControllerBase
 
 ## Documentation
 
-- [Architecture](ARCHITECTURE.md) — full architectural design, 25 entities, evaluation engine, contracts, APIs
+- [Getting started](docs/GETTING_STARTED.md) — install and your first flag in minutes
+- [Configuration](docs/CONFIGURATION.md) — every setting, the three-layer precedence, environment variables, the CLI
+- [Deployment](docs/DEPLOYMENT.md) — the three deployment patterns and a production checklist
+- [OpenFeature](docs/OPENFEATURE.md) — adopt the vendor-neutral OpenFeature API
+- [Performance](docs/PERFORMANCE.md) — evaluation benchmarks and targets
+- [Security audit](docs/SECURITY_AUDIT.md) — the v0.1.0 security review
+- [Architecture](ARCHITECTURE.md) — full architectural design, evaluation engine, contracts, APIs, [ADRs](docs/adr/)
 - [Implementation plan](PLAN.md) — milestones, ordering, current focus
-- [Getting started](docs/GETTING_STARTED.md) — install and first steps
 - [Contributing](CONTRIBUTING.md) — how to contribute code or ideas
 - [Security](SECURITY.md) — how to report vulnerabilities
 

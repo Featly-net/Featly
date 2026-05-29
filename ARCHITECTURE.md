@@ -1326,27 +1326,29 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 
 | # | Decision | Status |
 |---|---|---|
-| ADR-001 | Local-first evaluation in the SDK; server provides configuration only | Accepted |
-| ADR-002 | Dashboard served as embedded static resources, no Blazor | Accepted |
-| ADR-003 | OpenFeature provider as first-class day-one feature | Accepted |
-| ADR-004 | MurmurHash3 for deterministic bucketing | Accepted |
-| ADR-005 | First-match-wins on ordered rules; AND within a rule | Accepted |
-| ADR-006 | EF Core for relational storage; DbContext internal | Accepted |
-| ADR-007 | .NET 10 primary target; SDK multi-target net8 + net10 | Accepted |
-| ADR-008 | SQLite as default storage in the embedded quickstart | Accepted |
-| ADR-009 | API keys scoped per Environment with `SdkRead` / `AdminWrite` scope | Accepted |
-| ADR-010 | Sticky assignments opt-in per experiment | Accepted |
-| ADR-011 | Project as first-class top-level grouping above Environment | Accepted |
-| ADR-012 | System roles immutable; custom roles via clone-and-edit | Accepted |
-| ADR-013 | Polymorphic `RoleAssignment` (User \| Group) with wildcard environment | Accepted |
-| ADR-014 | Cumulative permissions; no deny rules | Accepted |
-| ADR-015 | `IFeatlyStore` as facade with per-entity sub-stores | Accepted |
+| [ADR-001](docs/adr/0001-local-first-evaluation.md) | Local-first evaluation in the SDK; server provides configuration only | Accepted |
+| [ADR-002](docs/adr/0002-embedded-dashboard-no-blazor.md) | Dashboard served as embedded static resources, no Blazor | Accepted |
+| [ADR-003](docs/adr/0003-openfeature-first-class.md) | OpenFeature provider as first-class day-one feature | Accepted |
+| [ADR-004](docs/adr/0004-murmurhash3-bucketing.md) | MurmurHash3 for deterministic bucketing | Accepted |
+| [ADR-005](docs/adr/0005-first-match-wins-rules.md) | First-match-wins on ordered rules; AND within a rule | Accepted |
+| [ADR-006](docs/adr/0006-ef-core-internal-dbcontext.md) | EF Core for relational storage; DbContext internal | Accepted |
+| [ADR-007](docs/adr/0007-net10-target-sdk-multitarget.md) | .NET 10 primary target; SDK multi-target net8 + net10 | Accepted |
+| [ADR-008](docs/adr/0008-sqlite-default-storage.md) | SQLite as default storage in the embedded quickstart | Accepted |
+| [ADR-009](docs/adr/0009-api-keys-per-environment-scoped.md) | API keys scoped per Environment with `SdkRead` / `AdminWrite` scope | Accepted |
+| [ADR-010](docs/adr/0010-sticky-assignments-opt-in.md) | Sticky assignments opt-in per experiment | Accepted |
+| [ADR-011](docs/adr/0011-project-top-level-grouping.md) | Project as first-class top-level grouping above Environment | Accepted |
+| [ADR-012](docs/adr/0012-system-roles-immutable.md) | System roles immutable; custom roles via clone-and-edit | Accepted |
+| [ADR-013](docs/adr/0013-polymorphic-role-assignment.md) | Polymorphic `RoleAssignment` (User \| Group) with wildcard environment | Accepted |
+| [ADR-014](docs/adr/0014-cumulative-permissions-no-deny.md) | Cumulative permissions; no deny rules | Accepted |
+| [ADR-015](docs/adr/0015-storage-facade.md) | `IFeatlyStore` as facade with per-entity sub-stores | Accepted |
 | [ADR-016](docs/adr/0016-database-overrides-appsettings.md) | Database overrides `appsettings` for runtime-editable settings | Accepted |
-| ADR-017 | Approval workflow as separate `PendingChange` entity, not entity versioning | Accepted |
-| ADR-018 | Webhooks as the single external notification channel; HMAC-signed | Accepted |
-| ADR-019 | Auto-create default Project and Environment on first boot | Accepted |
-| ADR-020 | Bootstrap admin via `appsettings` with DB override | Accepted |
+| [ADR-017](docs/adr/0017-approval-pending-change-entity.md) | Approval workflow as separate `PendingChange` entity, not entity versioning | Accepted |
+| [ADR-018](docs/adr/0018-webhooks-single-notification-channel.md) | Webhooks as the single external notification channel; HMAC-signed | Accepted |
+| [ADR-019](docs/adr/0019-auto-create-default-project-environment.md) | Auto-create default Project and Environment on first boot | Accepted |
+| [ADR-020](docs/adr/0020-bootstrap-admin-appsettings-db-override.md) | Bootstrap admin via `appsettings` with DB override | Accepted |
 | [ADR-021](docs/adr/0021-testing-library.md) | Testing library — stay on FluentAssertions 7.x for v0.0.x, migrate to AwesomeAssertions at v0.1.0 | Proposed |
+| [ADR-022](docs/adr/0022-cli-hybrid-online-offline.md) | CLI is hybrid — `db` commands offline, admin commands online over HTTP | Accepted |
+| [ADR-023](docs/adr/0023-user-bound-api-keys.md) | API keys may bind to a real user; persisted keys authenticate over Bearer | Accepted |
 
 ---
 

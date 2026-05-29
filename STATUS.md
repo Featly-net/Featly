@@ -11,9 +11,9 @@
 - [x] **PR 12B — server: user-bound API keys + mint/bootstrap + Bearer auth**: `ApiKey.UserId` (migration `AddApiKeyUserBinding`); Bearer handler now validates persisted keys (prefix + Argon2) and resolves the bound user's identity — closing the M8 limitation. `POST /api/admin/apikeys` (mint, returns token once), `GET` (metadata only), `POST /{id}/revoke`; guarded `POST /api/admin/bootstrap` (first-admin: user + admin role + bound key). 322 passing total.
 - [x] **PR 12C — CLI online: apikey/bootstrap/env via HTTP**: `AdminApiClient` + `ServerConnection` resolver; `featly apikey generate`, `bootstrap-admin`, `env lock`/`unlock` against a running server (`--server-url`/`FEATLY_SERVER_URL`, `--api-key`/`FEATLY_API_KEY`). Validated end-to-end live. 331 passing total.
 - [x] **PR 12D — export/import + `Centralized.Sample`**: `GET/POST /api/admin/export|import` (flag+config+segment definitions bundle) + CLI `export`/`import`; new `samples/Centralized.Sample` standalone server (3rd deployment pattern). Validated live. 336 passing total.
-- [ ] **PR 12E — docs + ADRs + PERFORMANCE.md + security audit**: GETTING_STARTED / CONFIGURATION / DEPLOYMENT, filled ADRs (ARCHITECTURE.md §22 + CLI/apikey decisions), benchmark results, security audit pass.
+- [x] **PR 12E — docs + ADRs + PERFORMANCE.md + security audit (closes M12)**: GETTING_STARTED / CONFIGURATION / DEPLOYMENT guides; all 22 accepted ADRs filled in + linked from ARCHITECTURE.md §22 (incl. ADR-0022 CLI-hybrid, ADR-0023 user-bound keys); refreshed v0.1.0 performance baseline; `docs/SECURITY_AUDIT.md`. Docs-only. 336 tests passing.
 
-Then `v0.1.0-preview.1` is cut (preview first; promoted to stable `v0.1.0` on a separate go-ahead).
+**M12 is complete.** All five PRs merged. Next: cut `v0.1.0-preview.1` (preview first; promoted to stable `v0.1.0` on a separate go-ahead) — awaiting a fresh go-ahead per the autonomy grant.
 
 ## Previous milestone
 
