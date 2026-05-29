@@ -440,6 +440,157 @@
     });
 
     // ============================================================
+    // Command palette (Cmd/Ctrl-K): jump to any screen, or open a
+    // flag/config/segment in the current environment by key or name.
+    // No new endpoints — reuses the admin list APIs + the router.
+    // ============================================================
+    var paletteEl = null, paletteOpen = false, paletteItems = [], paletteActive = 0;
+    var paletteEntityCache = { env: null, items: null };
+    var NAV_COMMANDS = [
+        { label: "Overview", route: "/", ti: "home" },
+        { label: "Inbox", route: "/inbox", ti: "inbox" },
+        { label: "Flags", route: "/flags", ti: "flag" },
+        { label: "Configs", route: "/configs", ti: "sliders" },
+        { label: "Segments", route: "/segments", ti: "segment" },
+        { label: "Experiments", route: "/experiments", ti: "flask" },
+        { label: "Users", route: "/users", ti: "users" },
+        { label: "Groups", route: "/groups", ti: "layers" },
+        { label: "Roles", route: "/roles", ti: "shield" },
+        { label: "API keys", route: "/apikeys", ti: "key" },
+        { label: "Webhooks", route: "/webhooks", ti: "webhook" },
+        { label: "Approval policies", route: "/approvals", ti: "git-pull-request" },
+        { label: "Audit log", route: "/audit", ti: "scroll" },
+        { label: "Settings", route: "/settings", ti: "settings" },
+    ];
+
+    function ensurePalette() {
+        if (paletteEl) { return paletteEl; }
+        paletteEl = document.createElement("div");
+        paletteEl.className = "palette-backdrop";
+        paletteEl.hidden = true;
+        paletteEl.innerHTML = [
+            '<div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">',
+            '  <div class="palette-input"><span class="ti-slot" data-ti="search"></span>',
+            '    <input id="palette-q" type="text" autocomplete="off" spellcheck="false" aria-label="Search" placeholder="Search flags, configs, segments — or jump to a screen…" />',
+            '  </div>',
+            '  <div class="palette-list" id="palette-list" role="listbox"></div>',
+            '  <div class="palette-foot"><span class="ent"><span class="kp">↑↓</span> navigate</span><span class="ent"><span class="kp">↵</span> open</span><span class="ent"><span class="kp">esc</span> close</span></div>',
+            '</div>',
+        ].join("");
+        document.body.appendChild(paletteEl);
+        hydrateIcons(paletteEl);
+        paletteEl.addEventListener("mousedown", function (e) { if (e.target === paletteEl) { closePalette(); } });
+        var input = paletteEl.querySelector("#palette-q");
+        input.addEventListener("input", function () { paletteFilter(input.value); });
+        input.addEventListener("keydown", paletteKeydown);
+        return paletteEl;
+    }
+
+    function openPalette() {
+        if (!isAuthenticated()) { return; }
+        ensurePalette();
+        paletteEl.hidden = false;
+        paletteOpen = true;
+        var input = paletteEl.querySelector("#palette-q");
+        input.value = "";
+        paletteFilter("");
+        input.focus();
+        paletteLoadEntities().then(function () { if (paletteOpen) { paletteFilter(input.value); } });
+    }
+
+    function closePalette() {
+        if (paletteEl) { paletteEl.hidden = true; }
+        paletteOpen = false;
+    }
+
+    function paletteLoadEntities() {
+        var envKey = currentEnv && currentEnv.key;
+        if (!envKey) { paletteEntityCache = { env: null, items: [] }; return Promise.resolve(); }
+        if (paletteEntityCache.env === envKey && paletteEntityCache.items) { return Promise.resolve(); }
+        var q = "?env=" + encodeURIComponent(envKey);
+        return Promise.all([
+            api("GET", "/admin/flags" + q).catch(function () { return []; }),
+            api("GET", "/admin/configs" + q).catch(function () { return []; }),
+            api("GET", "/admin/segments" + q).catch(function () { return []; }),
+        ]).then(function (res) {
+            var items = [];
+            (res[0] || []).forEach(function (f) { items.push({ label: f.key, sub: f.name || "", kind: "Flag", route: "/flags/" + encodeURIComponent(f.key), ti: "flag" }); });
+            (res[1] || []).forEach(function (c) { items.push({ label: c.key, sub: c.name || "", kind: "Config", route: "/configs/" + encodeURIComponent(c.key), ti: "sliders" }); });
+            (res[2] || []).forEach(function (s) { items.push({ label: s.key, sub: s.name || "", kind: "Segment", route: "/segments/" + encodeURIComponent(s.key), ti: "segment" }); });
+            paletteEntityCache = { env: envKey, items: items };
+        }).catch(function () { paletteEntityCache = { env: envKey, items: [] }; });
+    }
+
+    function paletteFilter(q) {
+        q = (q || "").trim().toLowerCase();
+        var nav = NAV_COMMANDS.filter(function (c) { return !q || c.label.toLowerCase().indexOf(q) >= 0; })
+            .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
+        var ents = (paletteEntityCache.items || []).filter(function (e) {
+            return !q || e.label.toLowerCase().indexOf(q) >= 0 || (e.sub && e.sub.toLowerCase().indexOf(q) >= 0);
+        });
+        ents.forEach(function (e) { e.group = "Entities"; });
+        var ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
+        paletteItems = ordered.slice(0, 40);
+        paletteActive = 0;
+        paletteRender();
+    }
+
+    function paletteRender() {
+        var list = paletteEl.querySelector("#palette-list");
+        if (!paletteItems.length) {
+            list.innerHTML = '<div class="palette-section-label">No matches</div>';
+            return;
+        }
+        var html = "", lastGroup = null;
+        paletteItems.forEach(function (it, i) {
+            if (it.group !== lastGroup) { html += '<div class="palette-section-label">' + esc(it.group) + '</div>'; lastGroup = it.group; }
+            html += '<div class="palette-item' + (i === paletteActive ? " active" : "") + '" data-i="' + i + '" role="option">'
+                + '<span class="ti-slot" data-ti="' + esc(it.ti) + '"></span>'
+                + '<span><span class="mono">' + esc(it.label) + '</span>' + (it.sub ? ' <span class="sub">' + esc(it.sub) + '</span>' : '') + '</span>'
+                + '<span class="kp">' + esc(it.kind) + '</span>'
+                + '</div>';
+        });
+        list.innerHTML = html;
+        hydrateIcons(list);
+        Array.prototype.slice.call(list.querySelectorAll(".palette-item")).forEach(function (el) {
+            el.addEventListener("mousemove", function () { paletteActive = parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
+            el.addEventListener("click", function () { paletteSelect(parseInt(el.getAttribute("data-i"), 10)); });
+        });
+    }
+
+    function paletteHighlight() {
+        var els = paletteEl.querySelectorAll(".palette-item");
+        Array.prototype.forEach.call(els, function (el) {
+            el.classList.toggle("active", parseInt(el.getAttribute("data-i"), 10) === paletteActive);
+        });
+        var active = paletteEl.querySelector(".palette-item.active");
+        if (active && active.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
+    }
+
+    function paletteSelect(i) {
+        var it = paletteItems[i];
+        if (!it) { return; }
+        closePalette();
+        navigate(it.route);
+    }
+
+    function paletteKeydown(e) {
+        if (e.key === "ArrowDown") { e.preventDefault(); paletteActive = Math.min(paletteActive + 1, paletteItems.length - 1); paletteHighlight(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); paletteActive = Math.max(paletteActive - 1, 0); paletteHighlight(); }
+        else if (e.key === "Enter") { e.preventDefault(); paletteSelect(paletteActive); }
+        else if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+    }
+
+    document.addEventListener("keydown", function (e) {
+        if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+            e.preventDefault();
+            if (paletteOpen) { closePalette(); } else { openPalette(); }
+        } else if (e.key === "Escape" && paletteOpen) { closePalette(); }
+    });
+    var globalSearchBtn = document.getElementById("global-search");
+    if (globalSearchBtn) { globalSearchBtn.addEventListener("click", openPalette); }
+
+    // ============================================================
     // Views
     // ============================================================
     function render() {
