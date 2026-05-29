@@ -948,8 +948,11 @@
     // ---------- Config editor ----------
     function renderConfigEditor(config) {
         viewEl.innerHTML = [
-            '<a data-link="/configs" class="back-link">← Configs</a>',
-            '<h1>' + code(config.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(config.key) + '</h1>',
+            '    <span class="sub">' + esc(config.name || "") + ' · ' + esc(config.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div><div class="actions"><span class="badge sq' + (config.type === "Json" ? " accent" : (config.type === "Bool" ? " info" : "")) + '">' + esc(config.type) + '</span></div>',
+            '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="config-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(config.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(config.description || "") + '</textarea>'),
@@ -960,16 +963,23 @@
             field("Tags", '<input name="tags" value="' + esc((config.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
             '<h2>Rules</h2>',
             renderRulesEditor(config.rules || [], { kind: "config" }),
-            '<button type="button" class="btn-ghost" data-action="add-rule">+ Add rule</button>',
+            '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save config</button>',
+            '  <button type="submit" class="btn primary">Save config</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
             renderPreviewPanel("config", config.key),
-            auditFooter(config),
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '  <dt>Type</dt><dd>' + esc(config.type) + '</dd>',
+            '  <dt>Default</dt><dd class="mono">' + esc(truncate(JSON.stringify(config.defaultValue), 24)) + '</dd>',
+            '  <dt>Rules</dt><dd>' + (config.rules || []).length + '</dd>',
+            '  <dt>Created</dt><dd>' + (formatDate(config.createdAt) || "—") + '</dd>',
+            '  <dt>Updated</dt><dd>' + (formatDate(config.updatedAt) || "—") + '</dd>',
+            '</dl></div></aside></div></div></div>',
         ].join("\n");
 
+        hydrateIcons(viewEl);
         wirePreviewPanel("config", config.key);
         var form = document.getElementById("config-form");
         form.addEventListener("click", function (e) {
@@ -1017,22 +1027,29 @@
     // ---------- Segment editor ----------
     function renderSegmentEditor(segment) {
         viewEl.innerHTML = [
-            '<a data-link="/segments" class="back-link">← Segments</a>',
-            '<h1>' + code(segment.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(segment.key) + '</h1>',
+            '    <span class="sub">' + esc(segment.name || "") + ' · reusable group in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="segment-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(segment.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(segment.description || "") + '</textarea>'),
             '<h2>Conditions</h2>',
             '<div class="conditions-list">' + (segment.conditions || []).map(renderConditionRow).join("") + '</div>',
-            '<button type="button" class="btn-ghost" data-action="add-condition">+ Add condition</button>',
+            '<button type="button" class="btn outline xs" data-action="add-condition"><span class="ti-slot" data-ti="plus"></span> Add condition</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save segment</button>',
+            '  <button type="submit" class="btn primary">Save segment</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
-            auditFooter(segment),
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '  <dt>Conditions</dt><dd>' + (segment.conditions || []).length + '</dd>',
+            '  <dt>Created</dt><dd>' + (formatDate(segment.createdAt) || "—") + '</dd>',
+            '  <dt>Updated</dt><dd>' + (formatDate(segment.updatedAt) || "—") + '</dd>',
+            '</dl><p class="muted" style="font-size:11px;margin:10px 0 0">Referenced from flag &amp; config rules via the <code>InSegment</code> operator.</p></div></aside></div></div></div>',
         ].join("\n");
 
+        hydrateIcons(viewEl);
         var form = document.getElementById("segment-form");
         form.addEventListener("click", function (e) {
             var action = e.target.closest("[data-action]")?.getAttribute("data-action");
