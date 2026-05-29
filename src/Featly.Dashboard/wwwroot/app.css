@@ -724,11 +724,13 @@ p:last-child { margin-bottom: 0; }
 }
 
 .variant-row {
-    display: grid;
-    grid-template-columns: 8rem 1fr 1fr 2rem;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
 }
+.variant-row > input { flex: 1 1 120px; min-width: 0; }
+.variant-row > .icon-btn { flex: 0 0 auto; }
 
 /* Rules */
 .rules-list {
@@ -766,11 +768,15 @@ p:last-child { margin-bottom: 0; }
 }
 
 .condition-row {
-    display: grid;
-    grid-template-columns: 1fr 11rem 1fr auto 2rem;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
 }
+.condition-row > input { flex: 1 1 150px; min-width: 0; }
+.condition-row > select { flex: 1 1 130px; min-width: 0; }
+.condition-row > .check,
+.condition-row > .icon-btn { flex: 0 0 auto; }
 
 .outcome {
     display: flex;
@@ -788,11 +794,13 @@ p:last-child { margin-bottom: 0; }
 }
 
 .split-row {
-    display: grid;
-    grid-template-columns: 1fr 7rem 2rem;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
 }
+.split-row > input { flex: 1 1 100px; min-width: 0; }
+.split-row > .icon-btn { flex: 0 0 auto; }
 
 .hidden { display: none !important; }
 /* The `hidden` attribute must always win over component display rules
