@@ -49,6 +49,15 @@ public sealed class ApiKey
     /// <summary>Environment this key authenticates against.</summary>
     public required Guid EnvironmentId { get; init; }
 
+    /// <summary>
+    /// Row id of the <see cref="User"/> this key acts as, or <c>null</c> for a
+    /// standalone service principal. When set, a request authenticated with this
+    /// key resolves to that user's identity — so RBAC, audit, and the approval
+    /// workflow attribute the action to a real person rather than to an anonymous
+    /// "api-key:Scope" pseudo-identity (ARCHITECTURE.md §10).
+    /// </summary>
+    public Guid? UserId { get; init; }
+
     /// <summary>Set to <c>true</c> when an admin revokes the key. Revoked keys remain in the table for audit.</summary>
     public bool Revoked { get; set; }
 

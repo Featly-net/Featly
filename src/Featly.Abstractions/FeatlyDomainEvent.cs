@@ -100,4 +100,13 @@ public static class FeatlyEventTypes
 
     /// <summary>An environment was unfrozen (ReadOnly cleared).</summary>
     public const string EnvironmentUnlocked = "environment.unlocked";
+
+    /// <summary>An API key was minted.</summary>
+    public const string ApiKeyCreated = "apikey.created";
+
+    /// <summary>An API key was revoked.</summary>
+    public const string ApiKeyRevoked = "apikey.revoked";
+
+    /// <summary>The first admin was provisioned via the bootstrap endpoint.</summary>
+    public const string AdminBootstrapped = "admin.bootstrapped";
 }
