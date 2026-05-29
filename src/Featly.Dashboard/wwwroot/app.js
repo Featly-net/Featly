@@ -1084,27 +1084,38 @@
     // ============================================================
     // Users + Roles (RBAC, M7) — not environment-scoped
     // ============================================================
+    function userRow(u) {
+        return '<tr data-key="' + esc(u.identifier) + '">'
+            + '<td><div class="cell-keyname"><span class="cell-key" style="font-weight:500">' + esc(u.displayName || u.identifier) + '</span>'
+            + '<span class="cell-name mono">' + esc(u.identifier) + '</span></div></td>'
+            + '<td>' + esc(u.email || "—") + '</td>'
+            + '<td>' + (u.disabled
+                ? '<span class="badge"><span class="dot"></span>disabled</span>'
+                : '<span class="badge success"><span class="dot"></span>active</span>') + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(u.createdAt) || "—") + '</td>'
+            + '</tr>';
+    }
     function renderUserList() {
-        viewEl.innerHTML = '<h1>Users</h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "People with access — auto-provisioned on first sign-in, or created via the admin API.";
+        viewEl.innerHTML = listPageShell("Users", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/users")
             .then(function (users) {
                 users = Array.isArray(users) ? users : [];
-                if (users.length === 0) {
-                    viewEl.innerHTML = '<h1>Users</h1><div class="placeholder"><p>No users yet.</p><p class="muted">Users are auto-provisioned on first sign-in, or created via the admin API.</p></div>';
-                    return;
+                var body = users.length
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name / Identifier</th><th>Email</th>'
+                        + '<th style="width:90px">Status</th><th style="width:140px">Created</th></tr></thead>'
+                        + '<tbody class="list-tbody">' + users.map(userRow).join("") + '</tbody></table></div>'
+                    : '<div class="empty"><p>No users yet.</p></div>';
+                viewEl.innerHTML = listPageShell("Users", sub, body);
+                hydrateIcons(viewEl);
+                var tb = viewEl.querySelector(".list-tbody");
+                if (tb) {
+                    tb.addEventListener("click", function (e) {
+                        if (e.target.closest("a, button, input")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/users/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
                 }
-                var rows = users.map(function (u) {
-                    return '<tr>'
-                        + '<td><a data-link="/users/' + encodeURIComponent(u.identifier) + '">' + esc(u.displayName || u.identifier) + '</a></td>'
-                        + '<td>' + code(u.identifier) + '</td>'
-                        + '<td>' + esc(u.email || "—") + '</td>'
-                        + '<td>' + (u.disabled ? '<span class="dot dot--off"></span> disabled' : '<span class="dot dot--on"></span> active') + '</td>'
-                        + '<td>' + formatDate(u.createdAt) + '</td>'
-                        + '</tr>';
-                }).join("");
-                viewEl.innerHTML = '<h1>Users</h1><div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Name</th><th>Identifier</th><th>Email</th><th>Status</th><th>Created</th></tr></thead>'
-                    + '<tbody>' + rows + '</tbody></table></div>';
             })
             .catch(handleErrOnView("Users"));
     }
@@ -1122,47 +1133,57 @@
             }).join("");
             var perms = (access.permissions || []);
             viewEl.innerHTML = [
-                '<a data-link="/users" class="back-link">← Users</a>',
-                '<h1>' + esc(user.displayName || user.identifier) + '</h1>',
-                '<div class="card">',
-                '  <dl class="preview-result__dl">',
-                '    <dt>Identifier</dt><dd>' + code(user.identifier) + '</dd>',
-                '    <dt>Email</dt><dd>' + esc(user.email || "—") + '</dd>',
-                '    <dt>Status</dt><dd>' + (user.disabled ? "disabled" : "active") + '</dd>',
-                '  </dl>',
-                '</div>',
-                '<h2>Effective access</h2>',
-                '<p class="muted">Why this user has the access they do — the union of every role granted by a matching assignment (direct or via a group), in the default project.</p>',
+                '<div class="page"><div class="page-head"><div class="title-wrap">',
+                '  <h1>' + esc(user.displayName || user.identifier) + '</h1>',
+                '  <span class="sub mono">' + esc(user.identifier) + '</span>',
+                '</div><div class="actions">' + (user.disabled
+                    ? '<span class="badge"><span class="dot"></span>disabled</span>'
+                    : '<span class="badge success"><span class="dot"></span>active</span>') + '</div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <div class="card-pad"><h2>Effective access</h2>',
+                '  <p class="muted" style="font-size:12px">The union of every role granted by a matching assignment (direct or via a group), in the default project.</p>',
                 roleRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Role</th><th>Name</th><th>Via</th><th>Environment</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No role assignments in this project.</p></div>',
-                '<h2>Permissions <span class="muted">(' + perms.length + ')</span></h2>',
+                    ? '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Role</th><th>Name</th><th>Via</th><th>Environment</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>'
+                    : '  <div class="empty"><p>No role assignments in this project.</p></div>',
+                '  </div>',
+                '  <div class="card-pad"><h2>Permissions <span class="muted">(' + perms.length + ')</span></h2>',
                 perms.length
-                    ? '<div class="card"><p>' + perms.map(function (p) { return badge(p); }).join(" ") + '</p></div>'
-                    : '<div class="placeholder"><p>No effective permissions in this scope.</p></div>',
+                    ? '  <div class="tag-list">' + perms.map(function (p) { return '<span class="tag muted">' + esc(p) + '</span>'; }).join("") + '</div>'
+                    : '  <div class="empty"><p>No effective permissions in this scope.</p></div>',
+                '  </div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Identity</h3><dl class="side-dl">',
+                '  <dt>Identifier</dt><dd class="mono">' + esc(truncate(user.identifier, 22)) + '</dd>',
+                '  <dt>Email</dt><dd>' + esc(user.email || "—") + '</dd>',
+                '  <dt>Status</dt><dd>' + (user.disabled ? "disabled" : "active") + '</dd>',
+                '  <dt>Roles</dt><dd>' + (access.roles || []).length + '</dd>',
+                '</dl></div></aside></div></div></div>',
             ].join("\n");
+            hydrateIcons(viewEl);
         }).catch(handleErrOnView("User: " + identifier));
     }
 
     function renderRoleList() {
-        viewEl.innerHTML = '<h1>Roles</h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "Permission sets. System roles are immutable; clone one to make an editable custom role.";
+        viewEl.innerHTML = listPageShell("Roles", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/roles")
             .then(function (roles) {
                 roles = Array.isArray(roles) ? roles : [];
                 var rows = roles.map(function (r) {
                     return '<tr>'
-                        + '<td>' + code(r.key) + '</td>'
+                        + '<td class="mono cell-key">' + esc(r.key) + '</td>'
                         + '<td>' + esc(r.name) + '</td>'
-                        + '<td>' + (r.isSystem ? badge("system") : badge("custom")) + '</td>'
-                        + '<td>' + (r.permissions || []).length + '</td>'
-                        + '<td class="muted">' + esc(truncate((r.permissions || []).join(", "), 80)) + '</td>'
+                        + '<td>' + (r.isSystem ? '<span class="badge info">system</span>' : '<span class="badge purple">custom</span>') + '</td>'
+                        + '<td class="num">' + (r.permissions || []).length + '</td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate((r.permissions || []).join(", "), 70)) + '</span></td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = '<h1>Roles</h1>'
-                    + '<p class="muted">System roles are immutable. Create a custom role by cloning a system template via <code>POST /api/admin/roles</code>.</p>'
-                    + '<div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Key</th><th>Name</th><th>Kind</th><th>Permissions</th><th>Sample</th></tr></thead>'
-                    + '<tbody>' + rows + '</tbody></table></div>';
+                var body = roles.length
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:120px">Key</th><th>Name</th>'
+                        + '<th style="width:90px">Kind</th><th style="width:110px">Permissions</th><th>Sample</th></tr></thead>'
+                        + '<tbody>' + rows + '</tbody></table></div>'
+                    : '<div class="empty"><p>No roles.</p></div>';
+                viewEl.innerHTML = listPageShell("Roles", sub, body);
+                hydrateIcons(viewEl);
             })
             .catch(handleErrOnView("Roles"));
     }

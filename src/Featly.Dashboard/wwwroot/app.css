@@ -2134,3 +2134,7 @@ p:last-child { margin-bottom: 0; }
 .side-dl dt { color: var(--fg-muted); }
 .side-dl dd { margin: 0; text-align: right; }
 @media (max-width: 860px) { .detail-grid { grid-template-columns: 1fr; } .detail-side { position: static; } }
+
+/* Card panel inside detail-main columns (redesign step 5). */
+.card-pad { background: var(--color-bg-elevated); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 16px; }
+.card-pad h2:first-child { margin-top: 0; }
