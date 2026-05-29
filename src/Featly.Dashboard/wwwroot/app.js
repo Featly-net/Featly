@@ -457,8 +457,8 @@
             ].join("\n");
         },
         flagList:    function () { renderFlagList(); },
-        configList:  function () { renderList("configs", "Configs", configCols); },
-        segmentList: function () { renderList("segments", "Segments", segmentCols); },
+        configList:  function () { renderConfigList(); },
+        segmentList: function () { renderSegmentList(); },
         flagDetail:    function (p) { renderFlagDetail(p.key); },
         configDetail:  function (p) { renderConfigDetail(p.key); },
         segmentDetail: function (p) { renderSegmentDetail(p.key); },
@@ -475,55 +475,6 @@
         roleList:    function () { renderRoleList(); },
         settings: function () { renderSettings(); },
     };
-
-    // ---------- List views ----------
-    var flagCols = [
-        { label: "Key", get: function (f) { return '<a data-link="/flags/' + encodeURIComponent(f.key) + '">' + code(f.key) + '</a>'; } },
-        { label: "Name", get: function (f) { return esc(f.name); } },
-        { label: "Type", get: function (f) { return badge(f.type); } },
-        { label: "Enabled", get: function (f) { return f.enabled ? '<span class="dot dot--on"></span> on' : '<span class="dot dot--off"></span> off'; } },
-        { label: "Variants", get: function (f) { return (f.variants || []).length; } },
-        { label: "Rules", get: function (f) { return (f.rules || []).length; } },
-        { label: "Updated", get: function (f) { return formatDate(f.updatedAt); } },
-    ];
-    var configCols = [
-        { label: "Key", get: function (c) { return '<a data-link="/configs/' + encodeURIComponent(c.key) + '">' + code(c.key) + '</a>'; } },
-        { label: "Name", get: function (c) { return esc(c.name); } },
-        { label: "Type", get: function (c) { return badge(c.type); } },
-        { label: "Default", get: function (c) { return code(truncate(JSON.stringify(c.defaultValue), 40)); } },
-        { label: "Rules", get: function (c) { return (c.rules || []).length; } },
-        { label: "Updated", get: function (c) { return formatDate(c.updatedAt); } },
-    ];
-    var segmentCols = [
-        { label: "Key", get: function (s) { return '<a data-link="/segments/' + encodeURIComponent(s.key) + '">' + code(s.key) + '</a>'; } },
-        { label: "Name", get: function (s) { return esc(s.name); } },
-        { label: "Conditions", get: function (s) { return (s.conditions || []).length; } },
-        { label: "Updated", get: function (s) { return formatDate(s.updatedAt); } },
-    ];
-
-    function renderList(resource, title, columns) {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>' + title + '</h1><div class="placeholder"><p>No environment selected yet.</p></div>';
-            return;
-        }
-        viewEl.innerHTML = '<h1>' + title + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
-        api("GET", "/admin/" + resource + "?env=" + encodeURIComponent(currentEnv.key))
-            .then(function (rows) { renderTable(title, columns, rows); })
-            .catch(handleErrOnView(title));
-    }
-
-    function renderTable(title, columns, rows) {
-        var heading = '<h1>' + title + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>';
-        if (!rows || rows.length === 0) {
-            viewEl.innerHTML = heading + '<div class="placeholder"><p>No ' + title.toLowerCase() + ' in this environment yet.</p><p class="muted">POST via the admin API to create one.</p></div>';
-            return;
-        }
-        var thead = '<thead><tr>' + columns.map(function (c) { return '<th>' + esc(c.label) + '</th>'; }).join("") + '</tr></thead>';
-        var tbody = '<tbody>' + rows.map(function (row) {
-            return '<tr>' + columns.map(function (c) { return '<td>' + c.get(row) + '</td>'; }).join("") + '</tr>';
-        }).join("") + '</tbody>';
-        viewEl.innerHTML = heading + '<div class="table-wrap"><table class="table">' + thead + tbody + '</table></div>';
-    }
 
     function handleErrOnView(title) {
         return function (err) {
@@ -672,6 +623,149 @@
                 Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
             });
         }
+    }
+
+    // ---------- Shared list helpers (redesign, step 5) ----------
+    function listPageShell(title, subHtml, bodyHtml) {
+        return [
+            '<div class="page">',
+            '  <div class="page-head"><div class="title-wrap"><h1>' + esc(title) + '</h1>',
+            subHtml ? '    <span class="sub">' + subHtml + '</span>' : '',
+            '  </div></div>',
+            '  <div class="page-body tight">' + bodyHtml + '</div>',
+            '</div>',
+        ].join("");
+    }
+    function listFilterBar(placeholder) {
+        return '<div class="filter-bar"><div class="search-input"><span class="ti-slot" data-ti="search"></span>'
+            + '<input class="list-filter" type="search" placeholder="' + esc(placeholder) + '" spellcheck="false" autocomplete="off" />'
+            + '<span class="clear-shortcut">/</span></div></div>';
+    }
+    function listFoot(n, noun) {
+        return '<div class="list-foot"><span class="list-count">Showing ' + n + ' of ' + n + ' ' + esc(noun) + '</span>'
+            + '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>';
+    }
+    function listEmptyEnv(title) {
+        return listPageShell(title, "", '<div class="empty"><p>No environment selected yet.</p></div>');
+    }
+    function tagsCell(row) {
+        var tags = row.tags || [];
+        if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
+        return '<div class="tag-list">' + tags.map(function (t) { return '<span class="tag muted">' + esc(t) + '</span>'; }).join("") + '</div>';
+    }
+    // Wires filter + row-click + select-all for a list whose tbody is .list-tbody,
+    // count is .list-count, filter input is .list-filter. `fields` are the row
+    // properties searched; `rowFn` re-renders one row; navBase + key → detail route.
+    function wireSimpleList(all, navBase, noun, fields, rowFn, colspan) {
+        var tbody = viewEl.querySelector(".list-tbody");
+        var countEl = viewEl.querySelector(".list-count");
+        var filterInput = viewEl.querySelector(".list-filter");
+        var checkAll = viewEl.querySelector(".check-all");
+        if (!tbody) { return; }
+        function repaint() {
+            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            var rows = all.filter(function (r) {
+                if (!q) { return true; }
+                var hay = fields.map(function (f) { var v = r[f]; return Array.isArray(v) ? v.join(" ") : (v == null ? "" : v); }).join(" ").toLowerCase();
+                return hay.indexOf(q) >= 0;
+            });
+            tbody.innerHTML = rows.length
+                ? rows.map(rowFn).join("")
+                : '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">No ' + esc(noun) + ' match this filter.</td></tr>';
+            hydrateIcons(tbody);
+            if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " " + noun; }
+            if (checkAll) { checkAll.checked = false; }
+        }
+        if (filterInput) { filterInput.addEventListener("input", repaint); }
+        tbody.addEventListener("click", function (e) {
+            if (e.target.closest("input, button, a")) { return; }
+            var tr = e.target.closest("tr[data-key]");
+            if (tr) { navigate(navBase + "/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+        });
+        if (checkAll) {
+            checkAll.addEventListener("change", function () {
+                Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
+            });
+        }
+    }
+
+    // ---------- Configs list (redesign) ----------
+    function configTypeBadge(type) {
+        var t = String(type == null ? "" : type);
+        var variant = t === "Json" ? " accent" : (t === "Bool" ? " info" : "");
+        return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
+    }
+    function configRow(c) {
+        return '<tr data-key="' + esc(c.key) + '">'
+            + '<td class="col-check"><input type="checkbox" class="row-check" aria-label="Select ' + esc(c.key) + '" /></td>'
+            + '<td>' + configTypeBadge(c.type) + '</td>'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(c.key) + '</span>'
+            + '<span class="cell-name">' + esc(c.name || "") + '</span></div></td>'
+            + '<td>' + code(truncate(JSON.stringify(c.defaultValue), 48)) + '</td>'
+            + '<td>' + tagsCell(c) + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(c.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(c.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+    function renderConfigList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Configs"); return; }
+        viewEl.innerHTML = configListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/configs?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = configListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireSimpleList(rows, "/configs", "configs", ["key", "name", "tags"], configRow, 7);
+            })
+            .catch(handleErrOnView("Configs"));
+    }
+    function configListMarkup(all, loading) {
+        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+            listFilterBar("Filter by key, name, or tag"),
+            '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+            '  <th style="width:28px"><input type="checkbox" class="check-all" aria-label="Select all" /></th>',
+            '  <th style="width:120px">Type</th><th>Key / Name</th><th>Value</th><th>Tags</th>',
+            '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
+            '</tr></thead><tbody class="list-tbody">' + all.map(configRow).join("") + '</tbody></table></div>',
+            listFoot(all.length, "configs"),
+        ].join("");
+        return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body);
+    }
+
+    // ---------- Segments list (redesign) ----------
+    function segmentRow(s) {
+        return '<tr data-key="' + esc(s.key) + '">'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(s.key) + '</span>'
+            + '<span class="cell-name">' + esc(s.name || "") + '</span></div></td>'
+            + '<td class="num">' + (s.conditions || []).length + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(s.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(s.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+    function renderSegmentList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Segments"); return; }
+        viewEl.innerHTML = segmentListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/segments?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = segmentListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireSimpleList(rows, "/segments", "segments", ["key", "name"], segmentRow, 4);
+            })
+            .catch(handleErrOnView("Segments"));
+    }
+    function segmentListMarkup(all, loading) {
+        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+            listFilterBar("Filter by key or name"),
+            '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+            '  <th>Key / Name</th><th style="width:120px">Conditions</th>',
+            '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
+            '</tr></thead><tbody class="list-tbody">' + all.map(segmentRow).join("") + '</tbody></table></div>',
+            listFoot(all.length, "segments"),
+        ].join("");
+        return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body);
     }
 
     // ============================================================
