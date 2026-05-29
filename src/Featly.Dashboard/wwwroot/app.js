@@ -266,7 +266,9 @@
         "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>',
         "check": '<path d="M20 6 9 17l-5-5"/>',
         "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-        "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
+        "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+        "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+        "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -325,6 +327,7 @@
         segmentList: "Segments", segmentDetail: "Segments",
         experimentList: "Experiments", experimentDetail: "Experiments",
         userList: "Users", userDetail: "Users", roleList: "Roles",
+        groupList: "Groups", groupDetail: "Groups", apiKeyList: "API keys",
         approvals: "Approval policies", webhookList: "Webhooks", webhookDetail: "Webhooks",
         auditLog: "Audit log", settings: "Settings"
     };
@@ -366,6 +369,9 @@
         { match: /^\/users\/(.+)$/,      key: "userDetail",   params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/users\/?$/,         key: "userList",     params: function () { return {}; } },
         { match: /^\/roles\/?$/,         key: "roleList",     params: function () { return {}; } },
+        { match: /^\/groups\/(.+)$/,     key: "groupDetail",  params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
+        { match: /^\/groups\/?$/,        key: "groupList",    params: function () { return {}; } },
+        { match: /^\/apikeys\/?$/,       key: "apiKeyList",   params: function () { return {}; } },
         { match: /^\/inbox\/(.+)$/,      key: "changeDetail", params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/inbox\/?$/,         key: "inbox",        params: function () { return {}; } },
         { match: /^\/approvals\/?$/,     key: "approvals",    params: function () { return {}; } },
@@ -400,6 +406,8 @@
         if (key.indexOf("experiment") === 0) { return "/experiments"; }
         if (key.indexOf("user") === 0) { return "/users"; }
         if (key.indexOf("role") === 0) { return "/roles"; }
+        if (key.indexOf("group") === 0) { return "/groups"; }
+        if (key.indexOf("apiKey") === 0) { return "/apikeys"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
         if (key.indexOf("webhook") === 0) { return "/webhooks"; }
@@ -476,6 +484,9 @@
         webhookDetail: function (p) { renderWebhookDetail(p.id); },
         auditLog:      function () { renderAuditLog(); },
         roleList:    function () { renderRoleList(); },
+        groupList:   function () { renderGroupList(); },
+        groupDetail: function (p) { renderGroupDetail(p.key); },
+        apiKeyList:  function () { renderApiKeyList(); },
         settings: function () { renderSettings(); },
     };
 
@@ -1184,6 +1195,203 @@
                 hydrateIcons(viewEl);
             })
             .catch(handleErrOnView("Roles"));
+    }
+
+    // ============================================================
+    // Groups (Access): bundle users for a single role assignment
+    // ============================================================
+    function renderGroupList() {
+        viewEl.innerHTML = listPageShell("Groups", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/groups")
+            .then(function (groups) {
+                groups = Array.isArray(groups) ? groups : [];
+                var rows = groups.map(function (g) {
+                    return '<tr data-key="' + esc(g.key) + '">'
+                        + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(g.key) + '</span>'
+                        + '<span class="cell-name">' + esc(g.name || "") + '</span></div></td>'
+                        + '<td class="num">' + ((g.memberUserIds || []).length) + '</td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate(g.description || "", 60)) + '</span></td>'
+                        + '<td class="mono cell-modified">' + (formatDate(g.updatedAt) || "—") + '</td>'
+                        + '</tr>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Groups</h1>',
+                    '  <span class="sub">Bundle users so a single role assignment grants a role to every member at once.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    groups.length
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Group</th><th>Members</th><th>Description</th><th>Modified</th></tr></thead><tbody class="grp-tbody">' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No groups yet. Create one on the right.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New group</h3>',
+                    '  <form id="grp-form" class="editor">',
+                    field("Key", '<input name="key" required placeholder="platform-team" />'),
+                    field("Name", '<input name="name" placeholder="Platform Team" />'),
+                    field("Description", '<input name="description" placeholder="optional" />'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create group</button><span class="save-msg" id="grp-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
+                ].join("\n");
+
+                var tbody = viewEl.querySelector(".grp-tbody");
+                if (tbody) {
+                    tbody.addEventListener("click", function (e) {
+                        if (e.target.closest("input, button, a")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/groups/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
+                document.getElementById("grp-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("grp-msg");
+                    setMessageOn(msg, "loading", "Creating…");
+                    api("POST", "/admin/groups", {
+                        key: f.key.value.trim(),
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                    }).then(function (g) { navigate("/groups/" + encodeURIComponent(g.key)); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Groups"));
+    }
+
+    function renderGroupDetail(key) {
+        viewEl.innerHTML = listPageShell("Group", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/groups/" + encodeURIComponent(key))
+            .then(function (g) {
+                var members = (g.memberUserIds || []).join("\n");
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
+                    '  <span class="sub">group <code>' + esc(g.key) + '</code> · ' + ((g.memberUserIds || []).length) + ' member(s)</span>',
+                    '</div><div class="actions"><button type="button" class="btn outline xs danger" data-grp="delete">Delete</button><span class="save-msg" id="grp-msg"></span></div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="grp-edit" class="editor card-pad">',
+                    field("Name", '<input name="name" value="' + esc(g.name || "") + '" />'),
+                    field("Description", '<input name="description" value="' + esc(g.description || "") + '" />'),
+                    field("Member user IDs", '<textarea name="members" rows="6" spellcheck="false" placeholder="one user GUID per line">' + esc(members) + '</textarea>'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '  <dt>Key</dt><dd class="mono">' + esc(g.key) + '</dd>',
+                    '  <dt>Members</dt><dd>' + ((g.memberUserIds || []).length) + '</dd>',
+                    '  <dt>Created</dt><dd>' + (formatDate(g.createdAt) || "—") + '</dd>',
+                    '  <dt>Updated</dt><dd>' + (formatDate(g.updatedAt) || "—") + '</dd>',
+                    '</dl></div></aside></div></div></div>',
+                ].join("\n");
+
+                var msg = document.getElementById("grp-msg");
+                document.getElementById("grp-edit").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var ids = f.members.value.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/groups/" + encodeURIComponent(key), {
+                        key: key,
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                        memberUserIds: ids,
+                    }).then(function () { setMessageOn(msg, "success", "Saved."); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+                viewEl.querySelector('[data-grp="delete"]').addEventListener("click", function () {
+                    if (!window.confirm("Delete group '" + key + "'? Role assignments targeting this group will stop granting access.")) { return; }
+                    api("DELETE", "/admin/groups/" + encodeURIComponent(key))
+                        .then(function () { navigate("/groups"); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Group: " + key));
+    }
+
+    // ============================================================
+    // API keys (Access): mint (token shown once) / list / revoke
+    // ============================================================
+    function apiKeyScopeBadge(scope) {
+        var v = scope === "AdminWrite" ? " purple" : " info";
+        return '<span class="badge' + v + '">' + esc(scope) + '</span>';
+    }
+
+    function renderApiKeyList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("API keys"); return; }
+        var envKey = currentEnv.key;
+        viewEl.innerHTML = [
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>API keys</h1>',
+            '  <span class="sub">Bearer tokens scoped to <code>' + esc(envKey) + '</code>. The plaintext token is shown exactly once, at creation; only an Argon2id hash is stored.</span>',
+            '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+            '  <div id="apikey-reveal"></div>',
+            '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="8" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Mint key</h3>',
+            '  <form id="apikey-form" class="editor">',
+            field("Name", '<input name="name" required placeholder="ci-pipeline" />'),
+            field("Scope", '<select name="scope"><option value="AdminWrite">AdminWrite</option><option value="SdkRead">SdkRead</option></select>'),
+            field("Bind to user", '<input name="user" placeholder="optional identifier, e.g. alice@example.com" />'),
+            '  <div class="editor__footer"><button type="submit" class="btn primary">Mint key</button><span class="save-msg" id="apikey-msg"></span></div>',
+            '  </form>',
+            '</div></aside></div></div></div>',
+        ].join("\n");
+        hydrateIcons(viewEl);
+
+        var tbody = document.getElementById("apikey-tbody");
+        function paint(keys) {
+            keys = Array.isArray(keys) ? keys : [];
+            if (!keys.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No API keys in this environment yet. Mint one on the right.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = keys.map(function (k) {
+                var status = k.revoked
+                    ? '<span class="badge danger">revoked</span>'
+                    : '<span class="badge success"><span class="dot"></span>active</span>';
+                return '<tr>'
+                    + '<td>' + esc(k.name) + '</td>'
+                    + '<td>' + code(k.prefix) + '</td>'
+                    + '<td>' + apiKeyScopeBadge(k.scope) + '</td>'
+                    + '<td class="mono">' + (k.userId ? esc(truncate(k.userId, 8)) : '<span class="muted">—</span>') + '</td>'
+                    + '<td>' + status + '</td>'
+                    + '<td class="mono cell-modified">' + (formatDate(k.createdAt) || "—") + '</td>'
+                    + '<td class="mono cell-modified">' + (k.lastUsedAt ? formatDate(k.lastUsedAt) : '<span class="muted">never</span>') + '</td>'
+                    + '<td class="col-actions">' + (k.revoked ? "" : '<button type="button" class="btn outline xs danger" data-revoke="' + esc(k.id) + '">Revoke</button>') + '</td>'
+                    + '</tr>';
+            }).join("");
+            Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var id = btn.getAttribute("data-revoke");
+                    if (!window.confirm("Revoke this API key? Requests using it start failing immediately.")) { return; }
+                    api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/revoke")
+                        .then(refresh)
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } window.alert(err.message); });
+                });
+            });
+        }
+        function refresh() {
+            return api("GET", "/admin/apikeys?environmentKey=" + encodeURIComponent(envKey))
+                .then(paint)
+                .catch(handleErrOnView("API keys"));
+        }
+
+        refresh();
+        document.getElementById("apikey-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("apikey-msg");
+            setMessageOn(msg, "loading", "Minting…");
+            api("POST", "/admin/apikeys", {
+                name: f.name.value.trim(),
+                scope: f.scope.value,
+                userIdentifier: f.user.value.trim() || null,
+                environmentKey: envKey,
+            }).then(function (res) {
+                var reveal = document.getElementById("apikey-reveal");
+                if (reveal) {
+                    reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
+                        + '<strong>Copy this token now — it will not be shown again.</strong>'
+                        + '<pre class="cr-json" style="margin:8px 0 0">' + esc(res.token) + '</pre></div>';
+                }
+                setMessageOn(msg, "success", "Minted.");
+                f.reset();
+                return refresh();
+            }).catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
     }
 
     // ============================================================
