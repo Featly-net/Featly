@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Samples.Centralized</RootNamespace>
+    <AssemblyName>Featly.Samples.Centralized</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>featly-sample-centralized</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A centralized deployment: just the server + dashboard + storage. No SDK
+         here — application processes (e.g. WebApi.Sample) point their SDK at
+         this server over HTTP. -->
+    <ProjectReference Include="..\..\src\Featly.Server\Featly.Server.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Dashboard\Featly.Dashboard.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" />
+  </ItemGroup>
+
+</Project>

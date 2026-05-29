@@ -60,6 +60,36 @@ public sealed class AdminApiClientTests
     }
 
     [Fact]
+    public async Task Export_gets_the_bundle_and_returns_it_verbatim()
+    {
+        const string bundle = """{"environmentKey":"development","exportedAt":"2026-05-29T00:00:00Z","flags":[],"configs":[],"segments":[]}""";
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK, bundle));
+        var client = new AdminApiClient(Client(handler));
+
+        var raw = await client.ExportAsync("development", Ct);
+
+        raw.Should().Be(bundle);
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Get);
+        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/api/admin/export?env=development");
+    }
+
+    [Fact]
+    public async Task Import_posts_the_bundle_and_parses_counts()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
+            """{"environmentKey":"production","flags":2,"configs":1,"segments":3}"""));
+        var client = new AdminApiClient(Client(handler));
+
+        var result = await client.ImportAsync("production", """{"flags":[]}""", Ct);
+
+        result.Flags.Should().Be(2);
+        result.Configs.Should().Be(1);
+        result.Segments.Should().Be(3);
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
+        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/api/admin/import?env=production");
+    }
+
+    [Fact]
     public async Task Non_success_surfaces_the_server_error_message()
     {
         var handler = new StubHandler(_ => Json(HttpStatusCode.Conflict, """{"error":"a user already exists."}"""));
