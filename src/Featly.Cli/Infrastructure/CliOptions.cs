@@ -22,4 +22,18 @@ internal static class CliOptions
         new(
             aliases: ["--yes", "-y"],
             description: "Skip the confirmation prompt (assume yes). Use in scripts.");
+
+    /// <summary>Base URL of the running Featly server (for the online commands).</summary>
+    public static Option<string?> ServerUrl() =>
+        new(
+            aliases: ["--server-url", "-s"],
+            description: $"Featly server base URL. " +
+                $"Falls back to the {ServerConnection.ServerUrlEnv} environment variable, " +
+                $"then '{ServerConnection.DefaultServerUrl}'.");
+
+    /// <summary>Admin API key used to authenticate the online commands.</summary>
+    public static Option<string?> ApiKey() =>
+        new(
+            aliases: ["--api-key", "-k"],
+            description: $"Admin API key (Bearer). Falls back to the {ServerConnection.ApiKeyEnv} environment variable.");
 }

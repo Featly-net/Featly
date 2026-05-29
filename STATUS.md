@@ -9,7 +9,7 @@
 
 - [x] **PR 12A — CLI scaffold + offline `db` commands**: `featly` command tree on `System.CommandLine`; public `SqliteMigrationRunner` facade in `Featly.Storage.Sqlite` (keeps `FeatlyDbContext` internal); `db migrate`/`status`/`rollback`/`drop` against `--connection-string`/`FEATLY_SQLITE`/default, confirmation-gated destructive ops. New `tests/Featly.Cli.Tests` (10 tests). 315 passing total.
 - [x] **PR 12B — server: user-bound API keys + mint/bootstrap + Bearer auth**: `ApiKey.UserId` (migration `AddApiKeyUserBinding`); Bearer handler now validates persisted keys (prefix + Argon2) and resolves the bound user's identity — closing the M8 limitation. `POST /api/admin/apikeys` (mint, returns token once), `GET` (metadata only), `POST /{id}/revoke`; guarded `POST /api/admin/bootstrap` (first-admin: user + admin role + bound key). 322 passing total.
-- [ ] **PR 12C — CLI online: apikey/bootstrap/env via HTTP**: CLI HTTP admin client + `apikey generate`, `bootstrap-admin`, `env lock`/`unlock`.
+- [x] **PR 12C — CLI online: apikey/bootstrap/env via HTTP**: `AdminApiClient` + `ServerConnection` resolver; `featly apikey generate`, `bootstrap-admin`, `env lock`/`unlock` against a running server (`--server-url`/`FEATLY_SERVER_URL`, `--api-key`/`FEATLY_API_KEY`). Validated end-to-end live. 331 passing total.
 - [ ] **PR 12D — export/import + `Centralized.Sample`**: server admin export/import snapshot endpoints + CLI `export`/`import`; standalone-server sample (3rd deployment pattern).
 - [ ] **PR 12E — docs + ADRs + PERFORMANCE.md + security audit**: GETTING_STARTED / CONFIGURATION / DEPLOYMENT, filled ADRs (ARCHITECTURE.md §22 + CLI/apikey decisions), benchmark results, security audit pass.
 
