@@ -5,7 +5,14 @@
 
 ## Active milestone
 
-**Between milestones** — M10 closed and shipped as `v0.0.8-preview.1`. A follow-up polish PR (`feat/m10-polish`) adds the ReadOnly environment lock/unlock (API + dashboard Settings) and the full audit-log filter UI; the remaining M10 plan items (webhook circuit breaker, DB-overridable settings, dry-run on non-gated endpoints, audit retention, CLI `env lock`) are recorded in `docs/DEFERRED.md`. M11 (OpenFeature provider: `Featly.OpenFeature.Provider` implementing the OpenFeature spec by delegating to `IFeatlyClient`) is the next planned milestone but has not started yet.
+**M11 — OpenFeature provider** (in progress)
+
+`Featly.OpenFeature.Provider` implements the OpenFeature spec by delegating to `IFlagClient` (flags only — configs stay on `IConfigClient`). Two sequenced PRs:
+
+- [x] **PR 11A — provider + mapping + tests**: `FeatlyOpenFeatureProvider : FeatureProvider` (OpenFeature 2.3.0) resolving boolean/string/integer/double/structure via `IFlagClient.EvaluateAsync`; spec-compliant reason + error mapping (`NotFound`→`FlagNotFound`, errors→`General`, default echoed on abnormal); OpenFeature→Featly context translation; JSON→`Value` for structures. New `Featly.OpenFeature.Provider.Tests` (9 tests, incl. end-to-end through the OpenFeature client). 305 passing total.
+- [ ] **PR 11B — sample + docs**: a sample wiring `Api.Instance.SetProviderAsync(new FeatlyOpenFeatureProvider(featly))` and a docs page on adopting OpenFeature with Featly. Closes M11.
+
+Carried over (unreleased, rides the next preview): the M10 polish PR (ReadOnly env lock/unlock + full audit filters). Deferred M10 line items are in `docs/DEFERRED.md`.
 
 ## Previous milestone
 
