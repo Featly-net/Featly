@@ -35,36 +35,39 @@
 
     var viewEl = document.getElementById("view");
     var envSelect = document.getElementById("env-select");
-    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav__link"));
-    var headerEl = document.querySelector(".app-header");
+    var envPill = document.getElementById("env-pill");
+    var envLock = document.getElementById("env-lock");
+    var crumbsEl = document.getElementById("crumbs");
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".sb-item"));
+
+    // Sidebar account row reflects the session.
+    var sbUserName = document.getElementById("sb-user-name");
+    var sbUserRole = document.getElementById("sb-user-role");
+    var sbAvatar = document.getElementById("sb-avatar");
 
     // Tracks whether /api/auth/me has confirmed an active session this load.
     // The cookie itself is HttpOnly so JS can't read it directly — we infer
     // session state by hitting /me and remembering the result.
     var session = null;
 
-    var sessionLabel = document.createElement("span");
-    sessionLabel.className = "session-label muted";
-    sessionLabel.hidden = true;
-    if (headerEl) { headerEl.appendChild(sessionLabel); }
-
-    var signOutBtn = document.createElement("button");
-    signOutBtn.type = "button";
-    signOutBtn.className = "btn-link";
-    signOutBtn.textContent = "Sign out";
-    signOutBtn.hidden = true;
-    signOutBtn.addEventListener("click", function () {
-        // POST /logout clears the cookie server-side; we then reload so the
-        // login screen shows. credentials: 'include' is mandatory — without
-        // it the browser would skip the cookie and the server can't know
-        // which session to expire.
+    // POST /logout clears the cookie server-side; we then reload so the login
+    // screen shows. credentials:'include' is mandatory — without it the browser
+    // would skip the cookie and the server can't know which session to expire.
+    // (The topbar avatar and the sidebar user row both sign out for now; the My
+    // Account screen lands in a later step.)
+    function signOut() {
         fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-            .finally(function () {
-                session = null;
-                location.reload();
-            });
-    });
-    if (headerEl) { headerEl.appendChild(signOutBtn); }
+            .finally(function () { session = null; location.reload(); });
+    }
+    var accountBtn = document.getElementById("account-btn");
+    if (accountBtn) { accountBtn.addEventListener("click", signOut); }
+    var sbUserEl = document.getElementById("sb-user");
+    if (sbUserEl) {
+        sbUserEl.addEventListener("click", signOut);
+        sbUserEl.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); signOut(); }
+        });
+    }
 
     // ============================================================
     // Auth
@@ -73,8 +76,8 @@
 
     function showAuthPrompt(errorText) {
         envSelect.disabled = true;
-        signOutBtn.hidden = true;
-        sessionLabel.hidden = true;
+        if (sbUserName) { sbUserName.textContent = "Not signed in"; }
+        if (sbUserRole) { sbUserRole.textContent = "—"; }
         viewEl.innerHTML = [
             '<h1>Sign in to Featly</h1>',
             '<div class="card auth-card">',
@@ -82,7 +85,7 @@
             '  <form id="auth-form" class="auth-form">',
             '    <label for="auth-token">Admin API key</label>',
             '    <input id="auth-token" type="password" autocomplete="off" required spellcheck="false" />',
-            '    <button type="submit" class="btn-primary">Sign in</button>',
+            '    <button type="submit" class="btn primary">Sign in</button>',
             errorText ? '    <p class="error" id="auth-error">' + esc(errorText) + '</p>' : '',
             '  </form>',
             '  <p class="muted">Featly stores your session as an <code>HttpOnly; SameSite=Strict</code> cookie. Nothing is written to <code>localStorage</code>.</p>',
@@ -188,6 +191,7 @@
             return '<option value="' + esc(e.key) + '"' + sel + '>' + esc(e.name || e.key) + (e.readOnly ? " (read-only)" : "") + '</option>';
         }).join("");
         envSelect.disabled = environments.length === 0;
+        updateEnvPill();
     }
 
     envSelect.addEventListener("change", function () {
@@ -195,6 +199,7 @@
         if (!picked) { return; }
         currentEnv = picked;
         try { localStorage.setItem(STORAGE_ENV_KEY, picked.key); } catch (_) {}
+        updateEnvPill();
         render();
     });
 
@@ -232,6 +237,115 @@
         slot.textContent = text;
     }
 
+    // ============================================================
+    // Shell: icons, theme, breadcrumbs, env pill
+    // ============================================================
+    // Inline-SVG icons (Lucide path data). No webfont — see README §6. This is
+    // the shell subset; more icons are added with the per-screen rewrites.
+    var ICONS = {
+        "home": '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+        "inbox": '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+        "flag": '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+        "sliders": '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/>',
+        "segment": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+        "flask": '<path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/>',
+        "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        "shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+        "webhook": '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>',
+        "git-pull-request": '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/>',
+        "scroll": '<path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
+        "settings": '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+        "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+        "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+        "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+        "moon": '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+        "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+        "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        "dots": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+        "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>',
+        "check": '<path d="M20 6 9 17l-5-5"/>',
+        "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+        "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+        "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+        "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>'
+    };
+    function icon(name, size) {
+        size = size || 16;
+        return '<svg class="ti" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            + 'stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + '</svg>';
+    }
+    function hydrateIcons(root) {
+        var slots = (root || document).querySelectorAll("[data-ti]");
+        Array.prototype.forEach.call(slots, function (el) {
+            if (el.getAttribute("data-ti-done") === "1") { return; }
+            el.innerHTML = icon(el.getAttribute("data-ti"));
+            el.setAttribute("data-ti-done", "1");
+        });
+    }
+
+    // Theme: OS default, overridable by a stored choice; the toggle swaps the icon.
+    var THEME_KEY = "featly.theme";
+    function effectiveTheme() {
+        return document.documentElement.getAttribute("data-theme")
+            || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+    function applyThemeIcon() {
+        var slot = document.querySelector("#theme-toggle .ti-slot");
+        if (slot) { slot.innerHTML = icon(effectiveTheme() === "dark" ? "sun" : "moon"); }
+    }
+    function initTheme() {
+        var saved = null;
+        try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
+        if (saved === "dark" || saved === "light") { document.documentElement.setAttribute("data-theme", saved); }
+        var btn = document.getElementById("theme-toggle");
+        if (btn) {
+            btn.addEventListener("click", function () {
+                var next = effectiveTheme() === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-theme", next);
+                try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+                applyThemeIcon();
+            });
+        }
+        applyThemeIcon();
+    }
+
+    // Env pill: colored pip (prod/staging/dev) + LOCKED badge from currentEnv.
+    function updateEnvPill() {
+        if (!envPill) { return; }
+        var key = ((currentEnv && currentEnv.key) || "").toLowerCase();
+        var tone = /prod/.test(key) ? "prod" : (/stag|stg|uat|pre/.test(key) ? "staging" : "dev");
+        envPill.className = "env-pill " + tone;
+        if (envLock) { envLock.hidden = !(currentEnv && currentEnv.readOnly); }
+    }
+
+    // Breadcrumbs: workspace / section [ / detail key ].
+    var SECTION_LABELS = {
+        overview: "Overview", inbox: "Inbox", changeDetail: "Inbox",
+        flagList: "Flags", flagDetail: "Flags", configList: "Configs", configDetail: "Configs",
+        segmentList: "Segments", segmentDetail: "Segments",
+        experimentList: "Experiments", experimentDetail: "Experiments",
+        userList: "Users", userDetail: "Users", roleList: "Roles",
+        groupList: "Groups", groupDetail: "Groups", apiKeyList: "API keys",
+        approvals: "Approval policies", webhookList: "Webhooks", webhookDetail: "Webhooks",
+        auditLog: "Audit log", settings: "Settings"
+    };
+    function renderCrumbs(route) {
+        if (!crumbsEl) { return; }
+        var section = SECTION_LABELS[route.key] || "Overview";
+        var detail = route.params && (route.params.key || route.params.id);
+        var parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
+        if (detail) {
+            parts.push('<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>');
+            parts.push('<span class="sep">/</span>');
+            parts.push('<span class="crumb current">' + esc(detail) + '</span>');
+        } else {
+            parts.push('<span class="crumb current">' + esc(section) + '</span>');
+        }
+        crumbsEl.innerHTML = parts.join("");
+    }
+
     var OPERATORS = [
         "Equals", "NotEquals", "In", "NotIn",
         "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual",
@@ -255,6 +369,9 @@
         { match: /^\/users\/(.+)$/,      key: "userDetail",   params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/users\/?$/,         key: "userList",     params: function () { return {}; } },
         { match: /^\/roles\/?$/,         key: "roleList",     params: function () { return {}; } },
+        { match: /^\/groups\/(.+)$/,     key: "groupDetail",  params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
+        { match: /^\/groups\/?$/,        key: "groupList",    params: function () { return {}; } },
+        { match: /^\/apikeys\/?$/,       key: "apiKeyList",   params: function () { return {}; } },
         { match: /^\/inbox\/(.+)$/,      key: "changeDetail", params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/inbox\/?$/,         key: "inbox",        params: function () { return {}; } },
         { match: /^\/approvals\/?$/,     key: "approvals",    params: function () { return {}; } },
@@ -289,6 +406,8 @@
         if (key.indexOf("experiment") === 0) { return "/experiments"; }
         if (key.indexOf("user") === 0) { return "/users"; }
         if (key.indexOf("role") === 0) { return "/roles"; }
+        if (key.indexOf("group") === 0) { return "/groups"; }
+        if (key.indexOf("apiKey") === 0) { return "/apikeys"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
         if (key.indexOf("webhook") === 0) { return "/webhooks"; }
@@ -321,6 +440,157 @@
     });
 
     // ============================================================
+    // Command palette (Cmd/Ctrl-K): jump to any screen, or open a
+    // flag/config/segment in the current environment by key or name.
+    // No new endpoints — reuses the admin list APIs + the router.
+    // ============================================================
+    var paletteEl = null, paletteOpen = false, paletteItems = [], paletteActive = 0;
+    var paletteEntityCache = { env: null, items: null };
+    var NAV_COMMANDS = [
+        { label: "Overview", route: "/", ti: "home" },
+        { label: "Inbox", route: "/inbox", ti: "inbox" },
+        { label: "Flags", route: "/flags", ti: "flag" },
+        { label: "Configs", route: "/configs", ti: "sliders" },
+        { label: "Segments", route: "/segments", ti: "segment" },
+        { label: "Experiments", route: "/experiments", ti: "flask" },
+        { label: "Users", route: "/users", ti: "users" },
+        { label: "Groups", route: "/groups", ti: "layers" },
+        { label: "Roles", route: "/roles", ti: "shield" },
+        { label: "API keys", route: "/apikeys", ti: "key" },
+        { label: "Webhooks", route: "/webhooks", ti: "webhook" },
+        { label: "Approval policies", route: "/approvals", ti: "git-pull-request" },
+        { label: "Audit log", route: "/audit", ti: "scroll" },
+        { label: "Settings", route: "/settings", ti: "settings" },
+    ];
+
+    function ensurePalette() {
+        if (paletteEl) { return paletteEl; }
+        paletteEl = document.createElement("div");
+        paletteEl.className = "palette-backdrop";
+        paletteEl.hidden = true;
+        paletteEl.innerHTML = [
+            '<div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">',
+            '  <div class="palette-input"><span class="ti-slot" data-ti="search"></span>',
+            '    <input id="palette-q" type="text" autocomplete="off" spellcheck="false" aria-label="Search" placeholder="Search flags, configs, segments — or jump to a screen…" />',
+            '  </div>',
+            '  <div class="palette-list" id="palette-list" role="listbox"></div>',
+            '  <div class="palette-foot"><span class="ent"><span class="kp">↑↓</span> navigate</span><span class="ent"><span class="kp">↵</span> open</span><span class="ent"><span class="kp">esc</span> close</span></div>',
+            '</div>',
+        ].join("");
+        document.body.appendChild(paletteEl);
+        hydrateIcons(paletteEl);
+        paletteEl.addEventListener("mousedown", function (e) { if (e.target === paletteEl) { closePalette(); } });
+        var input = paletteEl.querySelector("#palette-q");
+        input.addEventListener("input", function () { paletteFilter(input.value); });
+        input.addEventListener("keydown", paletteKeydown);
+        return paletteEl;
+    }
+
+    function openPalette() {
+        if (!isAuthenticated()) { return; }
+        ensurePalette();
+        paletteEl.hidden = false;
+        paletteOpen = true;
+        var input = paletteEl.querySelector("#palette-q");
+        input.value = "";
+        paletteFilter("");
+        input.focus();
+        paletteLoadEntities().then(function () { if (paletteOpen) { paletteFilter(input.value); } });
+    }
+
+    function closePalette() {
+        if (paletteEl) { paletteEl.hidden = true; }
+        paletteOpen = false;
+    }
+
+    function paletteLoadEntities() {
+        var envKey = currentEnv && currentEnv.key;
+        if (!envKey) { paletteEntityCache = { env: null, items: [] }; return Promise.resolve(); }
+        if (paletteEntityCache.env === envKey && paletteEntityCache.items) { return Promise.resolve(); }
+        var q = "?env=" + encodeURIComponent(envKey);
+        return Promise.all([
+            api("GET", "/admin/flags" + q).catch(function () { return []; }),
+            api("GET", "/admin/configs" + q).catch(function () { return []; }),
+            api("GET", "/admin/segments" + q).catch(function () { return []; }),
+        ]).then(function (res) {
+            var items = [];
+            (res[0] || []).forEach(function (f) { items.push({ label: f.key, sub: f.name || "", kind: "Flag", route: "/flags/" + encodeURIComponent(f.key), ti: "flag" }); });
+            (res[1] || []).forEach(function (c) { items.push({ label: c.key, sub: c.name || "", kind: "Config", route: "/configs/" + encodeURIComponent(c.key), ti: "sliders" }); });
+            (res[2] || []).forEach(function (s) { items.push({ label: s.key, sub: s.name || "", kind: "Segment", route: "/segments/" + encodeURIComponent(s.key), ti: "segment" }); });
+            paletteEntityCache = { env: envKey, items: items };
+        }).catch(function () { paletteEntityCache = { env: envKey, items: [] }; });
+    }
+
+    function paletteFilter(q) {
+        q = (q || "").trim().toLowerCase();
+        var nav = NAV_COMMANDS.filter(function (c) { return !q || c.label.toLowerCase().indexOf(q) >= 0; })
+            .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
+        var ents = (paletteEntityCache.items || []).filter(function (e) {
+            return !q || e.label.toLowerCase().indexOf(q) >= 0 || (e.sub && e.sub.toLowerCase().indexOf(q) >= 0);
+        });
+        ents.forEach(function (e) { e.group = "Entities"; });
+        var ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
+        paletteItems = ordered.slice(0, 40);
+        paletteActive = 0;
+        paletteRender();
+    }
+
+    function paletteRender() {
+        var list = paletteEl.querySelector("#palette-list");
+        if (!paletteItems.length) {
+            list.innerHTML = '<div class="palette-section-label">No matches</div>';
+            return;
+        }
+        var html = "", lastGroup = null;
+        paletteItems.forEach(function (it, i) {
+            if (it.group !== lastGroup) { html += '<div class="palette-section-label">' + esc(it.group) + '</div>'; lastGroup = it.group; }
+            html += '<div class="palette-item' + (i === paletteActive ? " active" : "") + '" data-i="' + i + '" role="option">'
+                + '<span class="ti-slot" data-ti="' + esc(it.ti) + '"></span>'
+                + '<span><span class="mono">' + esc(it.label) + '</span>' + (it.sub ? ' <span class="sub">' + esc(it.sub) + '</span>' : '') + '</span>'
+                + '<span class="kp">' + esc(it.kind) + '</span>'
+                + '</div>';
+        });
+        list.innerHTML = html;
+        hydrateIcons(list);
+        Array.prototype.slice.call(list.querySelectorAll(".palette-item")).forEach(function (el) {
+            el.addEventListener("mousemove", function () { paletteActive = parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
+            el.addEventListener("click", function () { paletteSelect(parseInt(el.getAttribute("data-i"), 10)); });
+        });
+    }
+
+    function paletteHighlight() {
+        var els = paletteEl.querySelectorAll(".palette-item");
+        Array.prototype.forEach.call(els, function (el) {
+            el.classList.toggle("active", parseInt(el.getAttribute("data-i"), 10) === paletteActive);
+        });
+        var active = paletteEl.querySelector(".palette-item.active");
+        if (active && active.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
+    }
+
+    function paletteSelect(i) {
+        var it = paletteItems[i];
+        if (!it) { return; }
+        closePalette();
+        navigate(it.route);
+    }
+
+    function paletteKeydown(e) {
+        if (e.key === "ArrowDown") { e.preventDefault(); paletteActive = Math.min(paletteActive + 1, paletteItems.length - 1); paletteHighlight(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); paletteActive = Math.max(paletteActive - 1, 0); paletteHighlight(); }
+        else if (e.key === "Enter") { e.preventDefault(); paletteSelect(paletteActive); }
+        else if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+    }
+
+    document.addEventListener("keydown", function (e) {
+        if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+            e.preventDefault();
+            if (paletteOpen) { closePalette(); } else { openPalette(); }
+        } else if (e.key === "Escape" && paletteOpen) { closePalette(); }
+    });
+    var globalSearchBtn = document.getElementById("global-search");
+    if (globalSearchBtn) { globalSearchBtn.addEventListener("click", openPalette); }
+
+    // ============================================================
     // Views
     // ============================================================
     function render() {
@@ -329,12 +599,11 @@
         var view = views[route.key];
         if (!view) { views.overview(); return; }
         navLinks.forEach(function (link) {
-            if (link.getAttribute("data-route") === route.navRoute) {
-                link.setAttribute("aria-current", "page");
-            } else {
-                link.removeAttribute("aria-current");
-            }
+            var active = link.getAttribute("data-route") === route.navRoute;
+            link.classList.toggle("active", active);
+            if (active) { link.setAttribute("aria-current", "page"); } else { link.removeAttribute("aria-current"); }
         });
+        renderCrumbs(route);
         document.title = route.key === "overview" ? "Featly" : "Featly — " + route.key.replace(/([A-Z])/g, " $1").trim();
         view(route.params);
     }
@@ -349,9 +618,9 @@
                 '</div>',
             ].join("\n");
         },
-        flagList:    function () { renderList("flags", "Flags", flagCols); },
-        configList:  function () { renderList("configs", "Configs", configCols); },
-        segmentList: function () { renderList("segments", "Segments", segmentCols); },
+        flagList:    function () { renderFlagList(); },
+        configList:  function () { renderConfigList(); },
+        segmentList: function () { renderSegmentList(); },
         flagDetail:    function (p) { renderFlagDetail(p.key); },
         configDetail:  function (p) { renderConfigDetail(p.key); },
         segmentDetail: function (p) { renderSegmentDetail(p.key); },
@@ -366,63 +635,302 @@
         webhookDetail: function (p) { renderWebhookDetail(p.id); },
         auditLog:      function () { renderAuditLog(); },
         roleList:    function () { renderRoleList(); },
+        groupList:   function () { renderGroupList(); },
+        groupDetail: function (p) { renderGroupDetail(p.key); },
+        apiKeyList:  function () { renderApiKeyList(); },
         settings: function () { renderSettings(); },
     };
-
-    // ---------- List views ----------
-    var flagCols = [
-        { label: "Key", get: function (f) { return '<a data-link="/flags/' + encodeURIComponent(f.key) + '">' + code(f.key) + '</a>'; } },
-        { label: "Name", get: function (f) { return esc(f.name); } },
-        { label: "Type", get: function (f) { return badge(f.type); } },
-        { label: "Enabled", get: function (f) { return f.enabled ? '<span class="dot dot--on"></span> on' : '<span class="dot dot--off"></span> off'; } },
-        { label: "Variants", get: function (f) { return (f.variants || []).length; } },
-        { label: "Rules", get: function (f) { return (f.rules || []).length; } },
-        { label: "Updated", get: function (f) { return formatDate(f.updatedAt); } },
-    ];
-    var configCols = [
-        { label: "Key", get: function (c) { return '<a data-link="/configs/' + encodeURIComponent(c.key) + '">' + code(c.key) + '</a>'; } },
-        { label: "Name", get: function (c) { return esc(c.name); } },
-        { label: "Type", get: function (c) { return badge(c.type); } },
-        { label: "Default", get: function (c) { return code(truncate(JSON.stringify(c.defaultValue), 40)); } },
-        { label: "Rules", get: function (c) { return (c.rules || []).length; } },
-        { label: "Updated", get: function (c) { return formatDate(c.updatedAt); } },
-    ];
-    var segmentCols = [
-        { label: "Key", get: function (s) { return '<a data-link="/segments/' + encodeURIComponent(s.key) + '">' + code(s.key) + '</a>'; } },
-        { label: "Name", get: function (s) { return esc(s.name); } },
-        { label: "Conditions", get: function (s) { return (s.conditions || []).length; } },
-        { label: "Updated", get: function (s) { return formatDate(s.updatedAt); } },
-    ];
-
-    function renderList(resource, title, columns) {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>' + title + '</h1><div class="placeholder"><p>No environment selected yet.</p></div>';
-            return;
-        }
-        viewEl.innerHTML = '<h1>' + title + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
-        api("GET", "/admin/" + resource + "?env=" + encodeURIComponent(currentEnv.key))
-            .then(function (rows) { renderTable(title, columns, rows); })
-            .catch(handleErrOnView(title));
-    }
-
-    function renderTable(title, columns, rows) {
-        var heading = '<h1>' + title + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>';
-        if (!rows || rows.length === 0) {
-            viewEl.innerHTML = heading + '<div class="placeholder"><p>No ' + title.toLowerCase() + ' in this environment yet.</p><p class="muted">POST via the admin API to create one.</p></div>';
-            return;
-        }
-        var thead = '<thead><tr>' + columns.map(function (c) { return '<th>' + esc(c.label) + '</th>'; }).join("") + '</tr></thead>';
-        var tbody = '<tbody>' + rows.map(function (row) {
-            return '<tr>' + columns.map(function (c) { return '<td>' + c.get(row) + '</td>'; }).join("") + '</tr>';
-        }).join("") + '</tbody>';
-        viewEl.innerHTML = heading + '<div class="table-wrap"><table class="table">' + thead + tbody + '</table></div>';
-    }
 
     function handleErrOnView(title) {
         return function (err) {
             if (err.kind === "auth") { showAuthPrompt(); return; }
             viewEl.innerHTML = '<h1>' + title + '</h1><div class="error">' + esc(err.message) + '</div>';
         };
+    }
+
+    // ---------- Flags list (redesigned, step 5) ----------
+    // Tab + filter state survives re-renders within a session.
+    var flagListTab = "all";
+
+    function flagTypeBadge(type) {
+        var t = String(type == null ? "" : type);
+        var variant = t === "Boolean" ? " info" : (t === "Json" ? " accent" : "");
+        return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
+    }
+    function flagStatusBadge(f) {
+        return f.enabled
+            ? '<span class="badge success"><span class="dot"></span>on</span>'
+            : '<span class="badge"><span class="dot"></span>off</span>';
+    }
+    function flagTagsCell(f) {
+        var tags = f.tags || [];
+        if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
+        return '<div class="tag-list">' + tags.map(function (t) {
+            return '<span class="tag muted">' + esc(t) + '</span>';
+        }).join("") + '</div>';
+    }
+    function flagRow(f) {
+        return '<tr data-key="' + esc(f.key) + '">'
+            + '<td class="col-check"><input type="checkbox" class="row-check" aria-label="Select ' + esc(f.key) + '" /></td>'
+            + '<td>' + flagStatusBadge(f) + '</td>'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(f.key) + '</span>'
+            + '<span class="cell-name">' + esc(f.name || "") + '</span></div></td>'
+            + '<td>' + flagTypeBadge(f.type) + '</td>'
+            + '<td class="num">' + (f.variants || []).length + '</td>'
+            + '<td>' + flagTagsCell(f) + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(f.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(f.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+
+    function renderFlagList() {
+        if (!currentEnv) {
+            viewEl.innerHTML = '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Flags</h1></div></div>'
+                + '<div class="page-body"><div class="empty"><p>No environment selected yet.</p></div></div></div>';
+            return;
+        }
+        viewEl.innerHTML = flagListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = flagListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireFlagList(rows);
+            })
+            .catch(handleErrOnView("Flags"));
+    }
+
+    function flagListMarkup(all, loading) {
+        var enabled = all.filter(function (f) { return f.enabled; }).length;
+        var tabs = [
+            { k: "all", label: "All flags", n: all.length },
+            { k: "enabled", label: "Enabled", n: enabled },
+            { k: "disabled", label: "Disabled", n: all.length - enabled },
+        ];
+        var tabsHtml = tabs.map(function (t) {
+            return '<button class="tab' + (t.k === flagListTab ? " active" : "") + '" type="button" data-tab="' + t.k + '">'
+                + esc(t.label) + ' <span class="count">' + t.n + '</span></button>';
+        }).join("");
+        var body = loading
+            ? '<div class="empty"><p class="muted">Loading…</p></div>'
+            : [
+                '<div class="filter-bar">',
+                '  <div class="search-input"><span class="ti-slot" data-ti="search"></span>',
+                '    <input id="flag-filter" type="search" placeholder="Filter by key, name, or tag" spellcheck="false" autocomplete="off" />',
+                '    <span class="clear-shortcut">/</span></div>',
+                '</div>',
+                '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+                '  <th style="width:28px"><input type="checkbox" id="flag-check-all" aria-label="Select all" /></th>',
+                '  <th style="width:54px">Status</th><th>Key / Name</th><th style="width:120px">Type</th>',
+                '  <th style="width:84px">Variants</th><th>Tags</th><th style="width:140px">Last modified</th><th style="width:48px"></th>',
+                '</tr></thead><tbody id="flag-tbody">' + all.map(flagRow).join("") + '</tbody></table></div>',
+                '<div class="list-foot"><span id="flag-count">Showing ' + all.length + ' of ' + all.length + ' flags</span>',
+                '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>',
+            ].join("");
+        return [
+            '<div class="page">',
+            '  <div class="page-head"><div class="title-wrap"><h1>Flags</h1>',
+            '    <span class="sub">Boolean and multivariate feature flags evaluated in <code>' + esc(currentEnv.key) + '</code>.</span>',
+            '  </div></div>',
+            '  <div class="tabs">' + tabsHtml + '</div>',
+            '  <div class="page-body tight">' + body + '</div>',
+            '</div>',
+        ].join("");
+    }
+
+    function wireFlagList(all) {
+        var tbody = document.getElementById("flag-tbody");
+        var countEl = document.getElementById("flag-count");
+        var filterInput = document.getElementById("flag-filter");
+        var checkAll = document.getElementById("flag-check-all");
+        if (!tbody) { return; }
+
+        function visibleRows() {
+            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            return all.filter(function (f) {
+                if (flagListTab === "enabled" && !f.enabled) { return false; }
+                if (flagListTab === "disabled" && f.enabled) { return false; }
+                if (q) {
+                    var hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
+                    if (hay.indexOf(q) < 0) { return false; }
+                }
+                return true;
+            });
+        }
+        function repaint() {
+            var rows = visibleRows();
+            tbody.innerHTML = rows.length
+                ? rows.map(flagRow).join("")
+                : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No flags match this filter.</td></tr>';
+            hydrateIcons(tbody);
+            if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " flags"; }
+            if (checkAll) { checkAll.checked = false; }
+        }
+
+        Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (btn) {
+            btn.addEventListener("click", function () {
+                flagListTab = btn.getAttribute("data-tab");
+                Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (b) {
+                    b.classList.toggle("active", b === btn);
+                });
+                repaint();
+            });
+        });
+        if (filterInput) { filterInput.addEventListener("input", repaint); }
+        tbody.addEventListener("click", function (e) {
+            if (e.target.closest("input, button, a")) { return; }
+            var tr = e.target.closest("tr[data-key]");
+            if (tr) { navigate("/flags/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+        });
+        if (checkAll) {
+            checkAll.addEventListener("change", function () {
+                Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
+            });
+        }
+    }
+
+    // ---------- Shared list helpers (redesign, step 5) ----------
+    function listPageShell(title, subHtml, bodyHtml) {
+        return [
+            '<div class="page">',
+            '  <div class="page-head"><div class="title-wrap"><h1>' + esc(title) + '</h1>',
+            subHtml ? '    <span class="sub">' + subHtml + '</span>' : '',
+            '  </div></div>',
+            '  <div class="page-body tight">' + bodyHtml + '</div>',
+            '</div>',
+        ].join("");
+    }
+    function listFilterBar(placeholder) {
+        return '<div class="filter-bar"><div class="search-input"><span class="ti-slot" data-ti="search"></span>'
+            + '<input class="list-filter" type="search" placeholder="' + esc(placeholder) + '" spellcheck="false" autocomplete="off" />'
+            + '<span class="clear-shortcut">/</span></div></div>';
+    }
+    function listFoot(n, noun) {
+        return '<div class="list-foot"><span class="list-count">Showing ' + n + ' of ' + n + ' ' + esc(noun) + '</span>'
+            + '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>';
+    }
+    function listEmptyEnv(title) {
+        return listPageShell(title, "", '<div class="empty"><p>No environment selected yet.</p></div>');
+    }
+    function tagsCell(row) {
+        var tags = row.tags || [];
+        if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
+        return '<div class="tag-list">' + tags.map(function (t) { return '<span class="tag muted">' + esc(t) + '</span>'; }).join("") + '</div>';
+    }
+    // Wires filter + row-click + select-all for a list whose tbody is .list-tbody,
+    // count is .list-count, filter input is .list-filter. `fields` are the row
+    // properties searched; `rowFn` re-renders one row; navBase + key → detail route.
+    function wireSimpleList(all, navBase, noun, fields, rowFn, colspan) {
+        var tbody = viewEl.querySelector(".list-tbody");
+        var countEl = viewEl.querySelector(".list-count");
+        var filterInput = viewEl.querySelector(".list-filter");
+        var checkAll = viewEl.querySelector(".check-all");
+        if (!tbody) { return; }
+        function repaint() {
+            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            var rows = all.filter(function (r) {
+                if (!q) { return true; }
+                var hay = fields.map(function (f) { var v = r[f]; return Array.isArray(v) ? v.join(" ") : (v == null ? "" : v); }).join(" ").toLowerCase();
+                return hay.indexOf(q) >= 0;
+            });
+            tbody.innerHTML = rows.length
+                ? rows.map(rowFn).join("")
+                : '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">No ' + esc(noun) + ' match this filter.</td></tr>';
+            hydrateIcons(tbody);
+            if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " " + noun; }
+            if (checkAll) { checkAll.checked = false; }
+        }
+        if (filterInput) { filterInput.addEventListener("input", repaint); }
+        tbody.addEventListener("click", function (e) {
+            if (e.target.closest("input, button, a")) { return; }
+            var tr = e.target.closest("tr[data-key]");
+            if (tr) { navigate(navBase + "/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+        });
+        if (checkAll) {
+            checkAll.addEventListener("change", function () {
+                Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
+            });
+        }
+    }
+
+    // ---------- Configs list (redesign) ----------
+    function configTypeBadge(type) {
+        var t = String(type == null ? "" : type);
+        var variant = t === "Json" ? " accent" : (t === "Bool" ? " info" : "");
+        return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
+    }
+    function configRow(c) {
+        return '<tr data-key="' + esc(c.key) + '">'
+            + '<td class="col-check"><input type="checkbox" class="row-check" aria-label="Select ' + esc(c.key) + '" /></td>'
+            + '<td>' + configTypeBadge(c.type) + '</td>'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(c.key) + '</span>'
+            + '<span class="cell-name">' + esc(c.name || "") + '</span></div></td>'
+            + '<td>' + code(truncate(JSON.stringify(c.defaultValue), 48)) + '</td>'
+            + '<td>' + tagsCell(c) + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(c.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(c.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+    function renderConfigList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Configs"); return; }
+        viewEl.innerHTML = configListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/configs?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = configListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireSimpleList(rows, "/configs", "configs", ["key", "name", "tags"], configRow, 7);
+            })
+            .catch(handleErrOnView("Configs"));
+    }
+    function configListMarkup(all, loading) {
+        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+            listFilterBar("Filter by key, name, or tag"),
+            '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+            '  <th style="width:28px"><input type="checkbox" class="check-all" aria-label="Select all" /></th>',
+            '  <th style="width:120px">Type</th><th>Key / Name</th><th>Value</th><th>Tags</th>',
+            '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
+            '</tr></thead><tbody class="list-tbody">' + all.map(configRow).join("") + '</tbody></table></div>',
+            listFoot(all.length, "configs"),
+        ].join("");
+        return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body);
+    }
+
+    // ---------- Segments list (redesign) ----------
+    function segmentRow(s) {
+        return '<tr data-key="' + esc(s.key) + '">'
+            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(s.key) + '</span>'
+            + '<span class="cell-name">' + esc(s.name || "") + '</span></div></td>'
+            + '<td class="num">' + (s.conditions || []).length + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(s.updatedAt) || "—") + '</td>'
+            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(s.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + '</tr>';
+    }
+    function renderSegmentList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Segments"); return; }
+        viewEl.innerHTML = segmentListMarkup([], true);
+        hydrateIcons(viewEl);
+        api("GET", "/admin/segments?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (rows) {
+                rows = rows || [];
+                viewEl.innerHTML = segmentListMarkup(rows, false);
+                hydrateIcons(viewEl);
+                wireSimpleList(rows, "/segments", "segments", ["key", "name"], segmentRow, 4);
+            })
+            .catch(handleErrOnView("Segments"));
+    }
+    function segmentListMarkup(all, loading) {
+        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+            listFilterBar("Filter by key or name"),
+            '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
+            '  <th>Key / Name</th><th style="width:120px">Conditions</th>',
+            '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
+            '</tr></thead><tbody class="list-tbody">' + all.map(segmentRow).join("") + '</tbody></table></div>',
+            listFoot(all.length, "segments"),
+        ].join("");
+        return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body);
     }
 
     // ============================================================
@@ -453,9 +961,7 @@
     }
 
     function detailLoadingShell(kind, key) {
-        return '<a data-link="/' + kind.toLowerCase() + 's" class="back-link">← ' + kind + 's</a>'
-            + '<h1>' + esc(key) + '</h1>'
-            + '<div class="card"><p class="muted">Loading…</p></div>';
+        return listPageShell(kind, key ? esc(key) : "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
     }
 
     function auditFooter(entity) {
@@ -471,9 +977,15 @@
             return '<option value="' + esc(v.key) + '"' + (v.key === flag.defaultVariantKey ? " selected" : "") + '>' + esc(v.key) + '</option>';
         }).join("");
 
+        var statusBadge = flag.enabled
+            ? '<span class="badge success"><span class="dot"></span>on</span>'
+            : '<span class="badge"><span class="dot"></span>off</span>';
         viewEl.innerHTML = [
-            '<a data-link="/flags" class="back-link">← Flags</a>',
-            '<h1>' + code(flag.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(flag.key) + '</h1>',
+            '    <span class="sub">' + esc(flag.name || "") + ' · ' + esc(flag.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div><div class="actions">' + statusBadge + '</div>',
+            '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="flag-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(flag.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(flag.description || "") + '</textarea>'),
@@ -485,21 +997,32 @@
             field("Tags", '<input name="tags" value="' + esc((flag.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
             '<h2>Variants</h2>',
             '<div class="variant-list">' + (flag.variants || []).map(renderVariantRow).join("") + '</div>',
-            '<button type="button" class="btn-ghost" data-action="add-variant">+ Add variant</button>',
+            '<button type="button" class="btn outline xs" data-action="add-variant"><span class="ti-slot" data-ti="plus"></span> Add variant</button>',
             '<h2>Rules</h2>',
             renderRulesEditor(flag.rules || [], { kind: "flag", variants: flag.variants || [] }),
-            '<button type="button" class="btn-ghost" data-action="add-rule">+ Add rule</button>',
+            '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save flag</button>',
+            '  <button type="submit" class="btn primary">Save flag</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
             renderPreviewPanel("flag", flag.key),
-            auditFooter(flag),
+            '</div><aside class="detail-side">',
+            '  <div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '    <dt>Status</dt><dd>' + statusBadge + '</dd>',
+            '    <dt>Type</dt><dd>' + esc(flag.type) + '</dd>',
+            '    <dt>Default</dt><dd class="mono">' + esc(flag.defaultVariantKey || "—") + '</dd>',
+            '    <dt>Variants</dt><dd>' + (flag.variants || []).length + '</dd>',
+            '    <dt>Rules</dt><dd>' + (flag.rules || []).length + '</dd>',
+            '    <dt>Created</dt><dd>' + (formatDate(flag.createdAt) || "—") + '</dd>',
+            '    <dt>Updated</dt><dd>' + (formatDate(flag.updatedAt) || "—") + '</dd>',
+            '  </dl></div>',
+            '</aside></div></div></div>',
         ].join("\n");
 
         wireFlagEditor(flag);
         wirePreviewPanel("flag", flag.key);
+        hydrateIcons(viewEl);
     }
 
     function renderVariantRow(v) {
@@ -585,8 +1108,11 @@
     // ---------- Config editor ----------
     function renderConfigEditor(config) {
         viewEl.innerHTML = [
-            '<a data-link="/configs" class="back-link">← Configs</a>',
-            '<h1>' + code(config.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(config.key) + '</h1>',
+            '    <span class="sub">' + esc(config.name || "") + ' · ' + esc(config.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div><div class="actions"><span class="badge sq' + (config.type === "Json" ? " accent" : (config.type === "Bool" ? " info" : "")) + '">' + esc(config.type) + '</span></div>',
+            '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="config-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(config.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(config.description || "") + '</textarea>'),
@@ -597,16 +1123,23 @@
             field("Tags", '<input name="tags" value="' + esc((config.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
             '<h2>Rules</h2>',
             renderRulesEditor(config.rules || [], { kind: "config" }),
-            '<button type="button" class="btn-ghost" data-action="add-rule">+ Add rule</button>',
+            '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save config</button>',
+            '  <button type="submit" class="btn primary">Save config</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
             renderPreviewPanel("config", config.key),
-            auditFooter(config),
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '  <dt>Type</dt><dd>' + esc(config.type) + '</dd>',
+            '  <dt>Default</dt><dd class="mono">' + esc(truncate(JSON.stringify(config.defaultValue), 24)) + '</dd>',
+            '  <dt>Rules</dt><dd>' + (config.rules || []).length + '</dd>',
+            '  <dt>Created</dt><dd>' + (formatDate(config.createdAt) || "—") + '</dd>',
+            '  <dt>Updated</dt><dd>' + (formatDate(config.updatedAt) || "—") + '</dd>',
+            '</dl></div></aside></div></div></div>',
         ].join("\n");
 
+        hydrateIcons(viewEl);
         wirePreviewPanel("config", config.key);
         var form = document.getElementById("config-form");
         form.addEventListener("click", function (e) {
@@ -654,22 +1187,29 @@
     // ---------- Segment editor ----------
     function renderSegmentEditor(segment) {
         viewEl.innerHTML = [
-            '<a data-link="/segments" class="back-link">← Segments</a>',
-            '<h1>' + code(segment.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
+            '<div class="page"><div class="page-head">',
+            '  <div class="title-wrap"><h1 class="mono">' + esc(segment.key) + '</h1>',
+            '    <span class="sub">' + esc(segment.name || "") + ' · reusable group in <code>' + esc(currentEnv.key) + '</code></span>',
+            '  </div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="segment-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(segment.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(segment.description || "") + '</textarea>'),
             '<h2>Conditions</h2>',
             '<div class="conditions-list">' + (segment.conditions || []).map(renderConditionRow).join("") + '</div>',
-            '<button type="button" class="btn-ghost" data-action="add-condition">+ Add condition</button>',
+            '<button type="button" class="btn outline xs" data-action="add-condition"><span class="ti-slot" data-ti="plus"></span> Add condition</button>',
             '<div class="editor__footer">',
-            '  <button type="submit" class="btn-primary">Save segment</button>',
+            '  <button type="submit" class="btn primary">Save segment</button>',
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
-            auditFooter(segment),
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+            '  <dt>Conditions</dt><dd>' + (segment.conditions || []).length + '</dd>',
+            '  <dt>Created</dt><dd>' + (formatDate(segment.createdAt) || "—") + '</dd>',
+            '  <dt>Updated</dt><dd>' + (formatDate(segment.updatedAt) || "—") + '</dd>',
+            '</dl><p class="muted" style="font-size:11px;margin:10px 0 0">Referenced from flag &amp; config rules via the <code>InSegment</code> operator.</p></div></aside></div></div></div>',
         ].join("\n");
 
+        hydrateIcons(viewEl);
         var form = document.getElementById("segment-form");
         form.addEventListener("click", function (e) {
             var action = e.target.closest("[data-action]")?.getAttribute("data-action");
@@ -704,33 +1244,44 @@
     // ============================================================
     // Users + Roles (RBAC, M7) — not environment-scoped
     // ============================================================
+    function userRow(u) {
+        return '<tr data-key="' + esc(u.identifier) + '">'
+            + '<td><div class="cell-keyname"><span class="cell-key" style="font-weight:500">' + esc(u.displayName || u.identifier) + '</span>'
+            + '<span class="cell-name mono">' + esc(u.identifier) + '</span></div></td>'
+            + '<td>' + esc(u.email || "—") + '</td>'
+            + '<td>' + (u.disabled
+                ? '<span class="badge"><span class="dot"></span>disabled</span>'
+                : '<span class="badge success"><span class="dot"></span>active</span>') + '</td>'
+            + '<td class="mono cell-modified">' + (formatDate(u.createdAt) || "—") + '</td>'
+            + '</tr>';
+    }
     function renderUserList() {
-        viewEl.innerHTML = '<h1>Users</h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "People with access — auto-provisioned on first sign-in, or created via the admin API.";
+        viewEl.innerHTML = listPageShell("Users", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/users")
             .then(function (users) {
                 users = Array.isArray(users) ? users : [];
-                if (users.length === 0) {
-                    viewEl.innerHTML = '<h1>Users</h1><div class="placeholder"><p>No users yet.</p><p class="muted">Users are auto-provisioned on first sign-in, or created via the admin API.</p></div>';
-                    return;
+                var body = users.length
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name / Identifier</th><th>Email</th>'
+                        + '<th style="width:90px">Status</th><th style="width:140px">Created</th></tr></thead>'
+                        + '<tbody class="list-tbody">' + users.map(userRow).join("") + '</tbody></table></div>'
+                    : '<div class="empty"><p>No users yet.</p></div>';
+                viewEl.innerHTML = listPageShell("Users", sub, body);
+                hydrateIcons(viewEl);
+                var tb = viewEl.querySelector(".list-tbody");
+                if (tb) {
+                    tb.addEventListener("click", function (e) {
+                        if (e.target.closest("a, button, input")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/users/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
                 }
-                var rows = users.map(function (u) {
-                    return '<tr>'
-                        + '<td><a data-link="/users/' + encodeURIComponent(u.identifier) + '">' + esc(u.displayName || u.identifier) + '</a></td>'
-                        + '<td>' + code(u.identifier) + '</td>'
-                        + '<td>' + esc(u.email || "—") + '</td>'
-                        + '<td>' + (u.disabled ? '<span class="dot dot--off"></span> disabled' : '<span class="dot dot--on"></span> active') + '</td>'
-                        + '<td>' + formatDate(u.createdAt) + '</td>'
-                        + '</tr>';
-                }).join("");
-                viewEl.innerHTML = '<h1>Users</h1><div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Name</th><th>Identifier</th><th>Email</th><th>Status</th><th>Created</th></tr></thead>'
-                    + '<tbody>' + rows + '</tbody></table></div>';
             })
             .catch(handleErrOnView("Users"));
     }
 
     function renderUserDetail(identifier) {
-        viewEl.innerHTML = '<a data-link="/users" class="back-link">← Users</a><h1>' + esc(identifier) + '</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("User", esc(identifier), '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/users/" + encodeURIComponent(identifier)),
             api("GET", "/admin/users/" + encodeURIComponent(identifier) + "/effective-access"),
@@ -742,89 +1293,301 @@
             }).join("");
             var perms = (access.permissions || []);
             viewEl.innerHTML = [
-                '<a data-link="/users" class="back-link">← Users</a>',
-                '<h1>' + esc(user.displayName || user.identifier) + '</h1>',
-                '<div class="card">',
-                '  <dl class="preview-result__dl">',
-                '    <dt>Identifier</dt><dd>' + code(user.identifier) + '</dd>',
-                '    <dt>Email</dt><dd>' + esc(user.email || "—") + '</dd>',
-                '    <dt>Status</dt><dd>' + (user.disabled ? "disabled" : "active") + '</dd>',
-                '  </dl>',
-                '</div>',
-                '<h2>Effective access</h2>',
-                '<p class="muted">Why this user has the access they do — the union of every role granted by a matching assignment (direct or via a group), in the default project.</p>',
+                '<div class="page"><div class="page-head"><div class="title-wrap">',
+                '  <h1>' + esc(user.displayName || user.identifier) + '</h1>',
+                '  <span class="sub mono">' + esc(user.identifier) + '</span>',
+                '</div><div class="actions">' + (user.disabled
+                    ? '<span class="badge"><span class="dot"></span>disabled</span>'
+                    : '<span class="badge success"><span class="dot"></span>active</span>') + '</div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <div class="card-pad"><h2>Effective access</h2>',
+                '  <p class="muted" style="font-size:12px">The union of every role granted by a matching assignment (direct or via a group), in the default project.</p>',
                 roleRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Role</th><th>Name</th><th>Via</th><th>Environment</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No role assignments in this project.</p></div>',
-                '<h2>Permissions <span class="muted">(' + perms.length + ')</span></h2>',
+                    ? '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Role</th><th>Name</th><th>Via</th><th>Environment</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>'
+                    : '  <div class="empty"><p>No role assignments in this project.</p></div>',
+                '  </div>',
+                '  <div class="card-pad"><h2>Permissions <span class="muted">(' + perms.length + ')</span></h2>',
                 perms.length
-                    ? '<div class="card"><p>' + perms.map(function (p) { return badge(p); }).join(" ") + '</p></div>'
-                    : '<div class="placeholder"><p>No effective permissions in this scope.</p></div>',
+                    ? '  <div class="tag-list">' + perms.map(function (p) { return '<span class="tag muted">' + esc(p) + '</span>'; }).join("") + '</div>'
+                    : '  <div class="empty"><p>No effective permissions in this scope.</p></div>',
+                '  </div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Identity</h3><dl class="side-dl">',
+                '  <dt>Identifier</dt><dd class="mono">' + esc(truncate(user.identifier, 22)) + '</dd>',
+                '  <dt>Email</dt><dd>' + esc(user.email || "—") + '</dd>',
+                '  <dt>Status</dt><dd>' + (user.disabled ? "disabled" : "active") + '</dd>',
+                '  <dt>Roles</dt><dd>' + (access.roles || []).length + '</dd>',
+                '</dl></div></aside></div></div></div>',
             ].join("\n");
+            hydrateIcons(viewEl);
         }).catch(handleErrOnView("User: " + identifier));
     }
 
     function renderRoleList() {
-        viewEl.innerHTML = '<h1>Roles</h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "Permission sets. System roles are immutable; clone one to make an editable custom role.";
+        viewEl.innerHTML = listPageShell("Roles", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/roles")
             .then(function (roles) {
                 roles = Array.isArray(roles) ? roles : [];
                 var rows = roles.map(function (r) {
                     return '<tr>'
-                        + '<td>' + code(r.key) + '</td>'
+                        + '<td class="mono cell-key">' + esc(r.key) + '</td>'
                         + '<td>' + esc(r.name) + '</td>'
-                        + '<td>' + (r.isSystem ? badge("system") : badge("custom")) + '</td>'
-                        + '<td>' + (r.permissions || []).length + '</td>'
-                        + '<td class="muted">' + esc(truncate((r.permissions || []).join(", "), 80)) + '</td>'
+                        + '<td>' + (r.isSystem ? '<span class="badge info">system</span>' : '<span class="badge purple">custom</span>') + '</td>'
+                        + '<td class="num">' + (r.permissions || []).length + '</td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate((r.permissions || []).join(", "), 70)) + '</span></td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = '<h1>Roles</h1>'
-                    + '<p class="muted">System roles are immutable. Create a custom role by cloning a system template via <code>POST /api/admin/roles</code>.</p>'
-                    + '<div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Key</th><th>Name</th><th>Kind</th><th>Permissions</th><th>Sample</th></tr></thead>'
-                    + '<tbody>' + rows + '</tbody></table></div>';
+                var body = roles.length
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:120px">Key</th><th>Name</th>'
+                        + '<th style="width:90px">Kind</th><th style="width:110px">Permissions</th><th>Sample</th></tr></thead>'
+                        + '<tbody>' + rows + '</tbody></table></div>'
+                    : '<div class="empty"><p>No roles.</p></div>';
+                viewEl.innerHTML = listPageShell("Roles", sub, body);
+                hydrateIcons(viewEl);
             })
             .catch(handleErrOnView("Roles"));
+    }
+
+    // ============================================================
+    // Groups (Access): bundle users for a single role assignment
+    // ============================================================
+    function renderGroupList() {
+        viewEl.innerHTML = listPageShell("Groups", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/groups")
+            .then(function (groups) {
+                groups = Array.isArray(groups) ? groups : [];
+                var rows = groups.map(function (g) {
+                    return '<tr data-key="' + esc(g.key) + '">'
+                        + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(g.key) + '</span>'
+                        + '<span class="cell-name">' + esc(g.name || "") + '</span></div></td>'
+                        + '<td class="num">' + ((g.memberUserIds || []).length) + '</td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate(g.description || "", 60)) + '</span></td>'
+                        + '<td class="mono cell-modified">' + (formatDate(g.updatedAt) || "—") + '</td>'
+                        + '</tr>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Groups</h1>',
+                    '  <span class="sub">Bundle users so a single role assignment grants a role to every member at once.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    groups.length
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Group</th><th>Members</th><th>Description</th><th>Modified</th></tr></thead><tbody class="grp-tbody">' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No groups yet. Create one on the right.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New group</h3>',
+                    '  <form id="grp-form" class="editor">',
+                    field("Key", '<input name="key" required placeholder="platform-team" />'),
+                    field("Name", '<input name="name" placeholder="Platform Team" />'),
+                    field("Description", '<input name="description" placeholder="optional" />'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create group</button><span class="save-msg" id="grp-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
+                ].join("\n");
+
+                var tbody = viewEl.querySelector(".grp-tbody");
+                if (tbody) {
+                    tbody.addEventListener("click", function (e) {
+                        if (e.target.closest("input, button, a")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/groups/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
+                document.getElementById("grp-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("grp-msg");
+                    setMessageOn(msg, "loading", "Creating…");
+                    api("POST", "/admin/groups", {
+                        key: f.key.value.trim(),
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                    }).then(function (g) { navigate("/groups/" + encodeURIComponent(g.key)); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Groups"));
+    }
+
+    function renderGroupDetail(key) {
+        viewEl.innerHTML = listPageShell("Group", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/groups/" + encodeURIComponent(key))
+            .then(function (g) {
+                var members = (g.memberUserIds || []).join("\n");
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
+                    '  <span class="sub">group <code>' + esc(g.key) + '</code> · ' + ((g.memberUserIds || []).length) + ' member(s)</span>',
+                    '</div><div class="actions"><button type="button" class="btn outline xs danger" data-grp="delete">Delete</button><span class="save-msg" id="grp-msg"></span></div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="grp-edit" class="editor card-pad">',
+                    field("Name", '<input name="name" value="' + esc(g.name || "") + '" />'),
+                    field("Description", '<input name="description" value="' + esc(g.description || "") + '" />'),
+                    field("Member user IDs", '<textarea name="members" rows="6" spellcheck="false" placeholder="one user GUID per line">' + esc(members) + '</textarea>'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '  <dt>Key</dt><dd class="mono">' + esc(g.key) + '</dd>',
+                    '  <dt>Members</dt><dd>' + ((g.memberUserIds || []).length) + '</dd>',
+                    '  <dt>Created</dt><dd>' + (formatDate(g.createdAt) || "—") + '</dd>',
+                    '  <dt>Updated</dt><dd>' + (formatDate(g.updatedAt) || "—") + '</dd>',
+                    '</dl></div></aside></div></div></div>',
+                ].join("\n");
+
+                var msg = document.getElementById("grp-msg");
+                document.getElementById("grp-edit").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var ids = f.members.value.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/groups/" + encodeURIComponent(key), {
+                        key: key,
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                        memberUserIds: ids,
+                    }).then(function () { setMessageOn(msg, "success", "Saved."); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+                viewEl.querySelector('[data-grp="delete"]').addEventListener("click", function () {
+                    if (!window.confirm("Delete group '" + key + "'? Role assignments targeting this group will stop granting access.")) { return; }
+                    api("DELETE", "/admin/groups/" + encodeURIComponent(key))
+                        .then(function () { navigate("/groups"); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Group: " + key));
+    }
+
+    // ============================================================
+    // API keys (Access): mint (token shown once) / list / revoke
+    // ============================================================
+    function apiKeyScopeBadge(scope) {
+        var v = scope === "AdminWrite" ? " purple" : " info";
+        return '<span class="badge' + v + '">' + esc(scope) + '</span>';
+    }
+
+    function renderApiKeyList() {
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("API keys"); return; }
+        var envKey = currentEnv.key;
+        viewEl.innerHTML = [
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>API keys</h1>',
+            '  <span class="sub">Bearer tokens scoped to <code>' + esc(envKey) + '</code>. The plaintext token is shown exactly once, at creation; only an Argon2id hash is stored.</span>',
+            '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+            '  <div id="apikey-reveal"></div>',
+            '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="8" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
+            '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Mint key</h3>',
+            '  <form id="apikey-form" class="editor">',
+            field("Name", '<input name="name" required placeholder="ci-pipeline" />'),
+            field("Scope", '<select name="scope"><option value="AdminWrite">AdminWrite</option><option value="SdkRead">SdkRead</option></select>'),
+            field("Bind to user", '<input name="user" placeholder="optional identifier, e.g. alice@example.com" />'),
+            '  <div class="editor__footer"><button type="submit" class="btn primary">Mint key</button><span class="save-msg" id="apikey-msg"></span></div>',
+            '  </form>',
+            '</div></aside></div></div></div>',
+        ].join("\n");
+        hydrateIcons(viewEl);
+
+        var tbody = document.getElementById("apikey-tbody");
+        function paint(keys) {
+            keys = Array.isArray(keys) ? keys : [];
+            if (!keys.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No API keys in this environment yet. Mint one on the right.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = keys.map(function (k) {
+                var status = k.revoked
+                    ? '<span class="badge danger">revoked</span>'
+                    : '<span class="badge success"><span class="dot"></span>active</span>';
+                return '<tr>'
+                    + '<td>' + esc(k.name) + '</td>'
+                    + '<td>' + code(k.prefix) + '</td>'
+                    + '<td>' + apiKeyScopeBadge(k.scope) + '</td>'
+                    + '<td class="mono">' + (k.userId ? esc(truncate(k.userId, 8)) : '<span class="muted">—</span>') + '</td>'
+                    + '<td>' + status + '</td>'
+                    + '<td class="mono cell-modified">' + (formatDate(k.createdAt) || "—") + '</td>'
+                    + '<td class="mono cell-modified">' + (k.lastUsedAt ? formatDate(k.lastUsedAt) : '<span class="muted">never</span>') + '</td>'
+                    + '<td class="col-actions">' + (k.revoked ? "" : '<button type="button" class="btn outline xs danger" data-revoke="' + esc(k.id) + '">Revoke</button>') + '</td>'
+                    + '</tr>';
+            }).join("");
+            Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var id = btn.getAttribute("data-revoke");
+                    if (!window.confirm("Revoke this API key? Requests using it start failing immediately.")) { return; }
+                    api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/revoke")
+                        .then(refresh)
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } window.alert(err.message); });
+                });
+            });
+        }
+        function refresh() {
+            return api("GET", "/admin/apikeys?environmentKey=" + encodeURIComponent(envKey))
+                .then(paint)
+                .catch(handleErrOnView("API keys"));
+        }
+
+        refresh();
+        document.getElementById("apikey-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("apikey-msg");
+            setMessageOn(msg, "loading", "Minting…");
+            api("POST", "/admin/apikeys", {
+                name: f.name.value.trim(),
+                scope: f.scope.value,
+                userIdentifier: f.user.value.trim() || null,
+                environmentKey: envKey,
+            }).then(function (res) {
+                var reveal = document.getElementById("apikey-reveal");
+                if (reveal) {
+                    reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
+                        + '<strong>Copy this token now — it will not be shown again.</strong>'
+                        + '<pre class="cr-json" style="margin:8px 0 0">' + esc(res.token) + '</pre></div>';
+                }
+                setMessageOn(msg, "success", "Minted.");
+                f.reset();
+                return refresh();
+            }).catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
     }
 
     // ============================================================
     // Experiments (M9): list, detail with analytics + bar charts
     // ============================================================
     function experimentStatus(exp) {
-        if (exp.isActive) { return '<span class="preview-reason preview-reason--TargetingMatch">running</span>'; }
-        if (exp.stoppedAt) { return '<span class="preview-reason preview-reason--Disabled">stopped</span>'; }
-        return '<span class="preview-reason preview-reason--Default">draft</span>';
+        if (exp.isActive) { return '<span class="badge success"><span class="dot"></span>running</span>'; }
+        if (exp.stoppedAt) { return '<span class="badge">stopped</span>'; }
+        return '<span class="badge warn">draft</span>';
     }
 
     function renderExperimentList() {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>Experiments</h1><div class="placeholder"><p>No environment selected yet.</p></div>';
-            return;
-        }
-        viewEl.innerHTML = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        var sub = "A/B experiments layered on a flag. Start one to collect exposures; track conversions via <code>IEventClient.TrackAsync</code>.";
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Experiments"); return; }
+        viewEl.innerHTML = listPageShell("Experiments", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/experiments?env=" + encodeURIComponent(currentEnv.key))
             .then(function (rows) {
                 rows = Array.isArray(rows) ? rows : [];
-                var heading = '<h1>Experiments <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>'
-                    + '<p class="muted">A/B experiments layered on a flag. Start one to begin collecting exposures; track conversions via <code>IEventClient.TrackAsync</code>.</p>';
+                var body;
                 if (rows.length === 0) {
-                    viewEl.innerHTML = heading + '<div class="placeholder"><p>No experiments in this environment yet.</p><p class="muted">Create one via <code>POST /api/admin/experiments</code>.</p></div>';
-                    return;
+                    body = '<div class="empty"><p>No experiments in this environment yet.</p></div>';
+                } else {
+                    var trs = rows.map(function (e) {
+                        return '<tr data-key="' + esc(e.key) + '">'
+                            + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(e.key) + '</span><span class="cell-name">' + esc(e.name || "") + '</span></div></td>'
+                            + '<td class="mono">' + esc(e.flagKey) + '</td>'
+                            + '<td>' + experimentStatus(e) + '</td>'
+                            + '<td class="num">' + (e.metricKeys || []).length + '</td>'
+                            + '<td class="mono cell-modified">' + (e.startedAt ? formatDate(e.startedAt) : "—") + '</td>'
+                            + '</tr>';
+                    }).join("");
+                    body = '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key / Name</th><th>Flag</th>'
+                        + '<th style="width:90px">Status</th><th style="width:80px">Metrics</th><th style="width:140px">Started</th></tr></thead>'
+                        + '<tbody class="list-tbody">' + trs + '</tbody></table></div>';
                 }
-                var body = rows.map(function (e) {
-                    return '<tr>'
-                        + '<td><a data-link="/experiments/' + encodeURIComponent(e.key) + '">' + code(e.key) + '</a></td>'
-                        + '<td>' + esc(e.name) + '</td>'
-                        + '<td>' + code(e.flagKey) + '</td>'
-                        + '<td>' + experimentStatus(e) + '</td>'
-                        + '<td>' + (e.metricKeys || []).length + '</td>'
-                        + '<td>' + (e.startedAt ? formatDate(e.startedAt) : '<span class="muted">—</span>') + '</td>'
-                        + '</tr>';
-                }).join("");
-                viewEl.innerHTML = heading
-                    + '<div class="table-wrap"><table class="table">'
-                    + '<thead><tr><th>Key</th><th>Name</th><th>Flag</th><th>Status</th><th>Metrics</th><th>Started</th></tr></thead>'
-                    + '<tbody>' + body + '</tbody></table></div>';
+                viewEl.innerHTML = listPageShell("Experiments", sub, body);
+                hydrateIcons(viewEl);
+                var tb = viewEl.querySelector(".list-tbody");
+                if (tb) {
+                    tb.addEventListener("click", function (e) {
+                        if (e.target.closest("a, button, input")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/experiments/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
             })
             .catch(handleErrOnView("Experiments"));
     }
@@ -840,35 +1603,35 @@
             var exp = res[0];
             var analytics = res[1];
             var startStop = exp.isActive
-                ? '<button type="button" class="btn-ghost" data-exp="stop">Stop experiment</button>'
-                : '<button type="button" class="btn-primary" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + ' experiment</button>';
+                ? '<button type="button" class="btn outline xs" data-exp="stop">Stop</button>'
+                : '<button type="button" class="btn primary xs" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + '</button>';
 
             viewEl.innerHTML = [
-                '<a data-link="/experiments" class="back-link">← Experiments</a>',
-                '<h1>' + code(exp.key) + ' <span class="muted">/ ' + esc(currentEnv.key) + '</span></h1>',
-                '<div class="card"><dl class="preview-result__dl">',
-                '  <dt>Name</dt><dd>' + esc(exp.name) + '</dd>',
-                exp.hypothesis ? '  <dt>Hypothesis</dt><dd>' + esc(exp.hypothesis) + '</dd>' : '',
-                '  <dt>Flag</dt><dd><a data-link="/flags/' + encodeURIComponent(exp.flagKey) + '">' + code(exp.flagKey) + '</a></dd>',
+                '<div class="page"><div class="page-head"><div class="title-wrap"><h1 class="mono">' + esc(exp.key) + '</h1>',
+                '  <span class="sub">' + esc(exp.name || "") + ' · flag <code>' + esc(exp.flagKey) + '</code> · ' + esc(currentEnv.key) + '</span>',
+                '</div><div class="actions">' + experimentStatus(exp) + startStop + '<span class="save-msg" id="exp-msg"></span></div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <div class="card-pad"><h2>Analytics</h2>' + renderExperimentAnalytics(exp, analytics) + '</div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Setup</h3><dl class="side-dl">',
+                '  <dt>Flag</dt><dd><a class="mono" data-link="/flags/' + encodeURIComponent(exp.flagKey) + '" href="' + esc(mountPath) + '/flags/' + encodeURIComponent(exp.flagKey) + '">' + esc(exp.flagKey) + '</a></dd>',
                 '  <dt>Status</dt><dd>' + experimentStatus(exp) + '</dd>',
-                '  <dt>Sticky</dt><dd>' + (exp.stickyAssignments ? "yes — subjects keep their first variant" : "no") + '</dd>',
-                '  <dt>Metric keys</dt><dd>' + ((exp.metricKeys || []).length ? (exp.metricKeys).map(function (m) { return code(m); }).join(" ") : '<span class="muted">none</span>') + '</dd>',
-                '  <dt>Started</dt><dd>' + (exp.startedAt ? formatDate(exp.startedAt) : '<span class="muted">—</span>') + '</dd>',
-                '  <dt>Stopped</dt><dd>' + (exp.stoppedAt ? formatDate(exp.stoppedAt) : '<span class="muted">—</span>') + '</dd>',
+                '  <dt>Sticky</dt><dd>' + (exp.stickyAssignments ? "yes" : "no") + '</dd>',
+                '  <dt>Metrics</dt><dd>' + (exp.metricKeys || []).length + '</dd>',
+                '  <dt>Started</dt><dd>' + (exp.startedAt ? formatDate(exp.startedAt) : "—") + '</dd>',
+                '  <dt>Stopped</dt><dd>' + (exp.stoppedAt ? formatDate(exp.stoppedAt) : "—") + '</dd>',
                 '</dl>',
-                '<div class="cr-actions">' + startStop + '<span class="save-msg" id="exp-msg"></span></div>',
-                '</div>',
-                '<h2>Analytics</h2>',
-                renderExperimentAnalytics(exp, analytics),
+                exp.hypothesis ? '<p class="muted" style="font-size:11px;margin:10px 0 0">' + esc(exp.hypothesis) + '</p>' : '',
+                '</div></aside></div></div></div>',
             ].join("\n");
 
             wireExperimentDetail(exp);
+            hydrateIcons(viewEl);
         }).catch(handleErrOnView("Experiment: " + key));
     }
 
     function renderExperimentAnalytics(exp, a) {
         if (!a || !a.variants || a.variants.length === 0) {
-            return '<div class="placeholder"><p>No exposures recorded yet.</p>'
+            return '<div class="empty"><p>No exposures recorded yet.</p>'
                 + '<p class="muted">' + (exp.isActive ? "Evaluate the flag from an SDK client to start collecting data." : "Start the experiment to begin collecting exposures.") + '</p></div>';
         }
 
@@ -938,44 +1701,72 @@
     // ============================================================
     // Approval workflow (M8): Inbox, change detail, policy editor
     // ============================================================
+    function inboxChangeCard(c) {
+        var approvals = (c.approvals || []).length;
+        var statusLine = approvals + ' approval' + (approvals === 1 ? '' : 's') + ' so far';
+        return '<div class="inbox-card urgent" data-cr="' + esc(c.id) + '">'
+            + '<span class="ic info"><span class="ti-slot" data-ti="git-pull-request"></span></span>'
+            + '<div class="main">'
+            + '  <div class="row1"><span class="title">' + esc(c.action || "Change") + '<span class="key">' + esc(c.entityKey || "") + '</span></span>'
+            + (c.entityType ? '<span class="badge sq">' + esc(c.entityType) + '</span>' : '') + '</div>'
+            + '  <div class="row2"><span>' + code(truncate(c.authorUserId || "—", 8)) + '</span><span class="dot-sep"></span>'
+            + '<span>' + (formatDate(c.createdAt) || "—") + '</span></div>'
+            + '  <div class="status-line"><span class="ti-slot" data-ti="clock"></span>' + esc(statusLine) + '</div>'
+            + '</div>'
+            + '<div class="actions"><a class="btn outline xs" data-link="/inbox/' + encodeURIComponent(c.id) + '">Review</a></div>'
+            + '</div>';
+    }
+    function inboxUpgradeCard(u) {
+        return '<div class="inbox-card mine">'
+            + '<span class="ic purple"><span class="ti-slot" data-ti="user-shield"></span></span>'
+            + '<div class="main">'
+            + '  <div class="row1"><span class="title">Role upgrade<span class="key">' + esc(truncate(u.userId || "", 12)) + '</span></span>'
+            + '<span class="badge warn">pending</span></div>'
+            + '  <div class="row2"><span>' + esc(truncate(u.justification || "No justification", 80)) + '</span><span class="dot-sep"></span>'
+            + '<span>' + (formatDate(u.createdAt) || "—") + '</span></div>'
+            + '</div></div>';
+    }
+    function inboxGroup(label, count, cardsHtml, emptyText) {
+        return '<div class="inbox-group">'
+            + '<div class="inbox-group-head">' + esc(label) + ' <span class="count">' + count + '</span></div>'
+            + (cardsHtml || '<div class="empty" style="padding:18px"><p class="muted">' + esc(emptyText) + '</p></div>')
+            + '</div>';
+    }
     function renderInbox() {
-        viewEl.innerHTML = '<h1>Inbox</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
+            '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
             api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
         ]).then(function (res) {
             var changes = Array.isArray(res[0]) ? res[0] : [];
             var upgrades = Array.isArray(res[1]) ? res[1] : [];
-
-            var changeRows = changes.map(function (c) {
-                return '<tr>'
-                    + '<td><a data-link="/inbox/' + encodeURIComponent(c.id) + '">' + badge(c.entityType) + ' ' + code(c.entityKey) + '</a></td>'
-                    + '<td>' + esc(c.action) + '</td>'
-                    + '<td>' + (c.approvals || []).length + ' approval(s)</td>'
-                    + '<td>' + formatDate(c.createdAt) + '</td>'
-                    + '</tr>';
-            }).join("");
-
-            var upgradeRows = upgrades.map(function (u) {
-                return '<tr><td>' + code(truncate(u.userId, 8)) + '</td><td>' + esc(u.justification || "—") + '</td><td>' + formatDate(u.createdAt) + '</td></tr>';
-            }).join("");
-
-            viewEl.innerHTML = [
-                '<h1>Inbox</h1>',
-                '<h2>Pending changes <span class="muted">(' + changes.length + ')</span></h2>',
-                changeRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Entity</th><th>Action</th><th>Approvals</th><th>Proposed</th></tr></thead><tbody>' + changeRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No pending changes.</p></div>',
-                '<h2>Role upgrade requests <span class="muted">(' + upgrades.length + ')</span></h2>',
-                upgradeRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Justification</th><th>Filed</th></tr></thead><tbody>' + upgradeRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No pending role upgrade requests.</p></div>',
-            ].join("\n");
+            var body = [
+                inboxGroup("Awaiting your approval", changes.length, changes.map(inboxChangeCard).join(""), "Nothing awaiting approval."),
+                inboxGroup("Role upgrade requests", upgrades.length, upgrades.map(inboxUpgradeCard).join(""), "No pending role-upgrade requests."),
+            ].join("");
+            viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
+                '<div class="inbox-list">' + body + '</div>');
+            hydrateIcons(viewEl);
+            var list = viewEl.querySelector(".inbox-list");
+            if (list) {
+                list.addEventListener("click", function (e) {
+                    if (e.target.closest("a, button")) { return; }
+                    var card = e.target.closest(".inbox-card[data-cr]");
+                    if (card) { navigate("/inbox/" + encodeURIComponent(card.getAttribute("data-cr"))); }
+                });
+            }
         }).catch(handleErrOnView("Inbox"));
     }
 
+    function crStatusBadge(status) {
+        var s = String(status == null ? "" : status);
+        var v = (s === "Approved" || s === "Applied") ? " success" : (s === "Rejected" ? " danger" : (s === "Pending" ? " warn" : ""));
+        return '<span class="badge' + v + '">' + esc(s || "—") + '</span>';
+    }
+
     function renderChangeDetail(id) {
-        viewEl.innerHTML = '<a data-link="/inbox" class="back-link">← Inbox</a><h1>Change</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Change request", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/changes/" + encodeURIComponent(id))
             .then(function (c) {
                 var actions = changeActionButtons(c);
@@ -986,25 +1777,31 @@
                     return '<li>' + badge(a.decision) + ' ' + code(truncate(a.approverUserId, 8)) + (a.comment ? ' — ' + esc(a.comment) : '') + '</li>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<a data-link="/inbox" class="back-link">← Inbox</a>',
-                    '<h1>' + badge(c.entityType) + ' ' + code(c.entityKey) + '</h1>',
-                    '<div class="card"><dl class="preview-result__dl">',
-                    '  <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
-                    '  <dt>Status</dt><dd>' + '<span class="preview-reason preview-reason--' + esc(c.status) + '">' + esc(c.status) + '</span>' + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</dd>',
-                    '  <dt>Author</dt><dd>' + code(truncate(c.authorUserId, 8)) + '</dd>',
-                    c.authorMessage ? '  <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
-                    '</dl></div>',
-                    '<h2>Diff</h2>',
-                    '<div class="cr-diff">',
-                    '  <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
-                    '  <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
-                    '</div>',
-                    approvals ? '<h2>Approvals</h2><ul class="cr-approvals">' + approvals + '</ul>' : '',
-                    '<h2>Comments</h2>',
-                    '<div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
-                    '<form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn-ghost btn-small">Comment</button></form>',
-                    '<h2>Decision</h2>',
-                    '<div class="cr-actions">' + actions + '<span class="save-msg" id="cr-msg"></span></div>',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + badge(c.entityType) + ' <span class="mono">' + esc(c.entityKey) + '</span></h1>',
+                    '  <span class="sub">' + esc(c.action) + ' · authored by <code>' + esc(truncate(c.authorUserId, 8)) + '</code></span>',
+                    '</div><div class="actions">' + crStatusBadge(c.status) + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <div class="card-pad"><h2>Diff</h2><div class="cr-diff">',
+                    '    <div><h3 class="preview-h3">Current</h3><pre class="cr-json">' + esc(prettyJson(c.currentState)) + '</pre></div>',
+                    '    <div><h3 class="preview-h3">Proposed</h3><pre class="cr-json">' + esc(prettyJson(c.proposedState)) + '</pre></div>',
+                    '  </div></div>',
+                    '  <div class="card-pad"><h2>Comments</h2>',
+                    '    <div class="cr-comments">' + (comments || '<p class="muted">No comments yet.</p>') + '</div>',
+                    '    <form id="cr-comment-form" class="cr-actions"><input id="cr-comment" placeholder="Add a comment…" /><button type="submit" class="btn outline xs">Comment</button></form>',
+                    '  </div>',
+                    '</div><aside class="detail-side">',
+                    '  <div class="side-card"><h3 class="side-h">Decision</h3>',
+                    '    <div class="cr-actions">' + actions + '</div><span class="save-msg" id="cr-msg"></span>',
+                    '  </div>',
+                    '  <div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '    <dt>Status</dt><dd>' + crStatusBadge(c.status) + '</dd>',
+                    '    <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
+                    '    <dt>Entity</dt><dd>' + esc(c.entityType) + '</dd>',
+                    '    <dt>Author</dt><dd><code>' + esc(truncate(c.authorUserId, 8)) + '</code></dd>',
+                    c.authorMessage ? '    <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
+                    '  </dl></div>',
+                    approvals ? '  <div class="side-card"><h3 class="side-h">Approvals</h3><ul class="cr-approvals">' + approvals + '</ul></div>' : '',
+                    '</aside></div></div></div>',
                 ].join("\n");
                 wireChangeDetail(c);
             })
@@ -1014,14 +1811,14 @@
     function changeActionButtons(c) {
         var buttons = [];
         if (c.status === "Pending") {
-            buttons.push('<button type="button" class="btn-primary" data-cr="approve">Approve</button>');
-            buttons.push('<button type="button" class="btn-ghost" data-cr="reject">Reject</button>');
+            buttons.push('<button type="button" class="btn primary xs" data-cr="approve">Approve</button>');
+            buttons.push('<button type="button" class="btn outline xs" data-cr="reject">Reject</button>');
         }
         if (c.status === "Approved") {
-            buttons.push('<button type="button" class="btn-primary" data-cr="apply">Apply</button>');
+            buttons.push('<button type="button" class="btn primary xs" data-cr="apply">Apply</button>');
         }
         if (c.status === "Pending" || c.status === "Approved") {
-            buttons.push('<button type="button" class="btn-ghost" data-cr="bypass">Emergency bypass</button>');
+            buttons.push('<button type="button" class="btn outline xs danger" data-cr="bypass">Emergency bypass</button>');
         }
         return buttons.join(" ") || '<span class="muted">No actions available (' + esc(c.status) + ').</span>';
     }
@@ -1072,28 +1869,28 @@
     }
 
     function renderApprovalsEditor() {
-        if (!currentEnv) {
-            viewEl.innerHTML = '<h1>Approvals</h1><div class="placeholder"><p>No environment selected.</p></div>';
-            return;
-        }
+        if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Approval policy"); return; }
         var envKey = currentEnv.key;
-        viewEl.innerHTML = '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Approval policy", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/approval-policies/" + encodeURIComponent(envKey))
             .then(function (p) {
                 var rules = (p.approverRules || []).map(function (r) {
-                    return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' min ' + (r.minFromThisRule || 1) + '</li>';
+                    return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' · min ' + (r.minFromThisRule || 1) + '</li>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<h1>Approvals <span class="muted">/ ' + esc(envKey) + '</span></h1>',
-                    '<p class="muted">When approval is required, mutations to this environment become pending changes that need sign-off before they apply.</p>',
-                    '<form id="policy-form" class="editor">',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Approval policy</h1>',
+                    '  <span class="sub">When approval is required, mutations to <code>' + esc(envKey) + '</code> become pending changes that need sign-off before they apply.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="policy-form" class="editor card-pad">',
                     field("Require approval", '<label class="check"><input type="checkbox" name="required"' + (p.required ? " checked" : "") + ' /> Mutations require approval</label>'),
                     field("Minimum approvals", '<input name="minApprovals" type="number" min="1" value="' + esc(p.minApprovals || 1) + '" />'),
                     field("Self-approval", '<label class="check"><input type="checkbox" name="self"' + (p.authorCanApproveOwnChange ? " checked" : "") + ' /> Author may approve their own change</label>'),
                     field("Emergency bypass", '<label class="check"><input type="checkbox" name="bypass"' + (p.allowEmergencyBypass ? " checked" : "") + ' /> Allow emergency bypass</label>'),
-                    '<div class="editor__footer"><button type="submit" class="btn-primary">Save policy</button><span class="save-msg" id="policy-msg"></span></div>',
-                    '</form>',
-                    rules ? '<h2>Approver rules</h2><ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted">No structured approver rules — a flat minimum-approvals count applies.</p>',
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save policy</button><span class="save-msg" id="policy-msg"></span></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Approver rules</h3>',
+                    rules ? '<ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted" style="font-size:12px">No structured approver rules — a flat minimum-approvals count applies.</p>',
+                    '</div></aside></div></div></div>',
                 ].join("\n");
                 document.getElementById("policy-form").addEventListener("submit", function (e) {
                     e.preventDefault();
@@ -1123,12 +1920,12 @@
     // Webhooks + Audit log (M10)
     // ============================================================
     function deliveryStatusBadge(status) {
-        var cls = status === "Succeeded" ? "TargetingMatch" : (status === "Dead" ? "NotFound" : "Default");
-        return '<span class="preview-reason preview-reason--' + cls + '">' + esc(status) + '</span>';
+        var v = status === "Succeeded" ? " success" : (status === "Dead" ? " danger" : " warn");
+        return '<span class="badge' + v + '">' + esc(status) + '</span>';
     }
 
     function renderWebhookList() {
-        viewEl.innerHTML = '<h1>Webhooks</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Webhooks", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/webhooks")
             .then(function (hooks) {
                 hooks = Array.isArray(hooks) ? hooks : [];
@@ -1137,24 +1934,26 @@
                     return '<tr>'
                         + '<td><a data-link="/webhooks/' + encodeURIComponent(w.id) + '">' + esc(w.name) + '</a></td>'
                         + '<td>' + code(truncate(w.url, 48)) + '</td>'
-                        + '<td>' + (w.enabled ? '<span class="dot dot--on"></span> on' : '<span class="dot dot--off"></span> off') + '</td>'
+                        + '<td>' + (w.enabled ? '<span class="badge success"><span class="dot"></span>on</span>' : '<span class="badge">off</span>') + '</td>'
                         + '<td>' + types + '</td>'
                         + '</tr>';
                 }).join("");
                 viewEl.innerHTML = [
-                    '<h1>Webhooks</h1>',
-                    '<p class="muted">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</p>',
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Webhooks</h1>',
+                    '  <span class="sub">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
                     hooks.length
-                        ? '<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                        : '<div class="placeholder"><p>No webhooks yet.</p></div>',
-                    '<h2>New webhook</h2>',
-                    '<form id="wh-form" class="editor">',
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No webhooks yet. Create one on the right.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New webhook</h3>',
+                    '  <form id="wh-form" class="editor">',
                     field("Name", '<input name="name" required placeholder="Slack relay" />'),
                     field("URL", '<input name="url" required placeholder="https://example.com/hook" />'),
                     field("Event types", '<input name="eventTypes" placeholder="flag.updated, change.applied (blank = all)" />'),
                     field("Secret", '<input name="secret" placeholder="(blank = auto-generate)" />'),
-                    '<div class="editor__footer"><button type="submit" class="btn-primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
-                    '</form>',
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
                 ].join("\n");
 
                 document.getElementById("wh-form").addEventListener("submit", function (e) {
@@ -1175,7 +1974,7 @@
     }
 
     function renderWebhookDetail(id) {
-        viewEl.innerHTML = '<a data-link="/webhooks" class="back-link">← Webhooks</a><h1>Webhook</h1><div class="card"><p class="muted">Loading…</p></div>';
+        viewEl.innerHTML = listPageShell("Webhook", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         Promise.all([
             api("GET", "/admin/webhooks/" + encodeURIComponent(id)),
             api("GET", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries").catch(function () { return []; }),
@@ -1186,33 +1985,41 @@
                 return '<tr>'
                     + '<td>' + code(d.eventType) + '</td>'
                     + '<td>' + deliveryStatusBadge(d.status) + '</td>'
-                    + '<td>' + (d.attemptCount || 0) + '</td>'
-                    + '<td>' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
+                    + '<td class="num">' + (d.attemptCount || 0) + '</td>'
+                    + '<td class="num">' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
                     + '<td class="muted">' + esc(truncate(d.lastError || "", 48)) + '</td>'
                     + '<td>' + formatDate(d.createdAt) + '</td>'
                     + '</tr>';
             }).join("");
 
             viewEl.innerHTML = [
-                '<a data-link="/webhooks" class="back-link">← Webhooks</a>',
-                '<h1>' + esc(w.name) + '</h1>',
-                '<form id="wh-edit" class="editor">',
+                '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(w.name) + '</h1>',
+                '  <span class="sub">' + (w.enabled ? '<span class="badge success"><span class="dot"></span>enabled</span>' : '<span class="badge">disabled</span>') + ' · ' + code(truncate(w.url, 56)) + '</span>',
+                '</div><div class="actions">',
+                '  <button type="button" class="btn outline xs" data-wh="test">Send test event</button>',
+                '  <button type="button" class="btn outline xs danger" data-wh="delete">Delete</button>',
+                '  <span class="save-msg" id="wh-msg"></span>',
+                '</div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <form id="wh-edit" class="editor card-pad">',
                 field("Name", '<input name="name" required value="' + esc(w.name) + '" />'),
                 field("URL", '<input name="url" required value="' + esc(w.url) + '" />'),
                 field("Enabled", '<label class="check"><input type="checkbox" name="enabled"' + (w.enabled ? " checked" : "") + ' /> Deliver events</label>'),
                 field("Event types", '<input name="eventTypes" value="' + esc((w.eventTypes || []).join(", ")) + '" placeholder="(blank = all)" />'),
                 field("Secret", '<input name="secret" value="' + esc(w.secret || "") + '" />'),
-                '<div class="editor__footer">',
-                '  <button type="submit" class="btn-primary">Save</button>',
-                '  <button type="button" class="btn-ghost" data-wh="test">Send test event</button>',
-                '  <button type="button" class="btn-ghost btn-danger" data-wh="delete">Delete</button>',
-                '  <span class="save-msg" id="wh-msg"></span>',
-                '</div>',
-                '</form>',
-                '<h2>Recent deliveries</h2>',
+                '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                '  </form>',
+                '  <div class="card-pad"><h2>Recent deliveries</h2>',
                 deliveryRows
-                    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
-                    : '<div class="placeholder"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
+                    : '<div class="empty"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
+                '  </div>',
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                '  <dt>Status</dt><dd>' + (w.enabled ? "enabled" : "disabled") + '</dd>',
+                '  <dt>Events</dt><dd>' + ((w.eventTypes || []).length ? esc((w.eventTypes).join(", ")) : "all events") + '</dd>',
+                '  <dt>Deliveries</dt><dd>' + deliveries.length + '</dd>',
+                '  <dt>Created</dt><dd>' + (formatDate(w.createdAt) || "—") + '</dd>',
+                '</dl></div></aside></div></div></div>',
             ].join("\n");
 
             var msg = document.getElementById("wh-msg");
@@ -1248,24 +2055,30 @@
     }
 
     function renderSettings() {
-        viewEl.innerHTML = '<h1>Settings</h1><h2>Environments</h2><div id="env-settings"><div class="card"><p class="muted">Loading…</p></div></div>';
+        viewEl.innerHTML = [
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Settings</h1>',
+            '  <span class="sub">Environment-level controls. A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</span>',
+            '</div></div><div class="page-body tight">',
+            '  <h2>Environments</h2>',
+            '  <div id="env-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '</div></div>',
+        ].join("\n");
         api("GET", "/admin/environments").then(function (envs) {
             envs = Array.isArray(envs) ? envs : [];
             var rows = envs.map(function (e) {
                 var frozen = e.readOnly;
                 var action = frozen ? "unlock" : "lock";
                 var label = frozen ? "Unlock" : "Lock (freeze)";
-                var btnClass = frozen ? "btn-primary" : "btn-ghost btn-danger";
+                var btnClass = frozen ? "btn primary xs" : "btn outline xs danger";
                 return '<tr>'
                     + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
                     + '<td>' + esc(e.name) + '</td>'
-                    + '<td>' + (frozen ? '<span class="preview-reason preview-reason--Disabled">read-only</span>' : '<span class="dot dot--on"></span> writable') + '</td>'
-                    + '<td><button type="button" class="' + btnClass + ' btn-small" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
+                    + '<td>' + (frozen ? '<span class="badge danger">read-only</span>' : '<span class="badge success"><span class="dot"></span>writable</span>') + '</td>'
+                    + '<td><button type="button" class="' + btnClass + '" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
                     + '</tr>';
             }).join("");
             document.getElementById("env-settings").innerHTML = [
-                '<p class="muted">A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</p>',
-                '<div class="table-wrap"><table class="table"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                 '<span class="save-msg" id="env-msg"></span>',
             ].join("\n");
 
@@ -1284,18 +2097,33 @@
         }).catch(handleErrOnView("Settings"));
     }
 
+    function auditIcon(entityType) {
+        switch (String(entityType == null ? "" : entityType)) {
+            case "Flag": return "flag";
+            case "Config": return "sliders";
+            case "Segment": return "segment";
+            case "Webhook": return "webhook";
+            case "Role": return "shield";
+            case "User": return "user";
+            case "ApiKey": return "user-shield";
+            default: return "scroll";
+        }
+    }
     function renderAuditLog() {
         viewEl.innerHTML = [
-            '<h1>Audit log</h1>',
+            '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Audit log</h1>',
+            '  <span class="sub">Every consequential action, newest first. Filter by entity, actor, or date.</span>',
+            '</div></div><div class="page-body tight">',
             '<form id="audit-filter" class="audit-filter">',
             '  <input name="entityType" placeholder="Entity type (e.g. Flag)" />',
             '  <input name="entityKey" placeholder="Entity key" />',
             '  <input name="actor" placeholder="Actor" />',
             '  <input name="from" type="date" title="From date" />',
             '  <input name="to" type="date" title="To date" />',
-            '  <button type="submit" class="btn-ghost btn-small">Filter</button>',
+            '  <button type="submit" class="btn outline xs">Filter</button>',
             '</form>',
-            '<div id="audit-results"><div class="card"><p class="muted">Loading…</p></div></div>',
+            '<div id="audit-results"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '</div></div>',
         ].join("\n");
 
         function load(filters) {
@@ -1310,18 +2138,21 @@
                 entries = Array.isArray(entries) ? entries : [];
                 var resultsEl = document.getElementById("audit-results");
                 if (entries.length === 0) {
-                    resultsEl.innerHTML = '<div class="placeholder"><p>No audit entries match.</p></div>';
+                    resultsEl.innerHTML = '<div class="empty"><p class="muted">No audit entries match.</p></div>';
                     return;
                 }
                 var rows = entries.map(function (a) {
-                    return '<tr>'
-                        + '<td>' + formatDate(a.at) + '</td>'
-                        + '<td>' + code(a.action) + '</td>'
-                        + '<td>' + badge(a.entityType) + ' ' + (a.entityKey ? code(truncate(a.entityKey, 24)) : '') + '</td>'
-                        + '<td>' + esc(a.actorIdentifier || "—") + '</td>'
-                        + '</tr>';
+                    var warn = /lock|bypass|drop|delete|revoke|bootstrap/i.test(a.action || "");
+                    return '<div class="audit-row' + (warn ? ' warn' : '') + '">'
+                        + '<span class="ts">' + (formatDate(a.at) || "—") + '</span>'
+                        + '<span class="ic"><span class="ti-slot" data-ti="' + auditIcon(a.entityType) + '"></span></span>'
+                        + '<span class="desc"><span class="who">' + esc(a.actorIdentifier || "—") + '</span> '
+                        + code(a.action) + (a.entityKey ? ' <span class="entity">' + esc(truncate(a.entityKey, 32)) + '</span>' : '') + '</span>'
+                        + (a.entityType ? '<span class="env-chip">' + esc(a.entityType) + '</span>' : '')
+                        + '</div>';
                 }).join("");
-                resultsEl.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Action</th><th>Entity</th><th>Actor</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+                resultsEl.innerHTML = '<div class="audit-list">' + rows + '</div>';
+                hydrateIcons(resultsEl);
             }).catch(handleErrOnView("Audit log"));
         }
 
@@ -1359,7 +2190,7 @@
             }).join("");
             var splitsHtml = '<div class="splits' + (hasSplits ? "" : " hidden") + '">'
                 + ((rule.outcome && rule.outcome.splits) || []).map(renderSplitRow).join("")
-                + '<button type="button" class="btn-ghost btn-small" data-action="add-split">+ Add split</button>'
+                + '<button type="button" class="btn outline xs" data-action="add-split">+ Add split</button>'
                 + '</div>';
             outcomeHtml =
                 '<div class="outcome">'
@@ -1386,7 +2217,7 @@
             + '</div>'
             + '<div class="rule-card__conditions">'
             + '  <div class="conditions-list">' + (rule.conditions || []).map(renderConditionRow).join("") + '</div>'
-            + '  <button type="button" class="btn-ghost btn-small" data-action="add-condition">+ Add condition</button>'
+            + '  <button type="button" class="btn outline xs" data-action="add-condition">+ Add condition</button>'
             + '</div>'
             + outcomeHtml
             + '</div>';
@@ -1504,9 +2335,9 @@
             + '</div>'
             + '<h3 class="preview-h3">Attributes</h3>'
             + '<div class="preview-attrs"></div>'
-            + '<button type="button" class="btn-ghost btn-small" data-action="preview-add-attr">+ Add attribute</button>'
+            + '<button type="button" class="btn outline xs" data-action="preview-add-attr">+ Add attribute</button>'
             + '<div class="preview-actions">'
-            + '  <button type="button" class="btn-primary" data-action="preview-eval">Evaluate</button>'
+            + '  <button type="button" class="btn primary" data-action="preview-eval">Evaluate</button>'
             + '  <span class="preview-msg muted"></span>'
             + '</div>'
             + '<div class="preview-result hidden"></div>'
@@ -1615,14 +2446,19 @@
     // ============================================================
     function boot() {
         if (!isAuthenticated()) { showAuthPrompt(); return; }
-        signOutBtn.hidden = false;
-        sessionLabel.hidden = false;
-        sessionLabel.textContent = "Signed in as " + (session.displayName || session.identifier);
+        var who = session.displayName || session.identifier || "Signed in";
+        if (sbUserName) { sbUserName.textContent = who; }
+        if (sbUserRole) { sbUserRole.textContent = session.identifier || "Admin"; }
+        if (sbAvatar) { sbAvatar.textContent = (who.charAt(0) || "F"); }
         loadEnvironments().then(render).catch(function (err) {
             if (err.kind === "auth") { showAuthPrompt(); }
             else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
         });
     }
+    // Fill the static shell icons and wire the theme toggle before first paint.
+    hydrateIcons();
+    initTheme();
+
     // Probe for an existing session before showing the login screen — a page
     // refresh shouldn't make the user re-paste their key.
     probeSession().then(function (ok) { ok ? boot() : showAuthPrompt(); });

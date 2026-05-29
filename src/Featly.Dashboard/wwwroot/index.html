@@ -11,52 +11,81 @@
 <body>
     <a class="skip-link" href="#main">Skip to main content</a>
 
-    <header class="app-header">
-        <div class="app-header__brand">
-            <span class="brand-mark" aria-hidden="true"></span>
-            <span class="brand-name">Featly</span>
-            <span class="brand-version" id="brand-version">preview</span>
+    <div class="app" id="app-root">
+        <!-- Sidebar: grouped nav. Items with a route exist today; more groups
+             (Organization / extra Access / Platform items) arrive with their
+             screens in a later step. -->
+        <aside class="sidebar" aria-label="Primary">
+            <div class="sb-head">
+                <span class="mark" aria-hidden="true">F</span>
+                <span class="name">Featly</span>
+            </div>
+            <nav class="sb-scroll" aria-label="Primary navigation">
+                <a class="sb-item" href="__MOUNT_PATH__/" data-route="/"><span class="ti-slot" data-ti="home"></span><span class="lbl">Overview</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/inbox" data-route="/inbox"><span class="ti-slot" data-ti="inbox"></span><span class="lbl">Inbox</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/flags" data-route="/flags"><span class="ti-slot" data-ti="flag"></span><span class="lbl">Flags</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/configs" data-route="/configs"><span class="ti-slot" data-ti="sliders"></span><span class="lbl">Configs</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/segments" data-route="/segments"><span class="ti-slot" data-ti="segment"></span><span class="lbl">Segments</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/experiments" data-route="/experiments"><span class="ti-slot" data-ti="flask"></span><span class="lbl">Experiments</span></a>
+
+                <div class="sb-section">Access</div>
+                <a class="sb-item" href="__MOUNT_PATH__/users" data-route="/users"><span class="ti-slot" data-ti="users"></span><span class="lbl">Users</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/groups" data-route="/groups"><span class="ti-slot" data-ti="layers"></span><span class="lbl">Groups</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/roles" data-route="/roles"><span class="ti-slot" data-ti="shield"></span><span class="lbl">Roles</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/apikeys" data-route="/apikeys"><span class="ti-slot" data-ti="key"></span><span class="lbl">API keys</span></a>
+
+                <div class="sb-section">Platform</div>
+                <a class="sb-item" href="__MOUNT_PATH__/webhooks" data-route="/webhooks"><span class="ti-slot" data-ti="webhook"></span><span class="lbl">Webhooks</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/approvals" data-route="/approvals"><span class="ti-slot" data-ti="git-pull-request"></span><span class="lbl">Approval policies</span></a>
+
+                <div class="sb-section">System</div>
+                <a class="sb-item" href="__MOUNT_PATH__/audit" data-route="/audit"><span class="ti-slot" data-ti="scroll"></span><span class="lbl">Audit log</span></a>
+                <a class="sb-item" href="__MOUNT_PATH__/settings" data-route="/settings"><span class="ti-slot" data-ti="settings"></span><span class="lbl">Settings</span></a>
+            </nav>
+            <div class="sb-foot">
+                <div class="sb-user" id="sb-user" role="button" tabindex="0" aria-label="Account">
+                    <span class="avatar" id="sb-avatar" aria-hidden="true">·</span>
+                    <span class="info">
+                        <span class="name" id="sb-user-name">Not signed in</span>
+                        <span class="role" id="sb-user-role">—</span>
+                    </span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Content column: sticky topbar + scrolling main. -->
+        <div class="app-content">
+            <header class="topbar">
+                <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+
+                <label class="env-pill dev" id="env-pill" title="Environment">
+                    <span class="pip" aria-hidden="true"></span>
+                    <span class="label">env</span>
+                    <select class="env-select" id="env-select" aria-label="Environment" disabled>
+                        <option>development</option>
+                    </select>
+                    <span class="ti-slot" data-ti="chevron-down" aria-hidden="true"></span>
+                </label>
+                <span class="locked-badge" id="env-lock" hidden><span class="ti-slot" data-ti="lock"></span>LOCKED</span>
+
+                <button class="global-search" id="global-search" type="button" aria-label="Search (Command-K)">
+                    <span class="ti-slot" data-ti="search" aria-hidden="true"></span>
+                    <span class="ph">Search flags, configs, segments…</span>
+                    <span class="kbd">⌘K</span>
+                </button>
+
+                <div class="tb-right">
+                    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"><span class="ti-slot" data-ti="sun"></span></button>
+                    <button class="icon-btn" id="notif-btn" type="button" aria-label="Notifications" title="Notifications"><span class="ti-slot" data-ti="bell"></span></button>
+                    <button class="icon-btn" id="account-btn" type="button" aria-label="Account" title="Sign out"><span class="ti-slot" data-ti="user"></span></button>
+                </div>
+            </header>
+
+            <main class="app-main" id="main" tabindex="-1">
+                <div id="view" class="view" role="region" aria-live="polite"></div>
+            </main>
         </div>
-        <nav class="app-header__env" aria-label="Environment selector">
-            <label class="env-label" for="env-select">Environment</label>
-            <select class="env-select" id="env-select" disabled>
-                <option>development</option>
-            </select>
-        </nav>
-    </header>
-
-    <div class="app-shell">
-        <nav class="app-sidebar" aria-label="Primary">
-            <ul class="nav">
-                <li><a class="nav__link" href="__MOUNT_PATH__/" data-route="/">Overview</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/flags" data-route="/flags">Flags</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/configs" data-route="/configs">Configs</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/segments" data-route="/segments">Segments</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/experiments" data-route="/experiments">Experiments</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/users" data-route="/users">Users</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/roles" data-route="/roles">Roles</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/inbox" data-route="/inbox">Inbox</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/approvals" data-route="/approvals">Approvals</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/webhooks" data-route="/webhooks">Webhooks</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/audit" data-route="/audit">Audit log</a></li>
-                <li><a class="nav__link" href="__MOUNT_PATH__/settings" data-route="/settings">Settings</a></li>
-            </ul>
-        </nav>
-
-        <main class="app-main" id="main" tabindex="-1">
-            <div id="view" class="view" role="region" aria-live="polite"></div>
-        </main>
     </div>
-
-    <footer class="app-footer">
-        <span>
-            Featly &middot;
-            <a href="https://github.com/Featly-net/Featly" target="_blank" rel="noopener">source</a>
-            &middot;
-            <a href="https://github.com/Featly-net/Featly/blob/main/CHANGELOG.md" target="_blank" rel="noopener">changelog</a>
-        </span>
-        <span class="app-footer__milestone">M5 skeleton</span>
-    </footer>
 
     <script src="__MOUNT_PATH__/app.js"></script>
 </body>
