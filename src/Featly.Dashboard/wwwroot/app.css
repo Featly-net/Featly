@@ -1817,6 +1817,14 @@ p:last-child { margin-bottom: 0; }
 .rule.default .rule-head { background: var(--bg2); }
 .rule.default .rule-head .rule-num { color: var(--fg-faint); }
 
+/* collapsible behaviour */
+.rule-head .summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-head .meta .check { gap: 4px; }
+.rule-head .chev { color: var(--fg-faint); display: inline-flex; transition: transform var(--t-quick); }
+.rule.collapsed .rule-head .chev { transform: rotate(-90deg); }
+.rule.collapsed .rule-body { display: none; }
+.rule-body .field { margin: 0; }
+
 /* ------------------------ Variant pill list ------------------------ */
 .variant-card {
   display: grid;
