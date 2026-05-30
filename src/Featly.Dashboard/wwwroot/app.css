@@ -2227,6 +2227,46 @@ p:last-child { margin-bottom: 0; }
 #toast.toast--ok  { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border); }
 #toast.toast--err { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border); }
 
+/* Group membership user picker + role-assignment card */
+.member-picker { display: flex; flex-direction: column; gap: 8px; }
+.member-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+.member-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 10px;
+  background: var(--accent-bg); color: var(--fg);
+  border: 0.5px solid var(--border); border-radius: 999px;
+  font-size: 12px;
+}
+.member-chip .chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; border: 0; cursor: pointer;
+  background: transparent; color: var(--fg-muted); border-radius: 999px;
+}
+.member-chip .chip-x:hover { background: var(--danger-bg); color: var(--danger-fg); }
+.member-search {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 10px; max-width: 360px;
+  background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--r-md);
+}
+.member-search input { flex: 1; border: 0; background: transparent; outline: 0; color: inherit; font-size: 12px; }
+.member-results {
+  display: flex; flex-direction: column;
+  max-width: 360px; max-height: 240px; overflow-y: auto;
+  border: 0.5px solid var(--border); border-radius: var(--r-md); background: var(--bg);
+}
+.member-results .user-result {
+  display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+  padding: 6px 10px; border: 0; background: transparent; cursor: pointer; text-align: left;
+  border-bottom: 0.5px solid var(--border);
+}
+.member-results .user-result:last-child { border-bottom: 0; }
+.member-results .user-result:hover { background: var(--bg2); }
+.member-results .ur-name { font-size: 12.5px; color: var(--fg); }
+.member-results .ur-id { font-size: 11px; color: var(--fg-muted); }
+.member-results .ur-empty { padding: 8px 10px; font-size: 12px; }
+.ra-card { margin-top: 16px; }
+.ra-card .ra-form { margin-top: 12px; }
+
 /* Inbox + Audit log (redesign step 5). */
 .inbox-list { display: flex; flex-direction: column; gap: 18px; }
 .inbox-card[data-cr] { cursor: pointer; }

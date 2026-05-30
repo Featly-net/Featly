@@ -1498,6 +1498,7 @@
                     ? '  <div class="tag-list">' + perms.map(function (p) { return '<span class="tag muted">' + esc(p) + '</span>'; }).join("") + '</div>'
                     : '  <div class="empty"><p>No effective permissions in this scope.</p></div>',
                 '  </div>',
+                roleAssignmentsCard(),
                 '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Identity</h3><dl class="side-dl">',
                 '  <dt>Identifier</dt><dd class="mono">' + esc(truncate(user.identifier, 22)) + '</dd>',
                 '  <dt>Email</dt><dd>' + esc(user.email || "—") + '</dd>',
@@ -1506,6 +1507,7 @@
                 '</dl></div></aside></div></div></div>',
             ].join("\n");
             hydrateIcons(viewEl);
+            loadRoleAssignments("User", user.id);
         }).catch(handleErrOnView("User: " + identifier));
     }
 
@@ -1723,52 +1725,204 @@
             .catch(handleErrOnView("Groups"));
     }
 
+    // ---------- User picker (group membership) ----------
+    function userDisplay(u) { return u ? (u.displayName || u.identifier || u.id) : ""; }
+
+    function memberChip(u, id) {
+        var label = u ? esc(userDisplay(u)) : '<span class="mono">' + esc(truncate(id, 8)) + '</span>';
+        return '<span class="member-chip" data-id="' + esc(id) + '">' + label
+            + '<button type="button" class="chip-x" data-remove="' + esc(id) + '" aria-label="Remove member">' + icon("x", 12) + '</button></span>';
+    }
+
+    function memberPickerMarkup() {
+        return '<div class="member-picker">'
+            + '<div class="member-chips"></div>'
+            + '<div class="member-search"><span class="ti-slot" data-ti="search"></span>'
+            + '<input class="member-search-input" type="search" placeholder="Search users by name or email" spellcheck="false" autocomplete="off" /></div>'
+            + '<div class="member-results" hidden></div>'
+            + '</div>';
+    }
+
+    // Drives the live membership array against a chips+search container.
+    function wireMemberPicker(root, memberIds, users, userById) {
+        var chipsEl = root.querySelector(".member-chips");
+        var searchEl = root.querySelector(".member-search-input");
+        var resultsEl = root.querySelector(".member-results");
+        function renderChips() {
+            chipsEl.innerHTML = memberIds.length
+                ? memberIds.map(function (id) { return memberChip(userById[id], id); }).join("")
+                : '<span class="muted" style="font-size:12px">No members yet.</span>';
+            hydrateIcons(chipsEl);
+        }
+        function renderResults() {
+            var q = (searchEl.value || "").trim().toLowerCase();
+            var matches = q ? users.filter(function (u) {
+                if (memberIds.indexOf(u.id) >= 0) { return false; }
+                return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().indexOf(q) >= 0;
+            }).slice(0, 8) : [];
+            resultsEl.innerHTML = matches.length
+                ? matches.map(function (u) {
+                    return '<button type="button" class="user-result" data-add="' + esc(u.id) + '">'
+                        + '<span class="ur-name">' + esc(userDisplay(u)) + '</span>'
+                        + '<span class="ur-id mono">' + esc(u.identifier || "") + '</span></button>';
+                }).join("")
+                : (q ? '<div class="ur-empty muted">No matching users.</div>' : "");
+            resultsEl.hidden = !q;
+        }
+        searchEl.addEventListener("input", renderResults);
+        resultsEl.addEventListener("click", function (e) {
+            var btn = e.target.closest("[data-add]");
+            if (!btn) { return; }
+            var id = btn.getAttribute("data-add");
+            if (memberIds.indexOf(id) < 0) { memberIds.push(id); }
+            searchEl.value = "";
+            renderResults();
+            renderChips();
+        });
+        chipsEl.addEventListener("click", function (e) {
+            var btn = e.target.closest("[data-remove]");
+            if (!btn) { return; }
+            var i = memberIds.indexOf(btn.getAttribute("data-remove"));
+            if (i >= 0) { memberIds.splice(i, 1); }
+            renderChips();
+        });
+        renderChips();
+    }
+
+    // ---------- Role assignments (grant / revoke a role to a user or group) ----------
+    function roleAssignmentsCard() {
+        return '<div class="card-pad ra-card"><h2>Role assignments</h2>'
+            + '<p class="muted" style="font-size:12px">Grant a role in the default project, optionally scoped to one environment.</p>'
+            + '<div class="ra-body"><p class="muted">Loading…</p></div></div>';
+    }
+
+    // assigneeType is the string "User" or "Group"; assigneeId is the entity GUID.
+    function loadRoleAssignments(assigneeType, assigneeId) {
+        var bodyEl = viewEl.querySelector(".ra-card .ra-body");
+        if (!bodyEl) { return; }
+        Promise.all([
+            api("GET", "/admin/role-assignments?assigneeId=" + encodeURIComponent(assigneeId)),
+            api("GET", "/admin/roles"),
+        ]).then(function (res) {
+            var assignments = Array.isArray(res[0]) ? res[0] : [];
+            var roles = Array.isArray(res[1]) ? res[1] : [];
+            var roleById = {};
+            roles.forEach(function (r) { roleById[r.id] = r; });
+            var envById = {};
+            environments.forEach(function (e) { envById[e.id] = e; });
+            var rows = assignments.map(function (a) {
+                var role = roleById[a.roleId];
+                var envLabel = a.environmentId
+                    ? (envById[a.environmentId] ? code(envById[a.environmentId].key) : code(truncate(a.environmentId, 8)))
+                    : '<span class="muted">all envs</span>';
+                return '<tr data-ra="' + esc(a.id) + '">'
+                    + '<td>' + (role ? code(role.key) : code(truncate(a.roleId, 8))) + '</td>'
+                    + '<td>' + (role ? esc(role.name) : '—') + '</td>'
+                    + '<td>' + envLabel + '</td>'
+                    + '<td class="mono cell-modified">' + (formatDate(a.assignedAt) || "—") + '</td>'
+                    + '<td class="col-actions"><button type="button" class="btn outline xs danger" data-revoke="' + esc(a.id) + '">Revoke</button></td>'
+                    + '</tr>';
+            }).join("");
+            var roleOpts = roles.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.key) + '</option>'; }).join("");
+            var envOpts = '<option value="">All environments</option>'
+                + environments.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.key) + '</option>'; }).join("");
+            bodyEl.innerHTML = [
+                assignments.length
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:120px">Role</th><th>Name</th><th style="width:140px">Environment</th><th style="width:120px">Granted</th><th style="width:90px"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                    : '<div class="empty"><p>No role assignments yet.</p></div>',
+                '<form class="row-form ra-form">',
+                '  <label class="field"><span class="field__label">Role</span><select name="role">' + roleOpts + '</select></label>',
+                '  <label class="field"><span class="field__label">Scope</span><select name="env">' + envOpts + '</select></label>',
+                '  <div class="row-form__action"><button type="submit" class="btn primary">Grant role</button><span class="save-msg" id="ra-msg"></span></div>',
+                '</form>',
+            ].join("");
+            var msg = bodyEl.querySelector("#ra-msg");
+            bodyEl.querySelector(".ra-form").addEventListener("submit", function (e) {
+                e.preventDefault();
+                var f = e.target;
+                if (!f.role.value) { setMessageOn(msg, "error", "Pick a role."); return; }
+                setMessageOn(msg, "loading", "Granting…");
+                api("POST", "/admin/role-assignments", {
+                    assigneeType: assigneeType,
+                    assigneeId: assigneeId,
+                    roleId: f.role.value,
+                    environmentId: f.env.value || null,
+                }).then(function () { loadRoleAssignments(assigneeType, assigneeId); })
+                    .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+            });
+            Array.prototype.forEach.call(bodyEl.querySelectorAll("[data-revoke]"), function (btn) {
+                btn.addEventListener("click", function () {
+                    if (!window.confirm("Revoke this role assignment?")) { return; }
+                    api("DELETE", "/admin/role-assignments/" + encodeURIComponent(btn.getAttribute("data-revoke")))
+                        .then(function () { loadRoleAssignments(assigneeType, assigneeId); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } });
+                });
+            });
+        }).catch(function () {
+            bodyEl.innerHTML = '<div class="empty"><p>Could not load role assignments.</p></div>';
+        });
+    }
+
     function renderGroupDetail(key) {
         viewEl.innerHTML = listPageShell("Group", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
-        api("GET", "/admin/groups/" + encodeURIComponent(key))
-            .then(function (g) {
-                var members = (g.memberUserIds || []).join("\n");
-                viewEl.innerHTML = [
-                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
-                    '  <span class="sub">group <code>' + esc(g.key) + '</code> · ' + ((g.memberUserIds || []).length) + ' member(s)</span>',
-                    '</div><div class="actions"><button type="button" class="btn outline xs danger" data-grp="delete">Delete</button><span class="save-msg" id="grp-msg"></span></div></div>',
-                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
-                    '  <form id="grp-edit" class="editor card-pad">',
-                    field("Name", '<input name="name" value="' + esc(g.name || "") + '" />'),
-                    field("Description", '<input name="description" value="' + esc(g.description || "") + '" />'),
-                    field("Member user IDs", '<textarea name="members" rows="6" spellcheck="false" placeholder="one user GUID per line">' + esc(members) + '</textarea>'),
-                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
-                    '  </form>',
-                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
-                    '  <dt>Key</dt><dd class="mono">' + esc(g.key) + '</dd>',
-                    '  <dt>Members</dt><dd>' + ((g.memberUserIds || []).length) + '</dd>',
-                    '  <dt>Created</dt><dd>' + (formatDate(g.createdAt) || "—") + '</dd>',
-                    '  <dt>Updated</dt><dd>' + (formatDate(g.updatedAt) || "—") + '</dd>',
-                    '</dl></div></aside></div></div></div>',
-                ].join("\n");
+        Promise.all([
+            api("GET", "/admin/groups/" + encodeURIComponent(key)),
+            api("GET", "/admin/users"),
+        ]).then(function (res) {
+            var g = res[0];
+            var users = Array.isArray(res[1]) ? res[1] : [];
+            var userById = {};
+            users.forEach(function (u) { userById[u.id] = u; });
+            var memberIds = (g.memberUserIds || []).slice();
 
-                var msg = document.getElementById("grp-msg");
-                document.getElementById("grp-edit").addEventListener("submit", function (e) {
-                    e.preventDefault();
-                    var f = e.target;
-                    var ids = f.members.value.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean);
-                    setMessageOn(msg, "loading", "Saving…");
-                    api("PUT", "/admin/groups/" + encodeURIComponent(key), {
-                        key: key,
-                        name: f.name.value.trim() || null,
-                        description: f.description.value.trim() || null,
-                        memberUserIds: ids,
-                    }).then(function () { setMessageOn(msg, "success", "Saved."); })
-                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
-                });
-                viewEl.querySelector('[data-grp="delete"]').addEventListener("click", function () {
-                    if (!window.confirm("Delete group '" + key + "'? Role assignments targeting this group will stop granting access.")) { return; }
-                    api("DELETE", "/admin/groups/" + encodeURIComponent(key))
-                        .then(function () { navigate("/groups"); })
-                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
-                });
-            })
-            .catch(handleErrOnView("Group: " + key));
+            viewEl.innerHTML = [
+                '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
+                '  <span class="sub">group <code>' + esc(g.key) + '</code> · <span id="grp-count">' + memberIds.length + '</span> member(s)</span>',
+                '</div><div class="actions"><button type="button" class="btn outline xs danger" data-grp="delete">Delete</button><span class="save-msg" id="grp-msg"></span></div></div>',
+                '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                '  <form id="grp-edit" class="editor card-pad">',
+                field("Name", '<input name="name" value="' + esc(g.name || "") + '" />'),
+                field("Description", '<input name="description" value="' + esc(g.description || "") + '" />'),
+                field("Members", memberPickerMarkup()),
+                '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                '  </form>',
+                roleAssignmentsCard(),
+                '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                '  <dt>Key</dt><dd class="mono">' + esc(g.key) + '</dd>',
+                '  <dt>Members</dt><dd>' + memberIds.length + '</dd>',
+                '  <dt>Created</dt><dd>' + (formatDate(g.createdAt) || "—") + '</dd>',
+                '  <dt>Updated</dt><dd>' + (formatDate(g.updatedAt) || "—") + '</dd>',
+                '</dl></div></aside></div></div></div>',
+            ].join("\n");
+            hydrateIcons(viewEl);
+
+            wireMemberPicker(viewEl.querySelector(".member-picker"), memberIds, users, userById);
+
+            var msg = document.getElementById("grp-msg");
+            document.getElementById("grp-edit").addEventListener("submit", function (e) {
+                e.preventDefault();
+                var f = e.target;
+                setMessageOn(msg, "loading", "Saving…");
+                api("PUT", "/admin/groups/" + encodeURIComponent(key), {
+                    key: key,
+                    name: f.name.value.trim() || null,
+                    description: f.description.value.trim() || null,
+                    memberUserIds: memberIds.slice(),
+                }).then(function () {
+                    setMessageOn(msg, "success", "Saved.");
+                    var c = document.getElementById("grp-count");
+                    if (c) { c.textContent = memberIds.length; }
+                }).catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+            });
+            viewEl.querySelector('[data-grp="delete"]').addEventListener("click", function () {
+                if (!window.confirm("Delete group '" + key + "'? Role assignments targeting this group will stop granting access.")) { return; }
+                api("DELETE", "/admin/groups/" + encodeURIComponent(key))
+                    .then(function () { navigate("/groups"); })
+                    .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+            });
+
+            loadRoleAssignments("Group", g.id);
+        }).catch(handleErrOnView("Group: " + key));
     }
 
     // ============================================================
