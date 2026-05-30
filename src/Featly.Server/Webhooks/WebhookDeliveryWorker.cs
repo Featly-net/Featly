@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
+using Featly.Server.Telemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,6 +21,7 @@ internal sealed partial class WebhookDeliveryWorker(
     IHttpClientFactory httpClientFactory,
     StorageFacade store,
     IOptions<WebhookOptions> options,
+    FeatlyServerMetrics metrics,
     ILogger<WebhookDeliveryWorker> logger) : BackgroundService
 {
     /// <summary>Named <see cref="HttpClient"/> for outbound deliveries.</summary>
@@ -80,6 +83,12 @@ internal sealed partial class WebhookDeliveryWorker(
         int? statusCode = null;
         string? error = null;
 
+        using var activity = metrics.ActivitySource.StartActivity("featly.webhook.deliver");
+        activity?.SetTag("featly.webhook.id", endpoint.Id);
+        activity?.SetTag("featly.event_type", delivery.EventType);
+        activity?.SetTag("featly.webhook.attempt", delivery.AttemptCount);
+
+        var startedAt = Stopwatch.GetTimestamp();
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint.Url)
@@ -113,6 +122,14 @@ internal sealed partial class WebhookDeliveryWorker(
         {
             error = ex.Message;
         }
+
+        var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        metrics.RecordWebhookDelivery(success: error is null, elapsedMs);
+        if (statusCode is not null)
+        {
+            activity?.SetTag("featly.webhook.status_code", statusCode);
+        }
+        activity?.SetStatus(error is null ? ActivityStatusCode.Ok : ActivityStatusCode.Error, error);
 
         var now = DateTimeOffset.UtcNow;
         delivery.LastStatusCode = statusCode;

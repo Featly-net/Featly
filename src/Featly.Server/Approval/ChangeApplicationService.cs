@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Featly.Server.Endpoints;
+using Featly.Server.Telemetry;
 using ChangeNotification = Featly.Storage.ChangeNotification;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
@@ -12,7 +13,7 @@ namespace Featly.Server.Approval;
 /// to the matching store, then emits the usual <see cref="ChangeNotification"/>
 /// so connected SDKs invalidate their cached snapshots.
 /// </summary>
-internal sealed class ChangeApplicationService(StorageFacade store)
+internal sealed class ChangeApplicationService(StorageFacade store, FeatlyServerMetrics metrics)
 {
     private static readonly JsonSerializerOptions s_json = ChangeJson.Options;
 
@@ -28,6 +29,11 @@ internal sealed class ChangeApplicationService(StorageFacade store)
     public async Task<bool> ApplyAsync(PendingChange change, string actor, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(change);
+
+        using var activity = metrics.ActivitySource.StartActivity("featly.change.apply");
+        activity?.SetTag("featly.entity_type", change.EntityType);
+        activity?.SetTag("featly.entity_key", change.EntityKey);
+        activity?.SetTag("featly.change_action", change.Action.ToString());
 
         switch (change.EntityType)
         {

@@ -59,6 +59,43 @@ Bound into `WebhookOptions` — the delivery worker's tuning. DB-overridable.
 | `MaxRetryDelay` | `00:30:00` | Backoff cap. |
 | `RequestTimeout` | `00:00:10` | Per-delivery HTTP timeout. |
 
+## `Featly:Telemetry`
+
+Bound into `FeatlyTelemetryOptions` — server-side OpenTelemetry. **Off by
+default.** Config-only (not DB-overridable): the export pipeline is built once at
+host startup, before the database is reachable, so it sits in the config-only
+tier alongside connection strings (ARCHITECTURE.md §15, §19).
+
+The Featly meter (`Featly.Server`) and activity source (`Featly.Server`) are
+always present and cost nothing while nothing listens. `Enabled` controls whether
+`AddFeatlyServerTelemetry(builder.Configuration)` wires the OpenTelemetry SDK —
+ASP.NET Core + HttpClient instrumentation plus the OTLP exporter.
+
+| Key | Default | Notes |
+|---|---|---|
+| `Enabled` | `false` | Master switch. When `false`, no OpenTelemetry services are registered and there is no per-request overhead. |
+| `Traces` | `true` | Export spans (HTTP server/client + Featly's `featly.change.apply`, `featly.webhook.deliver`) when enabled. |
+| `Metrics` | `true` | Export meters (HTTP + Featly's custom counters/histograms) when enabled. |
+| `ServiceName` | `Featly` | OpenTelemetry `service.name` resource attribute. |
+| `OtlpEndpoint` | `null` | OTLP collector URL (e.g. `http://localhost:4317`). When unset, falls back to `OTEL_EXPORTER_OTLP_ENDPOINT` and the OpenTelemetry default. |
+| `OtlpProtocol` | `Grpc` | `Grpc` (port 4317) or `HttpProtobuf` (port 4318). |
+
+Custom metrics emitted by the server:
+
+| Instrument | Type | Tags |
+|---|---|---|
+| `featly.server.evaluations` | counter | `featly.entity_type` (flag/config), `featly.reason` |
+| `featly.server.events_ingested` | counter | `featly.event_type` (Exposure/Custom) |
+| `featly.server.changes_applied` | counter | `featly.change_action`, `featly.bypassed` |
+| `featly.server.audit_writes` | counter | `featly.action` |
+| `featly.server.webhook_deliveries` | counter | `featly.result` (success/failure) |
+| `featly.server.webhook_delivery_duration` | histogram (ms) | `featly.result` |
+
+> Already run your own OpenTelemetry pipeline? Skip `AddFeatlyServerTelemetry`
+> and instead add `Featly.Server` to your own `AddSource(...)` and
+> `AddMeter(...)` calls (the names are exposed as `FeatlyTelemetry.ActivitySourceName`
+> and `FeatlyTelemetry.MeterName`).
+
 ## Example `appsettings.json`
 
 ```json
@@ -71,7 +108,8 @@ Bound into `WebhookOptions` — the delivery worker's tuning. DB-overridable.
     },
     "Storage": { "Sqlite": { "ConnectionString": "Data Source=/var/lib/featly/featly.db", "AutoMigrate": false } },
     "Authorization": { "AutoProvisionMode": "Closed" },
-    "Webhooks": { "MaxAttempts": 8 }
+    "Webhooks": { "MaxAttempts": 8 },
+    "Telemetry": { "Enabled": true, "OtlpEndpoint": "http://otel-collector:4317" }
   }
 }
 ```
