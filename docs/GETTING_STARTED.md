@@ -120,6 +120,39 @@ Prefer a vendor-neutral API? Use the
 [OpenFeature provider](OPENFEATURE.md) — the same flag, read through
 `Api.Instance.GetClient()`.
 
+## Tour the dashboard
+
+Open `http://localhost:<port>/featly` and sign in. The shell has a left nav
+grouped by area (flags/configs/segments/experiments, access, platform, system),
+breadcrumbs, an environment pill, a light/dark toggle, and a command palette.
+
+The **Flags** screen lists every flag with status, type, variants, tags, and
+last-modified, with quick filters and a tab split by enabled/disabled:
+
+![Flags list](images/dashboard-flags.png)
+
+Opening a flag gives you the editable detail plus a **visual rule editor** —
+each rule is a collapsible card of AND-ed conditions (attribute, operator,
+value, optional segment) resolving to a variant or a weighted split:
+
+![Flag detail with the rule editor](images/dashboard-flag-detail.png)
+
+When an environment requires approval, mutations become **pending changes**. The
+**Inbox** collects what needs your attention — approvals and role-upgrade
+requests:
+
+![Inbox](images/dashboard-inbox.png)
+
+Every mutation is recorded in the **Audit log**; clicking an entry opens a
+before/after diff:
+
+![Audit log diff](images/dashboard-audit-diff.png)
+
+Press `Cmd`/`Ctrl`-K anywhere to open the **command palette** — jump to a screen
+or search flags, configs, and segments by key or name:
+
+![Command palette](images/dashboard-command-palette.png)
+
 ## Runnable samples
 
 - **`samples/SelfHosted.Sample`** — embed everything in one app (this guide).
