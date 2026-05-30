@@ -88,3 +88,42 @@ Redis providers are designed but deferred until after v0.1.0 (see
 
 `GET /health/live` returns `200` with no auth when the host process can respond —
 wire it to your orchestrator's liveness probe.
+
+## Run the central server with Docker
+
+`samples/Centralized.Sample` ships a multi-stage `Dockerfile` and a
+`docker-compose.yml` so the centralized pattern is a one-command experience.
+From `samples/Centralized.Sample/`:
+
+```bash
+docker compose up --build
+```
+
+This builds the image, starts the server + dashboard, and maps it to
+`http://localhost:5085`:
+
+- Dashboard: `http://localhost:5085/featly`
+- Liveness: `http://localhost:5085/health/live`
+
+SQLite is stored on a named volume (`featly-data`, mounted at `/data`), so flags
+and config **persist across restarts**. `docker compose down` keeps the data;
+`docker compose down -v` wipes it.
+
+Configuration is supplied via environment variables (overriding `appsettings.json`).
+Override the placeholders before exposing the server anywhere real — for example
+in an `.env` file next to the compose file:
+
+```dotenv
+FEATLY_BOOTSTRAP_ADMIN=you@example.com
+FEATLY_ADMIN_API_KEY=<a strong admin key>
+FEATLY_SDK_API_KEY=<a strong sdk key>
+```
+
+The image runs as the non-root `app` user and publishes untrimmed (EF Core +
+reflection-based JSON make trimming unsafe). To build the image directly, run
+from the **repository root** (the build context the sample's project references
+need):
+
+```bash
+docker build -f samples/Centralized.Sample/Dockerfile -t featly-centralized .
+```

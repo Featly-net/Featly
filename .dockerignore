@@ -1,0 +1,15 @@
+# Keep the Docker build context small and deterministic. Applies to builds whose
+# context is the repository root (e.g. samples/Centralized.Sample/Dockerfile).
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+.git/
+.github/
+**/*.user
+**/TestResults/
+artifacts/
+# Local SQLite quickstart leftovers.
+**/featly*.db
+**/featly*.db-shm
+**/featly*.db-wal
