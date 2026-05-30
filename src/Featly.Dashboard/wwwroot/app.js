@@ -330,7 +330,7 @@
         flagList: "Flags", flagDetail: "Flags", configList: "Configs", configDetail: "Configs",
         segmentList: "Segments", segmentDetail: "Segments",
         experimentList: "Experiments", experimentDetail: "Experiments",
-        userList: "Users", userDetail: "Users", roleList: "Roles",
+        userList: "Users", userDetail: "Users", roleList: "Roles", roleDetail: "Roles",
         groupList: "Groups", groupDetail: "Groups", apiKeyList: "API keys",
         projectList: "Projects", projectDetail: "Projects",
         approvals: "Approval policies", webhookList: "Webhooks", webhookDetail: "Webhooks",
@@ -373,6 +373,7 @@
         { match: /^\/experiments\/?$/,   key: "experimentList", params: function () { return {}; } },
         { match: /^\/users\/(.+)$/,      key: "userDetail",   params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/users\/?$/,         key: "userList",     params: function () { return {}; } },
+        { match: /^\/roles\/(.+)$/,      key: "roleDetail",   params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
         { match: /^\/roles\/?$/,         key: "roleList",     params: function () { return {}; } },
         { match: /^\/groups\/(.+)$/,     key: "groupDetail",  params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
         { match: /^\/groups\/?$/,        key: "groupList",    params: function () { return {}; } },
@@ -731,6 +732,7 @@
         webhookDetail: function (p) { renderWebhookDetail(p.id); },
         auditLog:      function () { renderAuditLog(); },
         roleList:    function () { renderRoleList(); },
+        roleDetail:  function (p) { renderRoleDetail(p.key); },
         groupList:   function () { renderGroupList(); },
         groupDetail: function (p) { renderGroupDetail(p.key); },
         apiKeyList:  function () { renderApiKeyList(); },
@@ -1420,6 +1422,39 @@
         }).catch(handleErrOnView("User: " + identifier));
     }
 
+    // Every Permission enum member, grouped for the role editor matrix
+    // (mirrors Featly.Abstractions/Permission.cs).
+    var PERMISSION_GROUPS = [
+        { label: "Flags", perms: ["FlagRead", "FlagCreate", "FlagUpdate", "FlagArchive"] },
+        { label: "Configs", perms: ["ConfigRead", "ConfigCreate", "ConfigUpdate", "ConfigArchive"] },
+        { label: "Segments", perms: ["SegmentRead", "SegmentCreate", "SegmentUpdate", "SegmentArchive"] },
+        { label: "Experiments", perms: ["ExperimentRead", "ExperimentCreate", "ExperimentUpdate", "ExperimentStart", "ExperimentStop"] },
+        { label: "Environments", perms: ["EnvironmentRead", "EnvironmentCreate", "EnvironmentUpdate", "EnvironmentLock"] },
+        { label: "Projects", perms: ["ProjectRead", "ProjectCreate", "ProjectUpdate"] },
+        { label: "API keys", perms: ["ApiKeyRead", "ApiKeyCreate", "ApiKeyRevoke"] },
+        { label: "Users", perms: ["UserRead", "UserCreate", "UserUpdateRole", "UserDisable"] },
+        { label: "Roles", perms: ["RoleRead", "RoleCreate", "RoleUpdate", "RoleDelete"] },
+        { label: "Groups", perms: ["GroupRead", "GroupCreate", "GroupUpdate", "GroupDelete"] },
+        { label: "Changes & approvals", perms: ["ApprovalPolicyRead", "ApprovalPolicyUpdate", "ChangeRead", "ChangeCreate", "ChangeApprove", "ChangeReject", "ChangeApply", "ChangeBypass"] },
+        { label: "Platform", perms: ["WebhookRead", "WebhookCreate", "WebhookUpdate", "WebhookDelete", "AuditRead", "SettingsRead", "SettingsUpdate"] },
+    ];
+
+    function rolePermMatrix(current, readOnly) {
+        return PERMISSION_GROUPS.map(function (g) {
+            return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
+                + g.perms.map(function (p) {
+                    var on = current.indexOf(p) >= 0;
+                    return '<label class="check perm"><input type="checkbox" class="perm-cb" value="' + p + '"'
+                        + (on ? " checked" : "") + (readOnly ? " disabled" : "") + ' /> ' + p + '</label>';
+                }).join("")
+                + '</div></div>';
+        }).join("");
+    }
+
+    function collectPerms(form) {
+        return Array.prototype.slice.call(form.querySelectorAll(".perm-cb:checked")).map(function (c) { return c.value; });
+    }
+
     function renderRoleList() {
         var sub = "Permission sets. System roles are immutable; clone one to make an editable custom role.";
         viewEl.innerHTML = listPageShell("Roles", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
@@ -1427,23 +1462,120 @@
             .then(function (roles) {
                 roles = Array.isArray(roles) ? roles : [];
                 var rows = roles.map(function (r) {
-                    return '<tr>'
+                    return '<tr data-key="' + esc(r.key) + '">'
                         + '<td class="mono cell-key">' + esc(r.key) + '</td>'
                         + '<td>' + esc(r.name) + '</td>'
                         + '<td>' + (r.isSystem ? '<span class="badge info">system</span>' : '<span class="badge purple">custom</span>') + '</td>'
                         + '<td class="num">' + (r.permissions || []).length + '</td>'
-                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate((r.permissions || []).join(", "), 70)) + '</span></td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate((r.permissions || []).join(", "), 56)) + '</span></td>'
                         + '</tr>';
                 }).join("");
-                var body = roles.length
-                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:120px">Key</th><th>Name</th>'
-                        + '<th style="width:90px">Kind</th><th style="width:110px">Permissions</th><th>Sample</th></tr></thead>'
-                        + '<tbody>' + rows + '</tbody></table></div>'
-                    : '<div class="empty"><p>No roles.</p></div>';
-                viewEl.innerHTML = listPageShell("Roles", sub, body);
-                hydrateIcons(viewEl);
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Roles</h1>',
+                    '  <span class="sub">' + sub + '</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    roles.length
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:110px">Key</th><th>Name</th><th style="width:80px">Kind</th><th style="width:60px">Perms</th><th>Sample</th></tr></thead><tbody class="role-tbody">' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No roles.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New role</h3>',
+                    '  <form id="role-form" class="editor">',
+                    field("Key", '<input name="key" required placeholder="release-manager" />'),
+                    field("Name", '<input name="name" placeholder="Release Manager" />'),
+                    field("Clone permissions from", '<select name="clone"><option value="">(none)</option><option value="viewer">viewer</option><option value="editor">editor</option><option value="approver">approver</option><option value="admin">admin</option></select>'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create role</button><span class="save-msg" id="role-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
+                ].join("\n");
+
+                var tbody = viewEl.querySelector(".role-tbody");
+                if (tbody) {
+                    tbody.addEventListener("click", function (e) {
+                        if (e.target.closest("input, button, a")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/roles/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
+                document.getElementById("role-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("role-msg");
+                    setMessageOn(msg, "loading", "Creating…");
+                    api("POST", "/admin/roles", {
+                        key: f.key.value.trim(),
+                        name: f.name.value.trim() || null,
+                        cloneFromSystemRole: f.clone.value || null,
+                    }).then(function (r) { navigate("/roles/" + encodeURIComponent(r.key)); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
             })
             .catch(handleErrOnView("Roles"));
+    }
+
+    function renderRoleDetail(key) {
+        viewEl.innerHTML = listPageShell("Role", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/roles/" + encodeURIComponent(key))
+            .then(function (r) {
+                var sys = !!r.isSystem;
+                var perms = r.permissions || [];
+                var actions = '<button type="button" class="btn outline xs" data-role="clone">Clone</button> '
+                    + (sys ? "" : '<button type="button" class="btn outline xs danger" data-role="delete">Delete</button> ')
+                    + '<span class="save-msg" id="role-msg"></span>';
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(r.name || r.key) + '</h1>',
+                    '  <span class="sub">role <code>' + esc(r.key) + '</code> · ' + (sys ? '<span class="badge info">system</span>' : '<span class="badge purple">custom</span>') + ' · ' + perms.length + ' permission(s)' + (sys ? " · read-only" : "") + '</span>',
+                    '</div><div class="actions">' + actions + '</div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="role-edit" class="editor card-pad">',
+                    field("Name", '<input name="name" value="' + esc(r.name || "") + '"' + (sys ? " disabled" : "") + ' />'),
+                    field("Description", '<input name="description" value="' + esc(r.description || "") + '"' + (sys ? " disabled" : "") + ' />'),
+                    '  <div class="perm-matrix">' + rolePermMatrix(perms, sys) + '</div>',
+                    sys ? "" : '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '  <dt>Key</dt><dd class="mono">' + esc(r.key) + '</dd>',
+                    '  <dt>Kind</dt><dd>' + (sys ? "system" : "custom") + '</dd>',
+                    '  <dt>Permissions</dt><dd>' + perms.length + '</dd>',
+                    '  <dt>Updated</dt><dd>' + (formatDate(r.updatedAt) || "—") + '</dd>',
+                    '</dl>' + (sys ? '<p class="muted" style="font-size:11px;margin:10px 0 0">System roles are immutable. Use Clone to make an editable copy.</p>' : "") + '</div></aside></div></div></div>',
+                ].join("\n");
+
+                var msg = document.getElementById("role-msg");
+                var editForm = document.getElementById("role-edit");
+                if (!sys && editForm) {
+                    editForm.addEventListener("submit", function (e) {
+                        e.preventDefault();
+                        var f = e.target;
+                        setMessageOn(msg, "loading", "Saving…");
+                        api("PUT", "/admin/roles/" + encodeURIComponent(key), {
+                            key: key,
+                            name: f.name.value.trim() || null,
+                            description: f.description.value.trim() || null,
+                            permissions: collectPerms(f),
+                        }).then(function () { setMessageOn(msg, "success", "Saved."); })
+                          .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                    });
+                }
+                Array.prototype.slice.call(viewEl.querySelectorAll("[data-role]")).forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var act = btn.getAttribute("data-role");
+                        if (act === "delete") {
+                            if (!window.confirm("Delete custom role '" + key + "'? Assignments to it stop granting access.")) { return; }
+                            api("DELETE", "/admin/roles/" + encodeURIComponent(key))
+                                .then(function () { navigate("/roles"); })
+                                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                        } else if (act === "clone") {
+                            var newKey = window.prompt("Key for the new custom role:", key + "-copy");
+                            if (newKey == null || !newKey.trim()) { return; }
+                            var payload = { key: newKey.trim(), name: (r.name || key) + " (copy)" };
+                            if (sys) { payload.cloneFromSystemRole = r.key; } else { payload.permissions = perms; }
+                            api("POST", "/admin/roles", payload)
+                                .then(function (c) { navigate("/roles/" + encodeURIComponent(c.key)); })
+                                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                        }
+                    });
+                });
+            })
+            .catch(handleErrOnView("Role: " + key));
     }
 
     // ============================================================
