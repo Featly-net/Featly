@@ -3,6 +3,7 @@ using System.Text.Json;
 using Featly.Server.Approval;
 using Featly.Server.Authentication;
 using Featly.Server.Events;
+using Featly.Server.Telemetry;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -215,6 +216,7 @@ internal static class AdminChangesEndpoints
         StorageFacade store,
         ChangeApplicationService applier,
         IFeatlyEventPublisher events,
+        FeatlyServerMetrics metrics,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -250,6 +252,7 @@ internal static class AdminChangesEndpoints
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
         await ChangeStaleness.MarkSiblingsStaleAsync(store, change, ct).ConfigureAwait(false);
+        metrics.RecordChangeApplied(change.Action, bypassed: false);
         await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = false }, ct).ConfigureAwait(false);
         return Results.Ok(change);
@@ -261,6 +264,7 @@ internal static class AdminChangesEndpoints
         StorageFacade store,
         ChangeApplicationService applier,
         IFeatlyEventPublisher events,
+        FeatlyServerMetrics metrics,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -299,6 +303,7 @@ internal static class AdminChangesEndpoints
         change.AppliedAt = DateTimeOffset.UtcNow;
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+        metrics.RecordChangeApplied(change.Action, bypassed: true);
         await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = true }, ct).ConfigureAwait(false);
         return Results.Ok(change);

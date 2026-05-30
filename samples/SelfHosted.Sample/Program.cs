@@ -1,5 +1,6 @@
 using Featly.Dashboard;
 using Featly.Server;
+using Featly.Server.Telemetry;
 using Featly.Storage.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,11 @@ builder.Services.AddFeatlySqliteStore();
 
 // Featly server-side services.
 builder.Services.AddFeatlyServer();
+
+// OpenTelemetry traces + metrics. Off unless Featly:Telemetry:Enabled=true; when
+// enabled it exports ASP.NET Core/HttpClient spans and Featly's custom counters
+// over OTLP. See appsettings.json for the (disabled-by-default) block.
+builder.Services.AddFeatlyServerTelemetry(builder.Configuration);
 
 var app = builder.Build();
 

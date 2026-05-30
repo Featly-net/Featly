@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Featly.Server.Authentication;
+using Featly.Server.Telemetry;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -27,6 +28,7 @@ internal static class SdkEventsEndpoints
     private static async Task<IResult> IngestAsync(
         EventBatchRequest body,
         StorageFacade store,
+        FeatlyServerMetrics metrics,
         string? env,
         CancellationToken ct)
     {
@@ -68,6 +70,25 @@ internal static class SdkEventsEndpoints
         }
 
         await store.Events.AppendAsync(events, ct).ConfigureAwait(false);
+
+        // Count ingested events per type for the featly.server.events_ingested
+        // counter (one Add per distinct type keeps the tag set bounded).
+        var exposures = 0L;
+        var customs = 0L;
+        foreach (var e in events)
+        {
+            if (e.Type == EventType.Exposure)
+            {
+                exposures++;
+            }
+            else
+            {
+                customs++;
+            }
+        }
+        metrics.RecordEventsIngested(EventType.Exposure, exposures);
+        metrics.RecordEventsIngested(EventType.Custom, customs);
+
         return Results.Accepted(value: new { ingested = events.Count });
     }
 

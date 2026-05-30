@@ -1,5 +1,6 @@
 using Featly.Dashboard;
 using Featly.Server;
+using Featly.Server.Telemetry;
 using Featly.Storage.Sqlite;
 
 // Centralized deployment pattern: a standalone Featly server that other
@@ -19,6 +20,11 @@ builder.Services.AddFeatlySqliteStore();
 
 // Featly server-side services (admin + SDK HTTP APIs, auth, approval, webhooks).
 builder.Services.AddFeatlyServer();
+
+// OpenTelemetry traces + metrics for the centralized server. Off unless
+// Featly:Telemetry:Enabled=true; exports HTTP spans and Featly's custom counters
+// over OTLP when enabled. See appsettings.json for the (disabled) block.
+builder.Services.AddFeatlyServerTelemetry(builder.Configuration);
 
 var app = builder.Build();
 

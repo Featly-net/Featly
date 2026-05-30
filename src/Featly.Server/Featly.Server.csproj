@@ -24,4 +24,15 @@
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- OpenTelemetry (issue #77). The instrumentation (Meter + ActivitySource)
+         is always wired; the OTLP export pipeline is opt-in via Featly:Telemetry
+         and only added by AddFeatlyServerTelemetry, so there is zero overhead
+         when disabled. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+
 </Project>

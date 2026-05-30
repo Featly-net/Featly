@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Featly.Engine;
 using Featly.Server.Authentication;
+using Featly.Server.Telemetry;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -44,6 +45,7 @@ internal static class AdminPreviewEndpoints
         string key,
         PreviewRequest body,
         StorageFacade store,
+        FeatlyServerMetrics metrics,
         string? env,
         CancellationToken ct)
     {
@@ -67,6 +69,7 @@ internal static class AdminPreviewEndpoints
         var fallback = JsonSerializer.SerializeToElement<object?>(null);
 
         var result = Evaluator.EvaluateFlag(flag, context, fallback, lookup);
+        metrics.RecordEvaluation("flag", result.Reason.ToString());
         return Results.Ok(result);
     }
 
@@ -74,6 +77,7 @@ internal static class AdminPreviewEndpoints
         string key,
         PreviewRequest body,
         StorageFacade store,
+        FeatlyServerMetrics metrics,
         string? env,
         CancellationToken ct)
     {
@@ -97,6 +101,7 @@ internal static class AdminPreviewEndpoints
         var fallback = JsonSerializer.SerializeToElement<object?>(null);
 
         var result = Evaluator.EvaluateConfig(config, context, fallback, lookup);
+        metrics.RecordEvaluation("config", result.Reason.ToString());
         return Results.Ok(result);
     }
 
