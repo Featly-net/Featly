@@ -20,6 +20,9 @@ internal static class AdminEnvironmentsEndpoints
         var admin = group.MapGroup("/admin/environments").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
         admin.MapGet("/", ListAsync).WithName("Featly.Admin.Environments.List").RequirePermission(Permission.EnvironmentRead);
+        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Environments.Create").RequirePermission(Permission.EnvironmentCreate);
+        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Environments.Update").RequirePermission(Permission.EnvironmentUpdate);
+        admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Environments.Delete").RequirePermission(Permission.EnvironmentUpdate);
         admin.MapPost("/{key}/lock", LockAsync).WithName("Featly.Admin.Environments.Lock").RequirePermission(Permission.EnvironmentLock);
         admin.MapPost("/{key}/unlock", UnlockAsync).WithName("Featly.Admin.Environments.Unlock").RequirePermission(Permission.EnvironmentLock);
 
@@ -36,6 +39,93 @@ internal static class AdminEnvironmentsEndpoints
 
         var environments = await store.Environments.ListAsync(project.Id, ct).ConfigureAwait(false);
         return Results.Ok(environments);
+    }
+
+    private static async Task<IResult> CreateAsync(EnvironmentWriteRequest body, StorageFacade store, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (string.IsNullOrWhiteSpace(body.Key))
+        {
+            return Results.BadRequest(new { error = "key is required." });
+        }
+
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return Results.NotFound(new { error = "No default project." });
+        }
+
+        var existing = await store.Environments.GetByKeyAsync(project.Id, body.Key, ct).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return Results.Conflict(new { error = $"Environment '{body.Key}' already exists." });
+        }
+
+        var environment = new Environment
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            Key = body.Key,
+            Name = string.IsNullOrWhiteSpace(body.Name) ? body.Key : body.Name,
+            IsDefault = false,
+            ReadOnly = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        await store.Environments.CreateAsync(environment, ct).ConfigureAwait(false);
+        return Results.Created($"/api/admin/environments/{environment.Key}", environment);
+    }
+
+    private static async Task<IResult> UpdateAsync(string key, EnvironmentWriteRequest body, StorageFacade store, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return Results.NotFound(new { error = "No default project." });
+        }
+
+        var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+        }
+
+        existing.Name = string.IsNullOrWhiteSpace(body.Name) ? existing.Name : body.Name;
+        await store.Environments.UpdateAsync(existing, ct).ConfigureAwait(false);
+        return Results.Ok(existing);
+    }
+
+    private static async Task<IResult> DeleteAsync(string key, StorageFacade store, CancellationToken ct)
+    {
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return Results.NotFound(new { error = "No default project." });
+        }
+
+        var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+        }
+
+        if (existing.IsDefault)
+        {
+            return Results.Problem(detail: "The default environment cannot be deleted.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        // Refuse to delete a non-empty environment — that would orphan its content.
+        var flags = await store.Flags.ListAsync(existing.Id, ct).ConfigureAwait(false);
+        var configs = await store.Configs.ListAsync(existing.Id, ct).ConfigureAwait(false);
+        var segments = await store.Segments.ListAsync(existing.Id, ct).ConfigureAwait(false);
+        if (flags.Count > 0 || configs.Count > 0 || segments.Count > 0)
+        {
+            return Results.Conflict(new { error = "Environment is not empty; remove its flags, configs and segments first." });
+        }
+
+        await store.Environments.DeleteAsync(existing.Id, ct).ConfigureAwait(false);
+        return Results.NoContent();
     }
 
     private static Task<IResult> LockAsync(string key, StorageFacade store, IFeatlyEventPublisher events, ClaimsPrincipal user, CancellationToken ct)
@@ -72,3 +162,6 @@ internal static class AdminEnvironmentsEndpoints
         return Results.Ok(updated);
     }
 }
+
+/// <summary>Inbound shape for POST / PUT on the admin environments endpoint.</summary>
+public sealed record EnvironmentWriteRequest(string Key, string? Name);

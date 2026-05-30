@@ -2324,21 +2324,46 @@
             '  <span class="sub">Environment-level controls. A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</span>',
             '</div></div><div class="page-body tight">',
             '  <h2>Environments</h2>',
+            '  <div class="card-pad"><form id="env-new" class="row-form">',
+            '    <label class="field"><span class="field__label">Key</span><input name="key" required placeholder="staging" /></label>',
+            '    <label class="field"><span class="field__label">Name</span><input name="name" placeholder="Staging" /></label>',
+            '    <div class="row-form__action"><button type="submit" class="btn primary">Add environment</button><span class="save-msg" id="env-new-msg"></span></div>',
+            '  </form></div>',
             '  <div id="env-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
         ].join("\n");
+
+        function refreshSettings(msg) {
+            loadEnvironments().then(function () { renderSettings(); })
+                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } if (msg) { setMessageOn(msg, "error", err.message); } });
+        }
+
+        document.getElementById("env-new").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("env-new-msg");
+            setMessageOn(msg, "loading", "Creating…");
+            api("POST", "/admin/environments", { key: f.key.value.trim(), name: f.name.value.trim() || null })
+                .then(function () { refreshSettings(msg); })
+                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
+
         api("GET", "/admin/environments").then(function (envs) {
             envs = Array.isArray(envs) ? envs : [];
             var rows = envs.map(function (e) {
                 var frozen = e.readOnly;
                 var action = frozen ? "unlock" : "lock";
-                var label = frozen ? "Unlock" : "Lock (freeze)";
+                var label = frozen ? "Unlock" : "Lock";
                 var btnClass = frozen ? "btn primary xs" : "btn outline xs danger";
                 return '<tr>'
                     + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
                     + '<td>' + esc(e.name) + '</td>'
                     + '<td>' + (frozen ? '<span class="badge danger">read-only</span>' : '<span class="badge success"><span class="dot"></span>writable</span>') + '</td>'
-                    + '<td><button type="button" class="' + btnClass + '" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button></td>'
+                    + '<td class="col-actions" style="white-space:nowrap">'
+                    + '<button type="button" class="' + btnClass + '" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button> '
+                    + '<button type="button" class="btn outline xs" data-env-action="rename" data-env-key="' + esc(e.key) + '" data-env-name="' + esc(e.name) + '">Rename</button>'
+                    + (e.isDefault ? '' : ' <button type="button" class="btn outline xs danger" data-env-action="delete" data-env-key="' + esc(e.key) + '">Delete</button>')
+                    + '</td>'
                     + '</tr>';
             }).join("");
             document.getElementById("env-settings").innerHTML = [
@@ -2346,16 +2371,27 @@
                 '<span class="save-msg" id="env-msg"></span>',
             ].join("\n");
 
-            Array.prototype.slice.call(document.querySelectorAll("[data-env-action]")).forEach(function (btn) {
+            Array.prototype.slice.call(document.querySelectorAll("#env-settings [data-env-action]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
                     var key = btn.getAttribute("data-env-key");
                     var action = btn.getAttribute("data-env-action");
                     var msg = document.getElementById("env-msg");
-                    setMessageOn(msg, "loading", action === "lock" ? "Freezing…" : "Unfreezing…");
-                    api("POST", "/admin/environments/" + encodeURIComponent(key) + "/" + action)
-                        .then(function () { return loadEnvironments(); })
-                        .then(function () { renderSettings(); })
-                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                    var p;
+                    if (action === "lock" || action === "unlock") {
+                        setMessageOn(msg, "loading", action === "lock" ? "Freezing…" : "Unfreezing…");
+                        p = api("POST", "/admin/environments/" + encodeURIComponent(key) + "/" + action);
+                    } else if (action === "rename") {
+                        var name = window.prompt("New name for environment '" + key + "':", btn.getAttribute("data-env-name") || "");
+                        if (name == null) { return; }
+                        setMessageOn(msg, "loading", "Renaming…");
+                        p = api("PUT", "/admin/environments/" + encodeURIComponent(key), { key: key, name: name.trim() || null });
+                    } else if (action === "delete") {
+                        if (!window.confirm("Delete environment '" + key + "'? It must have no flags, configs or segments.")) { return; }
+                        setMessageOn(msg, "loading", "Deleting…");
+                        p = api("DELETE", "/admin/environments/" + encodeURIComponent(key));
+                    } else { return; }
+                    p.then(function () { refreshSettings(msg); })
+                     .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                 });
             });
         }).catch(handleErrOnView("Settings"));

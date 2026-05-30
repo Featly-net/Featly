@@ -50,4 +50,26 @@ internal sealed class InMemoryEnvironmentStore : IEnvironmentStore
         }
         return Task.FromResult<Environment?>(null);
     }
+
+    public Task UpdateAsync(Environment environment, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+
+        if (!_byId.ContainsKey(environment.Id))
+        {
+            throw new InvalidOperationException($"Environment '{environment.Key}' not found.");
+        }
+
+        _byId[environment.Id] = environment;
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        if (_byId.TryRemove(id, out var env))
+        {
+            _idByProjectKey.TryRemove((env.ProjectId, env.Key.ToUpperInvariant()), out _);
+        }
+        return Task.CompletedTask;
+    }
 }
