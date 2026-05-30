@@ -104,7 +104,7 @@ internal static class AdminFlagsEndpoints
         var flag = body.ToEntity(environment.Id, actor);
         await store.Flags.UpsertAsync(environment.Id, flag, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, flag.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.FlagCreated, "Flag", flag.Key, environment.Id, user, flag, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.FlagCreated, "Flag", flag.Key, environment.Id, user, new { after = flag }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/flags/{flag.Key}?env={environment.Key}", flag);
     }
@@ -154,6 +154,7 @@ internal static class AdminFlagsEndpoints
         }
 
         var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
         existing.Type = body.Type;
@@ -165,7 +166,7 @@ internal static class AdminFlagsEndpoints
 
         await store.Flags.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.FlagUpdated, "Flag", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.FlagUpdated, "Flag", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }

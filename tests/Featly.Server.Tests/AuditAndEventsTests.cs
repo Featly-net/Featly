@@ -112,8 +112,17 @@ public class AuditAndEventsTests
         created.EntityType.Should().Be("Flag");
         created.EntityKey.Should().Be("demo");
         created.ActorIdentifier.Should().NotBeNullOrEmpty();
-        // The 'after' payload was captured.
+        // Create carries the new state under `after`.
         created.Data.Should().NotBeNull();
+        created.Data!.Value.GetProperty("after").GetProperty("enabled").GetBoolean().Should().BeTrue();
+
+        // Update carries both states so the dashboard can render a real diff.
+        var updated = entries.Single(e => e.Action == FeatlyEventTypes.FlagUpdated);
+        var data = updated.Data!.Value;
+        data.GetProperty("before").GetProperty("enabled").GetBoolean().Should().BeTrue();
+        data.GetProperty("before").GetProperty("name").GetString().Should().Be("Demo");
+        data.GetProperty("after").GetProperty("enabled").GetBoolean().Should().BeFalse();
+        data.GetProperty("after").GetProperty("name").GetString().Should().Be("Demo (edited)");
     }
 
     [Fact]
