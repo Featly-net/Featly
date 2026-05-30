@@ -124,6 +124,52 @@ public class WebhookEngineTests
     }
 
     [Fact]
+    public async Task Resend_enqueues_a_new_delivery_cloned_from_an_existing_one()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var created = await (await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "Relay",
+            url = "https://example.com/hook",
+        }, ct)).Content.ReadFromJsonAsync<WebhookEndpoint>(TestJson.Options, cancellationToken: ct);
+
+        await admin.PostAsync(new Uri($"/api/admin/webhooks/{created!.Id}/test", UriKind.Relative), null, ct);
+        var first = (await admin.GetFromJsonAsync<List<WebhookDelivery>>(
+            $"/api/admin/webhooks/{created.Id}/deliveries", TestJson.Options, ct))!.Single();
+
+        var resend = await admin.PostAsync(
+            new Uri($"/api/admin/webhooks/{created.Id}/deliveries/{first.Id}/resend", UriKind.Relative), null, ct);
+        resend.StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var deliveries = await admin.GetFromJsonAsync<List<WebhookDelivery>>(
+            $"/api/admin/webhooks/{created.Id}/deliveries", TestJson.Options, ct);
+        deliveries.Should().HaveCount(2);
+        deliveries!.Should().OnlyContain(d => d.EventType == first.EventType);
+        deliveries.Select(d => d.Id).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task Resend_returns_404_for_a_delivery_that_is_not_on_the_webhook()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var created = await (await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "Relay",
+            url = "https://example.com/hook",
+        }, ct)).Content.ReadFromJsonAsync<WebhookEndpoint>(TestJson.Options, cancellationToken: ct);
+
+        var resend = await admin.PostAsync(
+            new Uri($"/api/admin/webhooks/{created!.Id}/deliveries/{Guid.NewGuid()}/resend", UriKind.Relative), null, ct);
+        resend.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Flag_update_enqueues_a_delivery_for_a_matching_endpoint_only()
     {
         using var host = await BuildHostAsync();

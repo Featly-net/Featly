@@ -2561,6 +2561,62 @@
         return '<span class="badge' + v + '">' + esc(status) + '</span>';
     }
 
+    // Known webhook event types, grouped (mirrors Featly.Abstractions/FeatlyDomainEvent.cs).
+    var WEBHOOK_EVENT_GROUPS = [
+        { label: "Flags", types: ["flag.created", "flag.updated", "flag.archived", "flag.unarchived"] },
+        { label: "Configs", types: ["config.created", "config.updated", "config.archived", "config.unarchived"] },
+        { label: "Segments", types: ["segment.created", "segment.updated", "segment.deleted", "segment.archived", "segment.unarchived"] },
+        { label: "Experiments", types: ["experiment.created", "experiment.updated", "experiment.started", "experiment.stopped"] },
+        { label: "Changes", types: ["change.proposed", "change.approved", "change.rejected", "change.applied"] },
+        { label: "Roles", types: ["role.assigned", "role.unassigned"] },
+        { label: "Environments", types: ["environment.locked", "environment.unlocked"] },
+        { label: "Platform", types: ["apikey.created", "apikey.revoked", "admin.bootstrapped", "configuration.imported"] },
+    ];
+
+    // Multi-select for event types. An empty saved set means "all events", so an
+    // explicit "All events" master checkbox disables the per-type grid.
+    function webhookEventPicker(selected) {
+        var all = !selected || selected.length === 0;
+        var groups = WEBHOOK_EVENT_GROUPS.map(function (g) {
+            return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
+                + g.types.map(function (t) {
+                    var on = !all && selected.indexOf(t) >= 0;
+                    return '<label class="check evt"><input type="checkbox" class="evt-cb" value="' + t + '"'
+                        + (on ? " checked" : "") + (all ? " disabled" : "") + ' /> ' + t + '</label>';
+                }).join("")
+                + '</div></div>';
+        }).join("");
+        return '<div class="evt-picker">'
+            + '<label class="check evt-all"><input type="checkbox" class="evt-all-cb"' + (all ? " checked" : "") + ' /> All events</label>'
+            + '<div class="evt-matrix' + (all ? " disabled" : "") + '">' + groups + '</div>'
+            + '</div>';
+    }
+
+    function collectEventTypes(form) {
+        if (form.querySelector(".evt-all-cb").checked) { return []; }
+        return Array.prototype.slice.call(form.querySelectorAll(".evt-cb:checked")).map(function (c) { return c.value; });
+    }
+
+    function wireEventPicker(root) {
+        if (!root) { return; }
+        var allCb = root.querySelector(".evt-all-cb");
+        var matrix = root.querySelector(".evt-matrix");
+        var cbs = root.querySelectorAll(".evt-cb");
+        function sync() {
+            var dis = allCb.checked;
+            matrix.classList.toggle("disabled", dis);
+            Array.prototype.forEach.call(cbs, function (c) {
+                c.disabled = dis;
+                if (dis) { c.checked = false; }
+            });
+        }
+        allCb.addEventListener("change", sync);
+        Array.prototype.forEach.call(cbs, function (c) {
+            c.addEventListener("change", function () { if (c.checked) { allCb.checked = false; } });
+        });
+        sync();
+    }
+
     function renderWebhookList() {
         viewEl.innerHTML = listPageShell("Webhooks", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/webhooks")
@@ -2626,6 +2682,7 @@
                     + '<td class="num">' + (d.lastStatusCode != null ? d.lastStatusCode : '—') + '</td>'
                     + '<td class="muted">' + esc(truncate(d.lastError || "", 48)) + '</td>'
                     + '<td>' + formatDate(d.createdAt) + '</td>'
+                    + '<td class="col-actions"><button type="button" class="btn outline xs" data-resend="' + esc(d.id) + '">Resend</button></td>'
                     + '</tr>';
             }).join("");
 
@@ -2642,13 +2699,13 @@
                 field("Name", '<input name="name" required value="' + esc(w.name) + '" />'),
                 field("URL", '<input name="url" required value="' + esc(w.url) + '" />'),
                 field("Enabled", '<label class="check"><input type="checkbox" name="enabled"' + (w.enabled ? " checked" : "") + ' /> Deliver events</label>'),
-                field("Event types", '<input name="eventTypes" value="' + esc((w.eventTypes || []).join(", ")) + '" placeholder="(blank = all)" />'),
+                field("Event types", webhookEventPicker(w.eventTypes || [])),
                 field("Secret", '<input name="secret" value="' + esc(w.secret || "") + '" />'),
                 '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
                 '  </form>',
                 '  <div class="card-pad"><h2>Recent deliveries</h2>',
                 deliveryRows
-                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th></tr></thead><tbody>' + deliveryRows + '</tbody></table></div>'
+                    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Code</th><th>Last error</th><th>Created</th><th></th></tr></thead><tbody id="wh-deliveries">' + deliveryRows + '</tbody></table></div>'
                     : '<div class="empty"><p>No deliveries yet. Use “Send test event” to enqueue one.</p></div>',
                 '  </div>',
                 '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
@@ -2659,6 +2716,9 @@
                 '</dl></div></aside></div></div></div>',
             ].join("\n");
 
+            hydrateIcons(viewEl);
+            wireEventPicker(viewEl.querySelector(".evt-picker"));
+
             var msg = document.getElementById("wh-msg");
             document.getElementById("wh-edit").addEventListener("submit", function (e) {
                 e.preventDefault();
@@ -2668,11 +2728,27 @@
                     name: f.name.value.trim(),
                     url: f.url.value.trim(),
                     enabled: f.enabled.checked,
-                    eventTypes: parseCsv(f.eventTypes.value),
+                    eventTypes: collectEventTypes(f),
                     secret: f.secret.value.trim() || null,
                 }).then(function () { setMessageOn(msg, "success", "Saved."); })
                   .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
             });
+
+            var deliveriesBody = document.getElementById("wh-deliveries");
+            if (deliveriesBody) {
+                deliveriesBody.addEventListener("click", function (e) {
+                    var btn = e.target.closest("[data-resend]");
+                    if (!btn) { return; }
+                    btn.disabled = true;
+                    api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries/" + encodeURIComponent(btn.getAttribute("data-resend")) + "/resend")
+                        .then(function () { flash("ok", "Delivery re-enqueued."); renderWebhookDetail(id); })
+                        .catch(function (err) {
+                            btn.disabled = false;
+                            if (err.kind === "auth") { showAuthPrompt(); return; }
+                            flash("err", "Resend failed: " + (err && err.message ? err.message : "error"));
+                        });
+                });
+            }
             Array.prototype.slice.call(document.querySelectorAll("[data-wh]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
                     var action = btn.getAttribute("data-wh");

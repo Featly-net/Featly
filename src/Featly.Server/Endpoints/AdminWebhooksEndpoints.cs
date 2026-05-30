@@ -29,6 +29,7 @@ internal static class AdminWebhooksEndpoints
         admin.MapPut("/{id:guid}", UpdateAsync).WithName("Featly.Admin.Webhooks.Update").RequirePermission(Permission.WebhookUpdate);
         admin.MapDelete("/{id:guid}", DeleteAsync).WithName("Featly.Admin.Webhooks.Delete").RequirePermission(Permission.WebhookDelete);
         admin.MapPost("/{id:guid}/test", TestAsync).WithName("Featly.Admin.Webhooks.Test").RequirePermission(Permission.WebhookUpdate);
+        admin.MapPost("/{id:guid}/deliveries/{deliveryId:guid}/resend", ResendAsync).WithName("Featly.Admin.Webhooks.Resend").RequirePermission(Permission.WebhookUpdate);
 
         return group;
     }
@@ -172,6 +173,38 @@ internal static class AdminWebhooksEndpoints
         };
         await store.WebhookDeliveries.EnqueueAsync([delivery], ct).ConfigureAwait(false);
         return Results.Accepted(value: new { deliveryId = delivery.Id });
+    }
+
+    // Re-enqueues a fresh delivery cloned from an existing one (same event type and
+    // payload). The original row is left untouched as an audit record.
+    private static async Task<IResult> ResendAsync(Guid id, Guid deliveryId, StorageFacade store, CancellationToken ct)
+    {
+        var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (endpoint is null)
+        {
+            return Results.NotFound(new { error = $"Webhook '{id}' not found." });
+        }
+
+        var original = await store.WebhookDeliveries.GetByIdAsync(deliveryId, ct).ConfigureAwait(false);
+        if (original is null || original.WebhookEndpointId != id)
+        {
+            return Results.NotFound(new { error = $"Delivery '{deliveryId}' not found for webhook '{id}'." });
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var resend = new WebhookDelivery
+        {
+            Id = Guid.NewGuid(),
+            WebhookEndpointId = endpoint.Id,
+            EventType = original.EventType,
+            Payload = original.Payload,
+            Status = WebhookDeliveryStatus.Pending,
+            NextAttemptAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.WebhookDeliveries.EnqueueAsync([resend], ct).ConfigureAwait(false);
+        return Results.Accepted(value: new { deliveryId = resend.Id });
     }
 
     private static async Task<Guid?> ResolveEnvironmentIdAsync(StorageFacade store, string? envKey, CancellationToken ct)
