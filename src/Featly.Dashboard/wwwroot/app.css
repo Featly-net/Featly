@@ -2188,6 +2188,13 @@ p:last-child { margin-bottom: 0; }
 .cell-name { font-size: 11px; color: var(--fg-muted); }
 .cell-modified { font-size: 11.5px; color: var(--fg-muted); white-space: nowrap; }
 .tbl td.col-actions { text-align: right; }
+
+/* Role editor permission matrix */
+.perm-matrix { display: flex; flex-direction: column; gap: 12px; }
+.perm-group-h { font: 500 11px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 6px; }
+.perm-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 12px; }
+.check.perm { font-size: 12px; font-family: var(--font-mono); }
+.check.perm input[disabled] { opacity: 0.6; }
 .tbl td.col-check, .tbl th:first-child { vertical-align: middle; }
 .tbl input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
