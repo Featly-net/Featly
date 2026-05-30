@@ -8,6 +8,26 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+## [0.1.0-preview.2] - 2026-05-30
+
+The dashboard preview. A full redesign of the embedded UI to a high-fidelity design system, the screens and admin endpoints that close the remaining management gaps (Projects, Environments, custom roles, group membership, archive/restore, webhook event-types + resend), before/after audit snapshots with a line-level diff view, and an end-to-end + headless smoke test of the dashboard in CI. Also adds server-side OpenTelemetry, a container story for the centralized sample, and refreshed docs. Everything is additive and opt-in — no breaking change. 367 tests passing.
+
+### Added
+
+- **Embedded dashboard redesign (#60-#67).** Rebuilt the embedded UI on a high-fidelity design system: a new app shell (left nav grouped by area, breadcrumbs, environment pill with a prod/staging/dev tone + LOCKED badge, light/dark toggle, command palette on `Cmd`/`Ctrl`-K), an inline-SVG icon set (Lucide-style, no webfont), and self-hosted IBM Plex fonts shipped as embedded resources. Adds a reusable line-level (LCS) **diff view** with an **audit details modal** (#61), a **notification popover** wired to the bell (#63), a fix so `[hidden]` overlays actually hide (#62), and rule-editor row-layout + API-keys table fixes (#64). Still vanilla JS, single `app.js`, no build step. Purple accent (`#7c3aed` / dark `#a78bfa`).
+- **Projects screen + admin endpoints (#68).** `/api/admin/projects` CRUD plus a Projects screen; the project/environment selectors stay hidden when only one of each exists, preserving the embedded quickstart UX.
+- **Before/after snapshots in mutation events (#69).** Mutation domain events now carry a `before`/`after` payload, so the audit log renders a real entity diff (consumed by the #61 audit modal).
+- **Collapsible rule-card editor (#70).** Each targeting rule is a collapsible card with a one-line summary header (first condition → outcome), so flags/configs with many rules stay scannable.
+- **Environments create / rename / delete (#81).** `/api/admin/environments` gains create/rename/delete (server + dashboard), with the default-environment and ReadOnly protections enforced.
+- **Custom roles editor (#82).** A permission-matrix editor to create, clone (from a system template), edit, and delete custom roles; the four system roles stay immutable.
+- **Archive & restore for flags / configs / segments (#83).** Soft archive + restore from the dashboard, backed by a new `Segment.Archived` field (migration) to match flags and configs.
+- **User picker for groups + role-assignment surface (#84).** Group membership gains a user picker, and a role-assignment surface ties users/groups to roles per project/environment.
+- **Webhooks: event-type picker + resend a delivery (#85).** The webhook editor gets a checkbox picker for subscribed event types, and a past delivery can be re-sent on demand.
+- **Dashboard E2E + headless smoke in CI (#86, #87).** An end-to-end admin-lifecycle test plus a Playwright **dashboard smoke** CI job that logs in and visits every routed screen, failing on any render/console error — the regression class that slipped through manual review during the redesign.
+- **Server OpenTelemetry traces + metrics (#88, closes #77).** Opt-in (`Featly:Telemetry:Enabled`) OTLP export of ASP.NET Core + HttpClient spans plus Featly's own meter (`Featly.Server`) — evaluations, events ingested, changes applied, audit writes, webhook deliveries + latency — and activity source (`featly.change.apply`, `featly.webhook.deliver`). Off by default with zero per-request overhead; the instrumentation records for free with no listener attached.
+- **Centralized.Sample Dockerfile + docker-compose (#89, closes #78).** A multi-stage `Dockerfile` (untrimmed; EF Core + reflection make trimming unsafe) and a `docker-compose.yml` so `docker compose up` brings up the centralized server + dashboard on a mapped port with SQLite persisted on a named volume. New "Run the central server with Docker" section in `docs/DEPLOYMENT.md`.
+- **Dashboard screenshots in the docs (#90, closes #79).** README "Dashboard" section and a GETTING_STARTED "Tour the dashboard" walkthrough, with captures of the redesigned shell (flags list, the visual rule editor, Inbox, change-review diff, audit diff modal, command palette).
+
 ## [0.1.0-preview.1] - 2026-05-29
 
 The first public preview. Ships **M12** end-to-end — the polish, tooling, third deployment sample, and documentation the project needs for a real release — on top of everything from M1–M11 (feature flags, dynamic configs, segments + the full targeting engine, experiments, custom RBAC, approval workflows, webhooks + audit, and the OpenFeature provider). New in this release: the `Featly.Cli` global tool (offline `db` schema commands; online `apikey`/`bootstrap-admin`/`env`/`export`/`import`), user-bound API keys that authenticate over Bearer and attribute actions to a real person (closing the approval-workflow limitation), a guarded first-admin bootstrap endpoint, config export/import, the standalone `Centralized.Sample`, and the full docs set (getting-started, configuration, deployment, performance, a security audit, and a complete set of ADRs). 336 tests passing. The public API is still pre-1.0 and may change before `v0.1.0` stable.
@@ -175,6 +195,8 @@ Release entries follow this shape:
 [0.1.0]: https://github.com/Featly-net/Featly/releases/tag/v0.1.0
 -->
 
-[Unreleased]: https://github.com/Featly-net/Featly/compare/v0.0.3-preview.1...HEAD
+[Unreleased]: https://github.com/Featly-net/Featly/compare/v0.1.0-preview.2...HEAD
+[0.1.0-preview.2]: https://github.com/Featly-net/Featly/releases/tag/v0.1.0-preview.2
+[0.1.0-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.1.0-preview.1
 [0.0.3-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.0.3-preview.1
 [0.0.2-preview.1]: https://github.com/Featly-net/Featly/releases/tag/v0.0.2-preview.1
