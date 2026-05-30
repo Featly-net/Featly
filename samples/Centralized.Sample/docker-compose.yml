@@ -1,0 +1,39 @@
+# Run the centralized Featly server (server + dashboard + persisted SQLite) with
+# a single command, from this directory:
+#
+#   docker compose up --build
+#
+# Then open the dashboard at http://localhost:5085/featly and the health probe at
+# http://localhost:5085/health/live. Data persists in the named volume across
+# `docker compose down` / `up` (use `down -v` to wipe it).
+#
+# The build context is the repository root (two levels up) because the sample
+# references projects under src/.
+
+services:
+  featly:
+    build:
+      context: ../..
+      dockerfile: samples/Centralized.Sample/Dockerfile
+    image: featly-centralized:latest
+    container_name: featly-centralized
+    ports:
+      - "5085:8080"
+    environment:
+      # SQLite on the persisted volume (overrides appsettings).
+      Featly__Storage__Sqlite__ConnectionString: "Data Source=/data/featly-central.db"
+      Featly__Storage__Sqlite__AutoMigrate: "true"
+      # Bootstrap the first admin without a chicken-and-egg problem: the first
+      # authenticated identity matching this identifier becomes Admin on boot.
+      Featly__Authorization__BootstrapAdminIdentifier: "${FEATLY_BOOTSTRAP_ADMIN:-admin@example.com}"
+      # Bootstrap API keys. Override these in any real deployment (e.g. an .env
+      # file next to this compose file, or your secret store) — never ship the
+      # dev placeholders.
+      Featly__Server__AdminApiKey: "${FEATLY_ADMIN_API_KEY:-dev-admin-replace-me}"
+      Featly__Server__SdkApiKey: "${FEATLY_SDK_API_KEY:-dev-sdk-replace-me}"
+    volumes:
+      - featly-data:/data
+    restart: unless-stopped
+
+volumes:
+  featly-data:
