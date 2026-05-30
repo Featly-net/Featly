@@ -270,7 +270,8 @@
         "user-shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
         "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
         "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
-        "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+        "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -330,6 +331,7 @@
         experimentList: "Experiments", experimentDetail: "Experiments",
         userList: "Users", userDetail: "Users", roleList: "Roles",
         groupList: "Groups", groupDetail: "Groups", apiKeyList: "API keys",
+        projectList: "Projects", projectDetail: "Projects",
         approvals: "Approval policies", webhookList: "Webhooks", webhookDetail: "Webhooks",
         auditLog: "Audit log", settings: "Settings"
     };
@@ -374,6 +376,8 @@
         { match: /^\/groups\/(.+)$/,     key: "groupDetail",  params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
         { match: /^\/groups\/?$/,        key: "groupList",    params: function () { return {}; } },
         { match: /^\/apikeys\/?$/,       key: "apiKeyList",   params: function () { return {}; } },
+        { match: /^\/projects\/(.+)$/,   key: "projectDetail", params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
+        { match: /^\/projects\/?$/,      key: "projectList",  params: function () { return {}; } },
         { match: /^\/inbox\/(.+)$/,      key: "changeDetail", params: function (m) { return { id: decodeURIComponent(m[1]) }; } },
         { match: /^\/inbox\/?$/,         key: "inbox",        params: function () { return {}; } },
         { match: /^\/approvals\/?$/,     key: "approvals",    params: function () { return {}; } },
@@ -410,6 +414,7 @@
         if (key.indexOf("role") === 0) { return "/roles"; }
         if (key.indexOf("group") === 0) { return "/groups"; }
         if (key.indexOf("apiKey") === 0) { return "/apikeys"; }
+        if (key.indexOf("project") === 0) { return "/projects"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
         if (key.indexOf("webhook") === 0) { return "/webhooks"; }
@@ -728,6 +733,8 @@
         groupList:   function () { renderGroupList(); },
         groupDetail: function (p) { renderGroupDetail(p.key); },
         apiKeyList:  function () { renderApiKeyList(); },
+        projectList:  function () { renderProjectList(); },
+        projectDetail: function (p) { renderProjectDetail(p.key); },
         settings: function () { renderSettings(); },
     };
 
@@ -1633,6 +1640,101 @@
                 return refresh();
             }).catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
         });
+    }
+
+    // ============================================================
+    // Projects (System): top-level scope grouping environments
+    // ============================================================
+    function renderProjectList() {
+        viewEl.innerHTML = listPageShell("Projects", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/projects")
+            .then(function (projects) {
+                projects = Array.isArray(projects) ? projects : [];
+                var rows = projects.map(function (p) {
+                    return '<tr data-key="' + esc(p.key) + '">'
+                        + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(p.key) + '</span>'
+                        + '<span class="cell-name">' + esc(p.name || "") + '</span></div></td>'
+                        + '<td>' + (p.isDefault ? '<span class="badge info">default</span>' : '<span class="muted" style="font-size:11px">—</span>') + '</td>'
+                        + '<td><span class="muted" style="font-size:11px">' + esc(truncate(p.description || "", 60)) + '</span></td>'
+                        + '<td class="mono cell-modified">' + (formatDate(p.createdAt) || "—") + '</td>'
+                        + '</tr>';
+                }).join("");
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Projects</h1>',
+                    '  <span class="sub">A project is the top-level scope that groups a set of environments.</span>',
+                    '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    projects.length
+                        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Project</th><th>Default</th><th>Description</th><th>Created</th></tr></thead><tbody class="prj-tbody">' + rows + '</tbody></table></div>'
+                        : '<div class="empty"><p>No projects yet. Create one on the right.</p></div>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">New project</h3>',
+                    '  <form id="prj-form" class="editor">',
+                    field("Key", '<input name="key" required placeholder="mobile" />'),
+                    field("Name", '<input name="name" placeholder="Mobile" />'),
+                    field("Description", '<input name="description" placeholder="optional" />'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Create project</button><span class="save-msg" id="prj-msg"></span></div>',
+                    '  </form>',
+                    '</div></aside></div></div></div>',
+                ].join("\n");
+
+                var tbody = viewEl.querySelector(".prj-tbody");
+                if (tbody) {
+                    tbody.addEventListener("click", function (e) {
+                        if (e.target.closest("input, button, a")) { return; }
+                        var tr = e.target.closest("tr[data-key]");
+                        if (tr) { navigate("/projects/" + encodeURIComponent(tr.getAttribute("data-key"))); }
+                    });
+                }
+                document.getElementById("prj-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("prj-msg");
+                    setMessageOn(msg, "loading", "Creating…");
+                    api("POST", "/admin/projects", {
+                        key: f.key.value.trim(),
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                    }).then(function (p) { navigate("/projects/" + encodeURIComponent(p.key)); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Projects"));
+    }
+
+    function renderProjectDetail(key) {
+        viewEl.innerHTML = listPageShell("Project", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
+        api("GET", "/admin/projects/" + encodeURIComponent(key))
+            .then(function (p) {
+                viewEl.innerHTML = [
+                    '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(p.name || p.key) + '</h1>',
+                    '  <span class="sub">project <code>' + esc(p.key) + '</code>' + (p.isDefault ? ' · default' : '') + '</span>',
+                    '</div><div class="actions"><span class="save-msg" id="prj-msg"></span></div></div>',
+                    '<div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '  <form id="prj-edit" class="editor card-pad">',
+                    field("Name", '<input name="name" value="' + esc(p.name || "") + '" />'),
+                    field("Description", '<input name="description" value="' + esc(p.description || "") + '" />'),
+                    '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
+                    '  </form>',
+                    '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
+                    '  <dt>Key</dt><dd class="mono">' + esc(p.key) + '</dd>',
+                    '  <dt>Default</dt><dd>' + (p.isDefault ? "yes" : "no") + '</dd>',
+                    '  <dt>Created</dt><dd>' + (formatDate(p.createdAt) || "—") + '</dd>',
+                    '</dl></div></aside></div></div></div>',
+                ].join("\n");
+
+                var msg = document.getElementById("prj-msg");
+                document.getElementById("prj-edit").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/projects/" + encodeURIComponent(key), {
+                        key: key,
+                        name: f.name.value.trim() || null,
+                        description: f.description.value.trim() || null,
+                    }).then(function () { setMessageOn(msg, "success", "Saved."); })
+                      .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            })
+            .catch(handleErrOnView("Project: " + key));
     }
 
     // ============================================================

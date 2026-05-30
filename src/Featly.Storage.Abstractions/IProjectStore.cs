@@ -19,4 +19,7 @@ public interface IProjectStore
 
     /// <summary>Inserts a new project. Throws if a project with the same key already exists.</summary>
     Task CreateAsync(Project project, CancellationToken ct);
+
+    /// <summary>Updates a project's mutable metadata (name, description). The key is immutable.</summary>
+    Task UpdateAsync(Project project, CancellationToken ct);
 }
