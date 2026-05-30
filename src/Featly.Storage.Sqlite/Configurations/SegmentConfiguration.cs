@@ -31,6 +31,8 @@ internal sealed class SegmentConfiguration : IEntityTypeConfiguration<Segment>
         builder.Property(s => s.EnvironmentId)
             .IsRequired();
 
+        builder.Property(s => s.Archived);
+
         // Persist timestamps as 64-bit UTC ticks so MAX / ORDER BY work in SQL.
         builder.Property(s => s.CreatedAt).HasConversion<DateTimeOffsetTicksConverter>();
         builder.Property(s => s.UpdatedAt).HasConversion<DateTimeOffsetTicksConverter>();

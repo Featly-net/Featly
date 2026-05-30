@@ -107,6 +107,46 @@ public class SqliteSegmentStoreTests
     }
 
     [Fact]
+    public async Task Archive_excludes_segment_from_list_and_persists_flag()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        await host.Store.Segments.UpsertAsync(envId, NewSegment(envId, "legacy"), "t", ct);
+        await host.Store.Segments.ArchiveAsync(envId, "legacy", "archiver", ct);
+
+        var active = await host.Store.Segments.ListAsync(envId, ct);
+        active.Should().NotContain(s => s.Key == "legacy");
+
+        var archived = await host.Store.Segments.ListArchivedAsync(envId, ct);
+        archived.Should().ContainSingle(s => s.Key == "legacy");
+
+        var loaded = await host.Store.Segments.GetAsync(envId, "legacy", ct);
+        loaded!.Archived.Should().BeTrue();
+        loaded.UpdatedBy.Should().Be("archiver");
+    }
+
+    [Fact]
+    public async Task Unarchive_restores_segment_to_list()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        await host.Store.Segments.UpsertAsync(envId, NewSegment(envId, "legacy"), "t", ct);
+        await host.Store.Segments.ArchiveAsync(envId, "legacy", "t", ct);
+        await host.Store.Segments.UnarchiveAsync(envId, "legacy", "restorer", ct);
+
+        var active = await host.Store.Segments.ListAsync(envId, ct);
+        active.Should().ContainSingle(s => s.Key == "legacy");
+
+        var loaded = await host.Store.Segments.GetAsync(envId, "legacy", ct);
+        loaded!.Archived.Should().BeFalse();
+        loaded.UpdatedBy.Should().Be("restorer");
+    }
+
+    [Fact]
     public async Task GetMostRecentUpdate_tracks_updates()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

@@ -228,6 +228,50 @@ public class AdminConfigsEndpointTests
         configs!.Select(c => c.Key).Should().BeEquivalentTo(["a", "b"]);
     }
 
+    [Fact]
+    public async Task Archive_then_unarchive_moves_config_between_active_and_archived_lists()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        await client.PostAsJsonAsync("/api/admin/configs", new
+        {
+            key = "legacy.flag",
+            name = "Legacy",
+            type = "String",
+            defaultValue = "x",
+        }, TestContext.Current.CancellationToken);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/configs/legacy.flag/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.OK);
+        var archived = await archive.Content.ReadFromJsonAsync<Config>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        archived!.Archived.Should().BeTrue();
+
+        var active = await client.GetFromJsonAsync<List<Config>>(new Uri("/api/admin/configs", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        active!.Should().NotContain(c => c.Key == "legacy.flag");
+
+        var archivedList = await client.GetFromJsonAsync<List<Config>>(new Uri("/api/admin/configs?archived=true", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        archivedList!.Should().ContainSingle(c => c.Key == "legacy.flag");
+
+        var restore = await client.PostAsync(new Uri("/api/admin/configs/legacy.flag/unarchive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        restore.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var activeAfter = await client.GetFromJsonAsync<List<Config>>(new Uri("/api/admin/configs", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        activeAfter!.Should().ContainSingle(c => c.Key == "legacy.flag");
+    }
+
+    [Fact]
+    public async Task Archive_returns_404_for_unknown_config()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/configs/ghost/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private static async Task<IHost> BuildHostAsync()
     {
         var builder = new HostBuilder()

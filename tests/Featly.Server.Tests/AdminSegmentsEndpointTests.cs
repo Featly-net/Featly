@@ -115,6 +115,67 @@ public class AdminSegmentsEndpointTests
     }
 
     [Fact]
+    public async Task Archive_hides_segment_from_active_list_and_lists_it_under_archived()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        await client.PostAsJsonAsync("/api/admin/segments", new
+        {
+            key = "legacy",
+            name = "Legacy",
+            conditions = Array.Empty<object>(),
+        }, TestContext.Current.CancellationToken);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/segments/legacy/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.OK);
+        var archived = await archive.Content.ReadFromJsonAsync<Segment>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        archived!.Archived.Should().BeTrue();
+
+        var active = await client.GetFromJsonAsync<List<Segment>>(new Uri("/api/admin/segments", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        active!.Should().NotContain(s => s.Key == "legacy");
+
+        var listArchived = await client.GetFromJsonAsync<List<Segment>>(new Uri("/api/admin/segments?archived=true", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        listArchived!.Should().ContainSingle(s => s.Key == "legacy");
+    }
+
+    [Fact]
+    public async Task Unarchive_restores_segment_to_active_list()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        await client.PostAsJsonAsync("/api/admin/segments", new
+        {
+            key = "legacy",
+            name = "Legacy",
+            conditions = Array.Empty<object>(),
+        }, TestContext.Current.CancellationToken);
+        await client.PostAsync(new Uri("/api/admin/segments/legacy/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+
+        var restore = await client.PostAsync(new Uri("/api/admin/segments/legacy/unarchive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        restore.StatusCode.Should().Be(HttpStatusCode.OK);
+        var restored = await restore.Content.ReadFromJsonAsync<Segment>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        restored!.Archived.Should().BeFalse();
+
+        var active = await client.GetFromJsonAsync<List<Segment>>(new Uri("/api/admin/segments", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        active!.Should().ContainSingle(s => s.Key == "legacy");
+    }
+
+    [Fact]
+    public async Task Archive_returns_404_for_unknown_segment()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/segments/ghost/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task POST_rejects_unauthenticated_requests()
     {
         using var host = await BuildHostAsync();
