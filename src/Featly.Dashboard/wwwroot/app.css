@@ -2267,6 +2267,13 @@ p:last-child { margin-bottom: 0; }
 .ra-card { margin-top: 16px; }
 .ra-card .ra-form { margin-top: 12px; }
 
+/* Webhook event-type multi-select */
+.evt-picker { display: flex; flex-direction: column; gap: 10px; }
+.evt-all { font-weight: 500; }
+.evt-matrix { display: flex; flex-direction: column; gap: 12px; }
+.evt-matrix.disabled { opacity: 0.45; pointer-events: none; }
+.check.evt { font-size: 12px; font-family: var(--font-mono); }
+
 /* Inbox + Audit log (redesign step 5). */
 .inbox-list { display: flex; flex-direction: column; gap: 18px; }
 .inbox-card[data-cr] { cursor: pointer; }
