@@ -53,4 +53,21 @@ internal sealed class SqliteProjectStore(IDbContextFactory<FeatlyDbContext> cont
         db.Projects.Add(project);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    public async Task UpdateAsync(Project project, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+        var existing = await db.Projects.FirstOrDefaultAsync(p => p.Id == project.Id, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            throw new InvalidOperationException($"Project '{project.Key}' not found.");
+        }
+
+        existing.Name = project.Name;
+        existing.Description = project.Description;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 }

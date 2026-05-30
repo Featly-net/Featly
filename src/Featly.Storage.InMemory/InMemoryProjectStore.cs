@@ -36,4 +36,17 @@ internal sealed class InMemoryProjectStore : IProjectStore
         _byId[project.Id] = project;
         return Task.CompletedTask;
     }
+
+    public Task UpdateAsync(Project project, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        if (!_byId.ContainsKey(project.Id))
+        {
+            throw new InvalidOperationException($"Project '{project.Key}' not found.");
+        }
+
+        _byId[project.Id] = project;
+        return Task.CompletedTask;
+    }
 }

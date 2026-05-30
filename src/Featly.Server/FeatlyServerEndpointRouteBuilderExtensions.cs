@@ -41,6 +41,7 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
         apiGroup.MapAdminSegments();
         apiGroup.MapAdminConfigs();
         apiGroup.MapAdminEnvironments();
+        apiGroup.MapAdminProjects();
         apiGroup.MapAdminPreview();
         apiGroup.MapAdminUsers();
         apiGroup.MapAdminApiKeys();
