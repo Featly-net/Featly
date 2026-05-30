@@ -5,7 +5,29 @@
 
 ## Active milestone
 
-**Releasing `v0.1.0-preview.1`** — the first public preview, packaging all of M12 on top of M1–M11. M12 (the final milestone) is **complete**: all five PRs merged. The preview is cut first; promotion to stable `v0.1.0` follows on a separate go-ahead.
+**Releasing `v0.1.0-preview.2`** — the dashboard preview. Builds on `v0.1.0-preview.1` (M1–M12) with a full redesign of the embedded UI plus the screens, endpoints, and tests that close the remaining management gaps, and adds server OpenTelemetry, a container story for the centralized sample, and refreshed docs. 367 tests passing. The public API is still pre-1.0; promotion to stable `v0.1.0` follows on a separate go-ahead.
+
+### Dashboard redesign + follow-ups (complete)
+
+- [x] **Redesign (#60-#67)** — high-fidelity design-system shell (grouped nav, breadcrumbs, env pill, light/dark toggle, `Cmd`/`Ctrl`-K command palette), inline-SVG icons, self-hosted IBM Plex fonts, a line-level diff view + audit details modal, a notification popover, and overlay/`[hidden]` + rule-editor/API-keys fixes. Vanilla JS, no build step; purple accent kept.
+- [x] **Projects (#68)** — `/api/admin/projects` CRUD + Projects screen (selectors stay hidden when only one exists).
+- [x] **Audit before/after (#69)** — mutation domain events carry a before/after payload; the audit log renders a real entity diff.
+- [x] **Collapsible rule cards (#70)** — one-line summary headers keep many-rule flags/configs scannable.
+- [x] **Environments (#81)** — create / rename / delete (server + dashboard), default + ReadOnly protections enforced.
+- [x] **Custom roles editor (#82)** — permission-matrix create / clone / edit / delete; the four system roles stay immutable.
+- [x] **Archive & restore (#83)** — flags / configs / segments soft archive + restore (+ `Segment.Archived` migration).
+- [x] **Groups + assignments (#84)** — user picker for group membership + a role-assignment surface.
+- [x] **Webhooks (#85)** — subscribed-event-type picker + resend a past delivery.
+- [x] **Dashboard E2E + smoke (#86, #87)** — admin-lifecycle E2E + a Playwright smoke CI job over every routed screen.
+- [x] **Observability (#88 / closes #77)** — opt-in server OpenTelemetry traces + metrics over OTLP; off by default.
+- [x] **Container (#89 / closes #78)** — `Centralized.Sample` Dockerfile + docker-compose; `docker compose up` with persisted SQLite.
+- [x] **Docs (#90 / closes #79)** — refreshed dashboard screenshots in README + getting-started.
+
+**Cutting `v0.1.0-preview.2` now** (the dashboard preview); promotion to stable `v0.1.0` follows on a separate go-ahead.
+
+## Previous milestone
+
+**Released `v0.1.0-preview.1`** — the first public preview, packaging all of M12 on top of M1–M11. M12 (the final milestone) is **complete**: all five PRs merged. The preview is cut first; promotion to stable `v0.1.0` follows on a separate go-ahead.
 
 ### M12 — Polish, docs, first release (complete)
 
@@ -19,7 +41,7 @@ Delivered the `Featly.Cli` global tool, the `Centralized.Sample` (separate-serve
 
 **M12 is complete.** All five PRs merged; 336 tests passing. Cutting `v0.1.0-preview.1` now (the first public preview); promotion to stable `v0.1.0` follows on a separate go-ahead.
 
-## Previous milestone
+## Milestone before that
 
 **M11 — OpenFeature provider** (complete; published as `v0.0.9-preview.1` on NuGet)
 
