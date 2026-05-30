@@ -1,0 +1,87 @@
+name: dashboard-smoke
+
+# Headless smoke for the embedded dashboard. Boots the SelfHosted sample and
+# walks every routed screen, failing on a screen that does not render or that
+# emits a page/console error. Kept as a SEPARATE workflow (not a required status
+# check) so a runner/browser hiccup never blocks a merge — see issue #76.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: dashboard-smoke-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  ASPNETCORE_URLS: http://localhost:5080
+  FEATLY_BASE_URL: http://localhost:5080
+
+jobs:
+  smoke:
+    name: dashboard smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET 8 SDK (net8.0 multi-target)
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup .NET 10 SDK (primary)
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Build sample
+        run: dotnet build samples/SelfHosted.Sample/SelfHosted.Sample.csproj -c Release
+
+      - name: Start sample
+        run: |
+          nohup dotnet run --project samples/SelfHosted.Sample/SelfHosted.Sample.csproj -c Release --no-build > sample.log 2>&1 &
+          echo "Started sample (pid $!)"
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5080/health/live >/dev/null 2>&1; then
+              echo "Sample is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Sample did not become healthy in time." >&2
+          cat sample.log || true
+          exit 1
+
+      - name: Install smoke dependencies
+        working-directory: tests/dashboard-smoke
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: tests/dashboard-smoke
+        run: npx playwright install --with-deps chromium
+
+      - name: Run dashboard smoke
+        working-directory: tests/dashboard-smoke
+        run: node smoke.mjs
+
+      - name: Sample log (on failure)
+        if: failure()
+        run: cat sample.log || true

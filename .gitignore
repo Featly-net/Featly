@@ -79,6 +79,10 @@ appsettings.Development.json
 Thumbs.db
 desktop.ini
 
+# Node (dashboard smoke harness)
+node_modules/
+tests/dashboard-smoke/test-results/
+
 # Misc
 *.swp
 *~
