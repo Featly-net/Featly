@@ -271,7 +271,8 @@
         "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
         "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
         "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-        "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'
+        "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+        "grip": '<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -2469,10 +2470,39 @@
     // Rule editor (shared between Flag rules and Config rules)
     // ============================================================
     function renderRulesEditor(rules, context) {
-        return '<div class="rules-list">' + rules.map(function (r) { return renderRuleCard(r, context); }).join("") + '</div>';
+        return '<div class="rules-list">' + rules.map(function (r, i) { return renderRuleCard(r, context, i); }).join("") + '</div>';
     }
 
-    function renderRuleCard(rule, context) {
+    // One-line glance of a rule for the collapsible header: first condition
+    // (attr op value) + the outcome. Computed from the saved data; refreshes on
+    // the next render. Editing happens in the body.
+    function ruleSummary(rule, context) {
+        var conds = rule.conditions || [];
+        var head;
+        if (!conds.length) {
+            head = '<span class="op">any context</span>';
+        } else {
+            var c = conds[0];
+            var val = typeof c.value === "string" ? c.value : JSON.stringify(c.value);
+            head = '<span class="mono">' + esc(c.attribute || "?") + '</span>'
+                + '<span class="op">' + esc(c.operator || "") + '</span>'
+                + '<span class="val">' + esc(truncate(val == null ? "" : String(val), 28)) + '</span>'
+                + (conds.length > 1 ? '<span class="op">+' + (conds.length - 1) + '</span>' : '');
+        }
+        var out = "";
+        if (context.kind === "flag") {
+            if (rule.outcome && rule.outcome.splits && rule.outcome.splits.length) {
+                out = '<span class="op">&rarr; split</span>';
+            } else if (rule.outcome && rule.outcome.variantKey) {
+                out = '<span class="op">&rarr;</span><span class="val">' + esc(rule.outcome.variantKey) + '</span>';
+            }
+        } else {
+            out = '<span class="op">&rarr;</span><span class="val">' + esc(truncate(JSON.stringify(rule.value), 24)) + '</span>';
+        }
+        return head + out;
+    }
+
+    function renderRuleCard(rule, context, index) {
         var outcomeHtml;
         if (context.kind === "flag") {
             var hasSplits = !!(rule.outcome && rule.outcome.splits && rule.outcome.splits.length);
@@ -2496,21 +2526,26 @@
                 + '</div>';
         }
 
-        return '<div class="rule-card" data-rule-id="' + esc(rule.id || cryptoId()) + '">'
-            + '<div class="rule-card__head">'
-            + '  <input class="r-name" placeholder="rule name" value="' + esc(rule.name || "") + '" />'
-            + '  <label class="check"><input type="checkbox" class="r-enabled"' + (rule.enabled === false ? "" : " checked") + ' /> enabled</label>'
-            + '  <div class="rule-card__buttons">'
+        var num = (typeof index === "number" ? index + 1 : 0);
+        return '<div class="rule rule-card" data-rule-id="' + esc(rule.id || cryptoId()) + '">'
+            + '<div class="rule-head" data-action="rule-toggle">'
+            + '  <span class="grip" aria-hidden="true">' + icon("grip") + '</span>'
+            + '  <span class="rule-num">#' + num + '</span>'
+            + '  <span class="summary">' + ruleSummary(rule, context) + '</span>'
+            + '  <span class="meta">'
+            + '    <label class="check"><input type="checkbox" class="r-enabled"' + (rule.enabled === false ? "" : " checked") + ' /> on</label>'
             + '    <button type="button" class="icon-btn" data-action="rule-up" aria-label="Move up">' + icon("chevron-up") + '</button>'
             + '    <button type="button" class="icon-btn" data-action="rule-down" aria-label="Move down">' + icon("chevron-down") + '</button>'
             + '    <button type="button" class="icon-btn" data-action="rule-remove" aria-label="Remove">' + icon("x") + '</button>'
-            + '  </div>'
+            + '    <span class="chev" aria-hidden="true">' + icon("chevron-down") + '</span>'
+            + '  </span>'
             + '</div>'
-            + '<div class="rule-card__conditions">'
+            + '<div class="rule-body">'
+            + '  <label class="field"><span class="field__label">Rule name</span><input class="r-name" placeholder="optional label" value="' + esc(rule.name || "") + '" /></label>'
             + '  <div class="conditions-list">' + (rule.conditions || []).map(renderConditionRow).join("") + '</div>'
             + '  <button type="button" class="btn outline xs" data-action="add-condition">+ Add condition</button>'
+            + '  ' + outcomeHtml
             + '</div>'
-            + outcomeHtml
             + '</div>';
     }
 
@@ -2549,6 +2584,12 @@
         else if (action === "remove-condition") { btn.closest(".condition-row").remove(); }
         else if (action === "add-split") { card.querySelector(".splits").insertBefore(htmlToElement(renderSplitRow({ variantKey: "", weight: 0 })), btn); }
         else if (action === "remove-split") { btn.closest(".split-row").remove(); }
+        else if (action === "rule-toggle") {
+            // Collapse / expand the rule body — but ignore clicks on the controls
+            // that live in the header (enabled toggle, move/remove buttons).
+            if (!event.target.closest("input, select, button, label") && card) { card.classList.toggle("collapsed"); }
+            return;
+        }
         else { return; }
         // Re-bind split toggle in case we added one.
         if (context.kind === "flag" && card) {
