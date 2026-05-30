@@ -139,6 +139,112 @@ public class AdminEnvironmentsEndpointTests
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Create_then_list_includes_the_new_environment()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var created = await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "Staging" }, ct);
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var envs = await client.GetFromJsonAsync<List<Environment>>("/api/admin/environments", TestJson.Options, ct);
+        envs!.Should().Contain(e => e.Key == "staging" && e.Name == "Staging" && !e.IsDefault);
+    }
+
+    [Fact]
+    public async Task Create_with_duplicate_key_returns_Conflict()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "S1" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "S2" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Rename_changes_the_name_and_keeps_the_key()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "Staging" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var renamed = await client.PutAsJsonAsync("/api/admin/environments/staging", new { key = "staging", name = "Staging Env" }, ct);
+        renamed.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var envs = await client.GetFromJsonAsync<List<Environment>>("/api/admin/environments", TestJson.Options, ct);
+        envs!.Single(e => e.Key == "staging").Name.Should().Be("Staging Env");
+    }
+
+    [Fact]
+    public async Task Update_unknown_environment_returns_NotFound()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+
+        var resp = await client.PutAsJsonAsync("/api/admin/environments/ghost", new { key = "ghost", name = "Ghost" }, TestContext.Current.CancellationToken);
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Delete_empty_env_succeeds_and_default_is_protected()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "Staging" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await client.DeleteAsync(new Uri("/api/admin/environments/staging", UriKind.Relative), ct))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var envs = await client.GetFromJsonAsync<List<Environment>>("/api/admin/environments", TestJson.Options, ct);
+        envs!.Should().NotContain(e => e.Key == "staging");
+
+        // The bootstrap default cannot be deleted.
+        (await client.DeleteAsync(new Uri("/api/admin/environments/development", UriKind.Relative), ct))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Delete_non_empty_env_returns_Conflict()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "Staging" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await client.PostAsJsonAsync("/api/admin/flags?env=staging", new
+        {
+            key = "f",
+            name = "F",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await client.DeleteAsync(new Uri("/api/admin/environments/staging", UriKind.Relative), ct))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    private static HttpClient AdminClient(IHost host)
+    {
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        return client;
+    }
+
     private static async Task<IHost> BuildHostAsync()
     {
         var builder = new HostBuilder()

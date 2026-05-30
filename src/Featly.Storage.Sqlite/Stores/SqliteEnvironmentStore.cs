@@ -71,4 +71,32 @@ internal sealed class SqliteEnvironmentStore(IDbContextFactory<FeatlyDbContext> 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return existing;
     }
+
+    public async Task UpdateAsync(Environment environment, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        var existing = await db.Environments.FirstOrDefaultAsync(e => e.Id == environment.Id, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            throw new InvalidOperationException($"Environment '{environment.Key}' not found.");
+        }
+
+        existing.Name = environment.Name;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        var existing = await db.Environments.FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return;
+        }
+
+        db.Environments.Remove(existing);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 }
