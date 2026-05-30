@@ -12,6 +12,9 @@ public interface IConfigStore
     /// <summary>Lists all non-archived configs in the environment.</summary>
     Task<IReadOnlyList<Config>> ListAsync(Guid environmentId, CancellationToken ct);
 
+    /// <summary>Lists all archived configs in the environment.</summary>
+    Task<IReadOnlyList<Config>> ListArchivedAsync(Guid environmentId, CancellationToken ct);
+
     /// <summary>
     /// Inserts or replaces the config. Bumps <see cref="Config.UpdatedAt"/> and
     /// <see cref="Config.UpdatedBy"/> server-side based on <paramref name="actor"/>.
@@ -20,6 +23,9 @@ public interface IConfigStore
 
     /// <summary>Marks the config as archived. The row is retained for audit.</summary>
     Task ArchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
+
+    /// <summary>Clears the archived flag, returning the config to the active list.</summary>
+    Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
 
     /// <summary>
     /// Returns the most recent <see cref="Config.UpdatedAt"/> across all configs

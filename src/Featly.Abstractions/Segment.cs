@@ -29,6 +29,9 @@ public sealed class Segment
     /// <summary>Environment this segment is scoped to.</summary>
     public required Guid EnvironmentId { get; init; }
 
+    /// <summary>Whether the segment is archived (hidden from lists and excluded from the SDK snapshot).</summary>
+    public bool Archived { get; set; }
+
     /// <summary>Audit: row creation time.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 

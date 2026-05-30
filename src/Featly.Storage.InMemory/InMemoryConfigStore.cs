@@ -17,6 +17,10 @@ internal sealed class InMemoryConfigStore : IConfigStore
         => Task.FromResult<IReadOnlyList<Config>>(
             [.. _configs.Values.Where(c => c.EnvironmentId == environmentId && !c.Archived)]);
 
+    public Task<IReadOnlyList<Config>> ListArchivedAsync(Guid environmentId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Config>>(
+            [.. _configs.Values.Where(c => c.EnvironmentId == environmentId && c.Archived)]);
+
     public Task UpsertAsync(Guid environmentId, Config config, string actor, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -38,6 +42,21 @@ internal sealed class InMemoryConfigStore : IConfigStore
         if (_configs.TryGetValue(lookupKey, out var existing))
         {
             existing.Archived = true;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            existing.UpdatedBy = actor;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
+
+        var lookupKey = (environmentId, key.ToUpperInvariant());
+        if (_configs.TryGetValue(lookupKey, out var existing))
+        {
+            existing.Archived = false;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             existing.UpdatedBy = actor;
         }

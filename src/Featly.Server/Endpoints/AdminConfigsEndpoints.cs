@@ -27,11 +27,13 @@ internal static class AdminConfigsEndpoints
         admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Configs.Get").RequirePermission(Permission.ConfigRead);
         admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Configs.Create").RequirePermission(Permission.ConfigCreate);
         admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Configs.Update").RequirePermission(Permission.ConfigUpdate);
+        admin.MapPost("/{key}/archive", ArchiveAsync).WithName("Featly.Admin.Configs.Archive").RequirePermission(Permission.ConfigArchive);
+        admin.MapPost("/{key}/unarchive", UnarchiveAsync).WithName("Featly.Admin.Configs.Unarchive").RequirePermission(Permission.ConfigArchive);
 
         return group;
     }
 
-    private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct)
+    private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct, bool archived = false)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -39,7 +41,9 @@ internal static class AdminConfigsEndpoints
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
         }
 
-        var configs = await store.Configs.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var configs = archived
+            ? await store.Configs.ListArchivedAsync(environment.Id, ct).ConfigureAwait(false)
+            : await store.Configs.ListAsync(environment.Id, ct).ConfigureAwait(false);
         return Results.Ok(configs);
     }
 
@@ -164,6 +168,70 @@ internal static class AdminConfigsEndpoints
         await events.PublishAsync(FeatlyEventTypes.ConfigUpdated, "Config", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
+    }
+
+    private static Task<IResult> ArchiveAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
+        => SetArchivedAsync(key, store, events, env, user, archived: true, ct);
+
+    private static Task<IResult> UnarchiveAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
+        => SetArchivedAsync(key, store, events, env, user, archived: false, ct);
+
+    private static async Task<IResult> SetArchivedAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        bool archived,
+        CancellationToken ct)
+    {
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+
+        if (environment.ReadOnly)
+        {
+            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Results.NotFound(new { error = $"Config '{key}' not found." });
+        }
+
+        var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
+        if (archived)
+        {
+            await store.Configs.ArchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await store.Configs.UnarchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+
+        var updated = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
+        await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await events.PublishAsync(
+            archived ? FeatlyEventTypes.ConfigArchived : FeatlyEventTypes.ConfigUnarchived,
+            "Config", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
+
+        return Results.Ok(updated);
     }
 
     private static async Task<Environment?> ResolveEnvironmentAsync(

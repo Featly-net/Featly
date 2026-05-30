@@ -17,6 +17,10 @@ internal sealed class InMemoryFlagStore : IFlagStore
         => Task.FromResult<IReadOnlyList<Flag>>(
             [.. _flags.Values.Where(f => f.EnvironmentId == environmentId && !f.Archived)]);
 
+    public Task<IReadOnlyList<Flag>> ListArchivedAsync(Guid environmentId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Flag>>(
+            [.. _flags.Values.Where(f => f.EnvironmentId == environmentId && f.Archived)]);
+
     public Task UpsertAsync(Guid environmentId, Flag flag, string actor, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(flag);
@@ -38,6 +42,21 @@ internal sealed class InMemoryFlagStore : IFlagStore
         if (_flags.TryGetValue(lookupKey, out var existing))
         {
             existing.Archived = true;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            existing.UpdatedBy = actor;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
+
+        var lookupKey = (environmentId, key.ToUpperInvariant());
+        if (_flags.TryGetValue(lookupKey, out var existing))
+        {
+            existing.Archived = false;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             existing.UpdatedBy = actor;
         }

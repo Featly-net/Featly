@@ -2198,6 +2198,35 @@ p:last-child { margin-bottom: 0; }
 .tbl td.col-check, .tbl th:first-child { vertical-align: middle; }
 .tbl input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
+/* Archive / restore: Active|Archived segmented toggle + row action + toast */
+.seg-toggle {
+  display: inline-flex; flex: 0 0 auto;
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: var(--r-md); padding: 2px;
+}
+.seg-toggle .seg {
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--fg-muted); font: 500 11.5px var(--font-sans);
+  padding: 4px 12px; border-radius: var(--r-sm);
+  transition: background var(--t-quick), color var(--t-quick);
+}
+.seg-toggle .seg:hover { color: var(--fg); }
+.seg-toggle .seg.active { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.row-act:hover { color: var(--accent); background: var(--accent-bg); }
+#toast {
+  position: fixed; bottom: 20px; right: 20px; z-index: 60;
+  max-width: 360px; padding: 10px 14px;
+  border-radius: var(--r-md); font-size: 12.5px; font-weight: 500;
+  border: 0.5px solid var(--border); background: var(--bg2); color: var(--fg);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity var(--t-quick), transform var(--t-quick);
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.toast--ok  { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border); }
+#toast.toast--err { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border); }
+
 /* Inbox + Audit log (redesign step 5). */
 .inbox-list { display: flex; flex-direction: column; gap: 18px; }
 .inbox-card[data-cr] { cursor: pointer; }

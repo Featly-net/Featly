@@ -27,12 +27,14 @@ internal static class AdminSegmentsEndpoints
         admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Segments.Get").RequirePermission(Permission.SegmentRead);
         admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Segments.Create").RequirePermission(Permission.SegmentCreate);
         admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Segments.Update").RequirePermission(Permission.SegmentUpdate);
+        admin.MapPost("/{key}/archive", ArchiveAsync).WithName("Featly.Admin.Segments.Archive").RequirePermission(Permission.SegmentArchive);
+        admin.MapPost("/{key}/unarchive", UnarchiveAsync).WithName("Featly.Admin.Segments.Unarchive").RequirePermission(Permission.SegmentArchive);
         admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Segments.Delete").RequirePermission(Permission.SegmentArchive);
 
         return group;
     }
 
-    private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct)
+    private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct, bool archived = false)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -40,7 +42,9 @@ internal static class AdminSegmentsEndpoints
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
         }
 
-        var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var segments = archived
+            ? await store.Segments.ListArchivedAsync(environment.Id, ct).ConfigureAwait(false)
+            : await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
         return Results.Ok(segments);
     }
 
@@ -191,6 +195,70 @@ internal static class AdminSegmentsEndpoints
         await events.PublishAsync(FeatlyEventTypes.SegmentDeleted, "Segment", key, environment.Id, user, deletedData, ct).ConfigureAwait(false);
 
         return Results.NoContent();
+    }
+
+    private static Task<IResult> ArchiveAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
+        => SetArchivedAsync(key, store, events, env, user, archived: true, ct);
+
+    private static Task<IResult> UnarchiveAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        CancellationToken ct)
+        => SetArchivedAsync(key, store, events, env, user, archived: false, ct);
+
+    private static async Task<IResult> SetArchivedAsync(
+        string key,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        bool archived,
+        CancellationToken ct)
+    {
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+
+        if (environment.ReadOnly)
+        {
+            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Results.NotFound(new { error = $"Segment '{key}' not found." });
+        }
+
+        var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
+        if (archived)
+        {
+            await store.Segments.ArchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await store.Segments.UnarchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+
+        var updated = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
+        await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await events.PublishAsync(
+            archived ? FeatlyEventTypes.SegmentArchived : FeatlyEventTypes.SegmentUnarchived,
+            "Segment", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
+
+        return Results.Ok(updated);
     }
 
     private static async Task<Environment?> ResolveEnvironmentAsync(

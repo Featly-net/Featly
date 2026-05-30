@@ -47,6 +47,12 @@ public static class FeatlyEventTypes
     /// <summary>A flag was updated.</summary>
     public const string FlagUpdated = "flag.updated";
 
+    /// <summary>A flag was archived.</summary>
+    public const string FlagArchived = "flag.archived";
+
+    /// <summary>A flag was restored from the archive.</summary>
+    public const string FlagUnarchived = "flag.unarchived";
+
     /// <summary>A config was created.</summary>
     public const string ConfigCreated = "config.created";
 
@@ -56,6 +62,9 @@ public static class FeatlyEventTypes
     /// <summary>A config was archived.</summary>
     public const string ConfigArchived = "config.archived";
 
+    /// <summary>A config was restored from the archive.</summary>
+    public const string ConfigUnarchived = "config.unarchived";
+
     /// <summary>A segment was created.</summary>
     public const string SegmentCreated = "segment.created";
 
@@ -64,6 +73,12 @@ public static class FeatlyEventTypes
 
     /// <summary>A segment was deleted.</summary>
     public const string SegmentDeleted = "segment.deleted";
+
+    /// <summary>A segment was archived.</summary>
+    public const string SegmentArchived = "segment.archived";
+
+    /// <summary>A segment was restored from the archive.</summary>
+    public const string SegmentUnarchived = "segment.unarchived";
 
     /// <summary>An experiment was created.</summary>
     public const string ExperimentCreated = "experiment.created";

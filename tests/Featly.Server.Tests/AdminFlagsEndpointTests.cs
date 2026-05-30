@@ -157,6 +157,56 @@ public class AdminFlagsEndpointTests
     }
 
     [Fact]
+    public async Task Archive_then_unarchive_moves_flag_between_active_and_archived_lists()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        await client.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "old-flag",
+            name = "Old flag",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/flags/old-flag/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.OK);
+        var archived = await archive.Content.ReadFromJsonAsync<Flag>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        archived!.Archived.Should().BeTrue();
+
+        var active = await client.GetFromJsonAsync<List<Flag>>(new Uri("/api/admin/flags", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        active!.Should().NotContain(f => f.Key == "old-flag");
+
+        var archivedList = await client.GetFromJsonAsync<List<Flag>>(new Uri("/api/admin/flags?archived=true", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        archivedList!.Should().ContainSingle(f => f.Key == "old-flag");
+
+        var restore = await client.PostAsync(new Uri("/api/admin/flags/old-flag/unarchive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        restore.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var activeAfter = await client.GetFromJsonAsync<List<Flag>>(new Uri("/api/admin/flags", UriKind.Relative), TestJson.Options, TestContext.Current.CancellationToken);
+        activeAfter!.Should().ContainSingle(f => f.Key == "old-flag");
+    }
+
+    [Fact]
+    public async Task Archive_returns_404_for_unknown_flag()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        var archive = await client.PostAsync(new Uri("/api/admin/flags/ghost/archive", UriKind.Relative), null, TestContext.Current.CancellationToken);
+        archive.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task POST_admin_flags_rejects_when_using_sdk_scope_key()
     {
         using var host = await BuildHostAsync();

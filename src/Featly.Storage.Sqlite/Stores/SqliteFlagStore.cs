@@ -23,6 +23,16 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<Flag>> ListArchivedAsync(Guid environmentId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        return await db.Flags.AsNoTracking()
+            .Where(f => f.EnvironmentId == environmentId && f.Archived)
+            .OrderBy(f => f.Key)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
     public async Task UpsertAsync(Guid environmentId, Flag flag, string actor, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(flag);
@@ -89,6 +99,28 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
         }
 
         existing.Archived = true;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        existing.UpdatedBy = actor;
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
+
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+        var existing = await db.Flags
+            .FirstOrDefaultAsync(f => f.EnvironmentId == environmentId && f.Key == key, ct)
+            .ConfigureAwait(false);
+        if (existing is null)
+        {
+            return;
+        }
+
+        existing.Archived = false;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
         existing.UpdatedBy = actor;
 

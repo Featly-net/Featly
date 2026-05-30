@@ -272,7 +272,9 @@
         "key": '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
         "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
         "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
-        "grip": '<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>'
+        "grip": '<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
+        "archive": '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+        "rotate-ccw": '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'
     };
     function icon(name, size) {
         size = size || 16;
@@ -751,6 +753,10 @@
     // ---------- Flags list (redesigned, step 5) ----------
     // Tab + filter state survives re-renders within a session.
     var flagListTab = "all";
+    // Archive view toggle per list (false = active items, true = archived items).
+    var flagListArchived = false;
+    var configListArchived = false;
+    var segmentListArchived = false;
 
     function flagTypeBadge(type) {
         var t = String(type == null ? "" : type);
@@ -779,7 +785,7 @@
             + '<td class="num">' + (f.variants || []).length + '</td>'
             + '<td>' + flagTagsCell(f) + '</td>'
             + '<td class="mono cell-modified">' + (formatDate(f.updatedAt) || "—") + '</td>'
-            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(f.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + archiveActionCell(f.key, flagListArchived)
             + '</tr>';
     }
 
@@ -791,7 +797,7 @@
         }
         viewEl.innerHTML = flagListMarkup([], true);
         hydrateIcons(viewEl);
-        api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key))
+        api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key) + (flagListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
                 viewEl.innerHTML = flagListMarkup(rows, false);
@@ -815,7 +821,7 @@
         var body = loading
             ? '<div class="empty"><p class="muted">Loading…</p></div>'
             : [
-                '<div class="filter-bar">',
+                '<div class="filter-bar">' + archiveToggle(flagListArchived),
                 '  <div class="search-input"><span class="ti-slot" data-ti="search"></span>',
                 '    <input id="flag-filter" type="search" placeholder="Filter by key, name, or tag" spellcheck="false" autocomplete="off" />',
                 '    <span class="clear-shortcut">/</span></div>',
@@ -824,7 +830,7 @@
                 '  <th style="width:28px"><input type="checkbox" id="flag-check-all" aria-label="Select all" /></th>',
                 '  <th style="width:54px">Status</th><th>Key / Name</th><th style="width:120px">Type</th>',
                 '  <th style="width:84px">Variants</th><th>Tags</th><th style="width:140px">Last modified</th><th style="width:48px"></th>',
-                '</tr></thead><tbody id="flag-tbody">' + all.map(flagRow).join("") + '</tbody></table></div>',
+                '</tr></thead><tbody id="flag-tbody">' + (all.length ? all.map(flagRow).join("") : emptyListRow(flagListArchived ? "No archived flags." : "No flags yet.", 8)) + '</tbody></table></div>',
                 '<div class="list-foot"><span id="flag-count">Showing ' + all.length + ' of ' + all.length + ' flags</span>',
                 '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>',
             ].join("");
@@ -888,6 +894,7 @@
                 Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
             });
         }
+        wireArchiveControls("/admin/flags", flagListArchived, function (v) { flagListArchived = v; }, renderFlagList);
     }
 
     // ---------- Shared list helpers (redesign, step 5) ----------
@@ -901,8 +908,8 @@
             '</div>',
         ].join("");
     }
-    function listFilterBar(placeholder) {
-        return '<div class="filter-bar"><div class="search-input"><span class="ti-slot" data-ti="search"></span>'
+    function listFilterBar(placeholder, prefixHtml) {
+        return '<div class="filter-bar">' + (prefixHtml || "") + '<div class="search-input"><span class="ti-slot" data-ti="search"></span>'
             + '<input class="list-filter" type="search" placeholder="' + esc(placeholder) + '" spellcheck="false" autocomplete="off" />'
             + '<span class="clear-shortcut">/</span></div></div>';
     }
@@ -954,6 +961,84 @@
         }
     }
 
+    // ---------- Archive / restore (shared across flags, configs, segments) ----------
+    // Segmented Active | Archived toggle shown at the top of each list body.
+    function archiveToggle(archived) {
+        return '<div class="seg-toggle" role="tablist" aria-label="Archive filter">'
+            + '<button type="button" class="seg' + (archived ? "" : " active") + '" data-arch="0" role="tab" aria-selected="' + (!archived) + '">Active</button>'
+            + '<button type="button" class="seg' + (archived ? " active" : "") + '" data-arch="1" role="tab" aria-selected="' + archived + '">Archived</button>'
+            + '</div>';
+    }
+    // Header badge marking an archived entity on its detail screen.
+    function archivedPill(archived) {
+        return archived ? '<span class="badge warn" title="This item is archived"><span class="dot"></span>archived</span> ' : '';
+    }
+    // Per-row action cell: Archive on the active list, Restore on the archived list.
+    function archiveActionCell(key, archived) {
+        var act = archived ? "restore" : "archive";
+        var ic = archived ? "rotate-ccw" : "archive";
+        var label = (archived ? "Restore " : "Archive ") + key;
+        return '<td class="col-actions"><button class="icon-btn row-act" type="button" data-act="' + act
+            + '" data-key="' + esc(key) + '" title="' + (archived ? "Restore" : "Archive") + '" aria-label="' + esc(label) + '">'
+            + icon(ic) + '</button></td>';
+    }
+    // POST the archive/unarchive verb, then re-render the list. `readOnlyEnv` blocks
+    // the action client-side with a hint (the server also returns 403).
+    function runArchiveAction(apiBase, key, archived, rerender) {
+        if (currentEnv && currentEnv.readOnly) {
+            flash("err", "Environment is read-only.");
+            return;
+        }
+        var verb = archived ? "unarchive" : "archive";
+        api("POST", apiBase + "/" + encodeURIComponent(key) + "/" + verb + "?env=" + encodeURIComponent(currentEnv.key))
+            .then(function () {
+                flash("ok", (archived ? "Restored " : "Archived ") + key);
+                rerender();
+            })
+            .catch(function (e) {
+                flash("err", "Action failed: " + (e && e.message ? e.message : "error"));
+            });
+    }
+    // Wires the Active/Archived toggle and per-row archive/restore buttons for a list.
+    // `setArchived` persists the new toggle state; `rerender` repaints the screen.
+    function wireArchiveControls(apiBase, isArchived, setArchived, rerender) {
+        Array.prototype.forEach.call(viewEl.querySelectorAll(".seg[data-arch]"), function (btn) {
+            btn.addEventListener("click", function () {
+                var next = btn.getAttribute("data-arch") === "1";
+                if (next === isArchived) { return; }
+                setArchived(next);
+                rerender();
+            });
+        });
+        var tbody = viewEl.querySelector(".list-tbody") || document.getElementById("flag-tbody");
+        if (tbody) {
+            tbody.addEventListener("click", function (e) {
+                var btn = e.target.closest(".row-act");
+                if (!btn) { return; }
+                e.stopPropagation();
+                runArchiveAction(apiBase, btn.getAttribute("data-key"), isArchived, rerender);
+            });
+        }
+    }
+    // Placeholder row spanning the table when a list (or archived view) is empty.
+    function emptyListRow(text, colspan) {
+        return '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">' + esc(text) + '</td></tr>';
+    }
+    // Lightweight transient toast, bottom-right. kind: "ok" | "err".
+    var flashTimer = null;
+    function flash(kind, text) {
+        var el = document.getElementById("toast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "toast";
+            document.body.appendChild(el);
+        }
+        el.className = "toast toast--" + kind + " show";
+        el.textContent = text;
+        if (flashTimer) { clearTimeout(flashTimer); }
+        flashTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
+    }
+
     // ---------- Configs list (redesign) ----------
     function configTypeBadge(type) {
         var t = String(type == null ? "" : type);
@@ -969,30 +1054,31 @@
             + '<td>' + code(truncate(JSON.stringify(c.defaultValue), 48)) + '</td>'
             + '<td>' + tagsCell(c) + '</td>'
             + '<td class="mono cell-modified">' + (formatDate(c.updatedAt) || "—") + '</td>'
-            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(c.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + archiveActionCell(c.key, configListArchived)
             + '</tr>';
     }
     function renderConfigList() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Configs"); return; }
         viewEl.innerHTML = configListMarkup([], true);
         hydrateIcons(viewEl);
-        api("GET", "/admin/configs?env=" + encodeURIComponent(currentEnv.key))
+        api("GET", "/admin/configs?env=" + encodeURIComponent(currentEnv.key) + (configListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
                 viewEl.innerHTML = configListMarkup(rows, false);
                 hydrateIcons(viewEl);
                 wireSimpleList(rows, "/configs", "configs", ["key", "name", "tags"], configRow, 7);
+                wireArchiveControls("/admin/configs", configListArchived, function (v) { configListArchived = v; }, renderConfigList);
             })
             .catch(handleErrOnView("Configs"));
     }
     function configListMarkup(all, loading) {
         var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
-            listFilterBar("Filter by key, name, or tag"),
+            listFilterBar("Filter by key, name, or tag", archiveToggle(configListArchived)),
             '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
             '  <th style="width:28px"><input type="checkbox" class="check-all" aria-label="Select all" /></th>',
             '  <th style="width:120px">Type</th><th>Key / Name</th><th>Value</th><th>Tags</th>',
             '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
-            '</tr></thead><tbody class="list-tbody">' + all.map(configRow).join("") + '</tbody></table></div>',
+            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(configRow).join("") : emptyListRow(configListArchived ? "No archived configs." : "No configs yet.", 7)) + '</tbody></table></div>',
             listFoot(all.length, "configs"),
         ].join("");
         return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body);
@@ -1005,29 +1091,30 @@
             + '<span class="cell-name">' + esc(s.name || "") + '</span></div></td>'
             + '<td class="num">' + (s.conditions || []).length + '</td>'
             + '<td class="mono cell-modified">' + (formatDate(s.updatedAt) || "—") + '</td>'
-            + '<td class="col-actions"><button class="icon-btn" type="button" tabindex="-1" aria-label="More for ' + esc(s.key) + '"><span class="ti-slot" data-ti="dots"></span></button></td>'
+            + archiveActionCell(s.key, segmentListArchived)
             + '</tr>';
     }
     function renderSegmentList() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Segments"); return; }
         viewEl.innerHTML = segmentListMarkup([], true);
         hydrateIcons(viewEl);
-        api("GET", "/admin/segments?env=" + encodeURIComponent(currentEnv.key))
+        api("GET", "/admin/segments?env=" + encodeURIComponent(currentEnv.key) + (segmentListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
                 viewEl.innerHTML = segmentListMarkup(rows, false);
                 hydrateIcons(viewEl);
                 wireSimpleList(rows, "/segments", "segments", ["key", "name"], segmentRow, 4);
+                wireArchiveControls("/admin/segments", segmentListArchived, function (v) { segmentListArchived = v; }, renderSegmentList);
             })
             .catch(handleErrOnView("Segments"));
     }
     function segmentListMarkup(all, loading) {
         var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
-            listFilterBar("Filter by key or name"),
+            listFilterBar("Filter by key or name", archiveToggle(segmentListArchived)),
             '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
             '  <th>Key / Name</th><th style="width:120px">Conditions</th>',
             '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
-            '</tr></thead><tbody class="list-tbody">' + all.map(segmentRow).join("") + '</tbody></table></div>',
+            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(segmentRow).join("") : emptyListRow(segmentListArchived ? "No archived segments." : "No segments yet.", 4)) + '</tbody></table></div>',
             listFoot(all.length, "segments"),
         ].join("");
         return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body);
@@ -1084,7 +1171,7 @@
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(flag.key) + '</h1>',
             '    <span class="sub">' + esc(flag.name || "") + ' · ' + esc(flag.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
-            '  </div><div class="actions">' + statusBadge + '</div>',
+            '  </div><div class="actions">' + archivedPill(flag.archived) + statusBadge + '</div>',
             '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="flag-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(flag.name) + '" />'),
@@ -1211,7 +1298,7 @@
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(config.key) + '</h1>',
             '    <span class="sub">' + esc(config.name || "") + ' · ' + esc(config.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
-            '  </div><div class="actions"><span class="badge sq' + (config.type === "Json" ? " accent" : (config.type === "Bool" ? " info" : "")) + '">' + esc(config.type) + '</span></div>',
+            '  </div><div class="actions">' + archivedPill(config.archived) + '<span class="badge sq' + (config.type === "Json" ? " accent" : (config.type === "Bool" ? " info" : "")) + '">' + esc(config.type) + '</span></div>',
             '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="config-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(config.name) + '" />'),
@@ -1290,7 +1377,7 @@
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(segment.key) + '</h1>',
             '    <span class="sub">' + esc(segment.name || "") + ' · reusable group in <code>' + esc(currentEnv.key) + '</code></span>',
-            '  </div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+            '  </div><div class="actions">' + archivedPill(segment.archived) + '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="segment-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(segment.name) + '" />'),
             field("Description", '<textarea name="description" rows="2">' + esc(segment.description || "") + '</textarea>'),

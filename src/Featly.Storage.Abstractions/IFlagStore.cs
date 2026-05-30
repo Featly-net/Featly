@@ -11,6 +11,9 @@ public interface IFlagStore
     /// <summary>Lists all non-archived flags in the environment.</summary>
     Task<IReadOnlyList<Flag>> ListAsync(Guid environmentId, CancellationToken ct);
 
+    /// <summary>Lists all archived flags in the environment.</summary>
+    Task<IReadOnlyList<Flag>> ListArchivedAsync(Guid environmentId, CancellationToken ct);
+
     /// <summary>
     /// Inserts or replaces the flag. Bumps <see cref="Flag.UpdatedAt"/> and
     /// <see cref="Flag.UpdatedBy"/> server-side based on <paramref name="actor"/>.
@@ -19,6 +22,9 @@ public interface IFlagStore
 
     /// <summary>Marks the flag as archived. The row is retained for audit.</summary>
     Task ArchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
+
+    /// <summary>Clears the archived flag, returning the flag to the active list.</summary>
+    Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
 
     /// <summary>
     /// Returns the most recent <see cref="Flag.UpdatedAt"/> across all flags
