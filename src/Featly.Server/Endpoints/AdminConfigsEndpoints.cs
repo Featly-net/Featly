@@ -101,7 +101,7 @@ internal static class AdminConfigsEndpoints
         var config = body.ToEntity(environment.Id, actor);
         await store.Configs.UpsertAsync(environment.Id, config, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, config.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.ConfigCreated, "Config", config.Key, environment.Id, user, config, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ConfigCreated, "Config", config.Key, environment.Id, user, new { after = config }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/configs/{config.Key}?env={environment.Key}", config);
     }
@@ -151,6 +151,7 @@ internal static class AdminConfigsEndpoints
         }
 
         var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
         existing.Type = body.Type;
@@ -160,7 +161,7 @@ internal static class AdminConfigsEndpoints
 
         await store.Configs.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.ConfigUpdated, "Config", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ConfigUpdated, "Config", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }

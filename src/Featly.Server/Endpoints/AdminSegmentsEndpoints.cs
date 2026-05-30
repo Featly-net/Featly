@@ -102,7 +102,7 @@ internal static class AdminSegmentsEndpoints
         var segment = body.ToEntity(environment.Id, actor);
         await store.Segments.UpsertAsync(environment.Id, segment, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, segment.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.SegmentCreated, "Segment", segment.Key, environment.Id, user, segment, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SegmentCreated, "Segment", segment.Key, environment.Id, user, new { after = segment }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/segments/{segment.Key}?env={environment.Key}", segment);
     }
@@ -152,13 +152,14 @@ internal static class AdminSegmentsEndpoints
         }
 
         var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
         existing.Conditions = [.. body.Conditions];
 
         await store.Segments.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.SegmentUpdated, "Segment", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SegmentUpdated, "Segment", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
     }
@@ -183,9 +184,11 @@ internal static class AdminSegmentsEndpoints
         }
 
         var actor = ResolveActor(user);
+        var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         await store.Segments.DeleteAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
         await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.SegmentDeleted, "Segment", key, environment.Id, user, null, ct).ConfigureAwait(false);
+        object? deletedData = existing is null ? null : new { before = existing };
+        await events.PublishAsync(FeatlyEventTypes.SegmentDeleted, "Segment", key, environment.Id, user, deletedData, ct).ConfigureAwait(false);
 
         return Results.NoContent();
     }
