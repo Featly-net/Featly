@@ -105,6 +105,13 @@ public static class FeatlyServerServiceCollectionExtensions
         services.AddMetrics();
         services.TryAddSingleton<Telemetry.FeatlyServerMetrics>();
 
+        // DB-overridable settings (ARCHITECTURE.md §15): the provider merges
+        // hardcoded default -> appsettings -> database and caches the effective
+        // values; the hosted service loads the DB layer at startup and reloads
+        // on a settings change notification.
+        services.TryAddSingleton<Settings.IFeatlySettingsProvider, Settings.DefaultFeatlySettingsProvider>();
+        services.AddHostedService<Settings.SettingsReloadHostedService>();
+
         services.TryAddSingleton<IFeatlyPermissionChecker, DefaultFeatlyPermissionChecker>();
         services.TryAddSingleton<ApiKeyHasher>();
         services.TryAddSingleton<Approval.ChangeApplicationService>();
