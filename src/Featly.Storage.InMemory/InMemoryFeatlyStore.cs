@@ -29,6 +29,7 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
         WebhookDeliveries = new InMemoryWebhookDeliveryStore();
         Audit = new InMemoryAuditStore();
         ApiKeys = new InMemoryApiKeyStore();
+        Settings = new InMemorySystemSettingsStore();
         Changes = new InProcessChangeNotifier();
     }
 
@@ -88,6 +89,9 @@ public sealed class InMemoryFeatlyStore : IFeatlyStore
 
     /// <inheritdoc />
     public IApiKeyStore ApiKeys { get; }
+
+    /// <inheritdoc />
+    public ISystemSettingsStore Settings { get; }
 
     /// <inheritdoc />
     public IChangeNotifier Changes { get; }
