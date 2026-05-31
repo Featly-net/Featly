@@ -68,6 +68,7 @@ public static class SqliteStorageServiceCollectionExtensions
         services.TryAddSingleton<IWebhookDeliveryStore, SqliteWebhookDeliveryStore>();
         services.TryAddSingleton<IAuditStore, SqliteAuditStore>();
         services.TryAddSingleton<IApiKeyStore, SqliteApiKeyStore>();
+        services.TryAddSingleton<ISystemSettingsStore, SqliteSystemSettingsStore>();
 
         services.TryAddSingleton<SqliteFeatlyStore>();
         services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<SqliteFeatlyStore>());

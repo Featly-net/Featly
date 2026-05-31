@@ -51,6 +51,8 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -75,5 +77,6 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new WebhookDeliveryConfiguration());
         modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
+        modelBuilder.ApplyConfiguration(new SystemSettingConfiguration());
     }
 }

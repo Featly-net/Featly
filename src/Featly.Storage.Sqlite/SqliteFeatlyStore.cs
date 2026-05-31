@@ -27,6 +27,7 @@ internal sealed class SqliteFeatlyStore(
     IWebhookDeliveryStore webhookDeliveries,
     IAuditStore audit,
     IApiKeyStore apiKeys,
+    ISystemSettingsStore settings,
     IChangeNotifier changes) : IFeatlyStore
 {
     public IFlagStore Flags { get; } = flags;
@@ -66,6 +67,8 @@ internal sealed class SqliteFeatlyStore(
     public IAuditStore Audit { get; } = audit;
 
     public IApiKeyStore ApiKeys { get; } = apiKeys;
+
+    public ISystemSettingsStore Settings { get; } = settings;
 
     public IChangeNotifier Changes { get; } = changes;
 }

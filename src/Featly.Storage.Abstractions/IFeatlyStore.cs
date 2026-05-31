@@ -70,6 +70,9 @@ public interface IFeatlyStore : Featly.IFeatlyStore
     /// <summary>Persistence operations on API keys (M6+).</summary>
     IApiKeyStore ApiKeys { get; }
 
+    /// <summary>DB-overridable settings singletons (ARCHITECTURE.md §15).</summary>
+    ISystemSettingsStore Settings { get; }
+
     /// <summary>In-process change notification stream feeding SSE.</summary>
     IChangeNotifier Changes { get; }
 }
