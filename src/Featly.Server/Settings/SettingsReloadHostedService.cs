@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Settings;
@@ -11,10 +10,14 @@ namespace Featly.Server.Settings;
 /// effective values on every instance (ARCHITECTURE.md §15). For a single
 /// embedded instance the subscription simply reloads its own writes.
 /// </summary>
-internal sealed partial class SettingsReloadHostedService(
+/// <remarks>
+/// The change notifier already isolates subscriber failures (a throwing handler
+/// never takes down the publisher), so the reload handler stays exception-free
+/// here rather than wrapping its own catch.
+/// </remarks>
+internal sealed class SettingsReloadHostedService(
     IFeatlySettingsProvider provider,
-    StorageFacade store,
-    ILogger<SettingsReloadHostedService> logger) : IHostedService
+    StorageFacade store) : IHostedService
 {
     private IDisposable? _subscription;
 
@@ -31,29 +34,8 @@ internal sealed partial class SettingsReloadHostedService(
         return Task.CompletedTask;
     }
 
-    private async ValueTask OnChangeAsync(Featly.Storage.ChangeNotification notification, CancellationToken ct)
-    {
-        if (!string.Equals(notification.EntityType, FeatlySettingsKeys.ChangeEntityType, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        try
-        {
-            await provider.ReloadAsync(ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-#pragma warning disable CA1031 // Reload is best-effort; never let a reload failure break the notifier.
-        catch (Exception ex)
-#pragma warning restore CA1031
-        {
-            LogReloadFailed(logger, ex);
-        }
-    }
-
-    [LoggerMessage(EventId = 3201, Level = LogLevel.Error, Message = "Failed to reload settings after a change notification.")]
-    private static partial void LogReloadFailed(ILogger logger, Exception exception);
+    private ValueTask OnChangeAsync(Featly.Storage.ChangeNotification notification, CancellationToken ct)
+        => string.Equals(notification.EntityType, FeatlySettingsKeys.ChangeEntityType, StringComparison.Ordinal)
+            ? new ValueTask(provider.ReloadAsync(ct))
+            : ValueTask.CompletedTask;
 }
