@@ -1,7 +1,7 @@
+using AwesomeAssertions;
 using Featly.Authorization;
 using Featly.Server;
 using Featly.Storage.InMemory;
-using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;

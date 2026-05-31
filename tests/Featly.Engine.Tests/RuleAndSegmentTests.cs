@@ -1,6 +1,6 @@
 using System.Text.Json;
+using AwesomeAssertions;
 using Featly.Engine;
-using FluentAssertions;
 using Xunit;
 
 namespace Featly.Engine.Tests;

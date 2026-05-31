@@ -1,5 +1,5 @@
+using AwesomeAssertions;
 using Featly.Cli.Infrastructure;
-using FluentAssertions;
 using Xunit;
 
 namespace Featly.Cli.Tests;

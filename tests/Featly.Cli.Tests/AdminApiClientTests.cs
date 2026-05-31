@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
+using AwesomeAssertions;
 using Featly.Cli.Infrastructure;
-using FluentAssertions;
 using Xunit;
 
 namespace Featly.Cli.Tests;

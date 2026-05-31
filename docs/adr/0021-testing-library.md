@@ -1,7 +1,7 @@
 # ADR-0021: Testing library — stay on FluentAssertions 7.x, then migrate to AwesomeAssertions
 
-- **Status:** Proposed
-- **Date:** 2026-05-26
+- **Status:** Accepted
+- **Date:** 2026-05-26 (migration completed 2026-05-30, at `v0.1.0-preview.2`)
 - **Deciders:** @thiagoluga
 - **Supersedes:** _(none)_
 - **Superseded by:** _(none)_
@@ -78,6 +78,14 @@ Rejected. CVE backports stop at the 7.x line. Long-term, the codebase needs a ma
 - The migration is irreversible in practice (we won't migrate twice). The v0.1.0 boundary becomes the commitment point.
 
 ## Implementation notes
+
+> **Migration completed (2026-05-30).** Swapped the `Directory.Packages.props`
+> `PackageVersion` from `FluentAssertions 7.2.0` to `AwesomeAssertions 9.4.0`,
+> changed the `PackageReference` id in all seven test projects, and renamed the
+> 59 `using FluentAssertions;` directives to `using AwesomeAssertions;`. No
+> assertion rewrites; the suite builds and passes unchanged. AwesomeAssertions
+> 9.x uses its own root namespace (it is not a same-namespace drop-in), so the
+> using rename was required — as anticipated in step 2 below.
 
 - Until v0.1.0: no action. The `Directory.Packages.props` comment already explains the pin.
 - v0.1.0 migration:
