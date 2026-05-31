@@ -1,0 +1,45 @@
+namespace Featly.Server.Settings;
+
+/// <summary>Stable keys for the DB-overridable settings singletons (ARCHITECTURE.md §15).</summary>
+public static class FeatlySettingsKeys
+{
+    /// <summary>Webhook retry-tuning aggregate key.</summary>
+    public const string Webhook = "webhook";
+
+    /// <summary>
+    /// Entity type used on the <c>IChangeNotifier</c> notification emitted when a
+    /// settings singleton changes, so other instances reload.
+    /// </summary>
+    public const string ChangeEntityType = "Settings";
+}
+
+/// <summary>Which precedence layer supplied an effective settings value.</summary>
+public enum FeatlySettingsSource
+{
+    /// <summary>The in-code default (no <c>appsettings</c> section, no DB row).</summary>
+    HardcodedDefault,
+
+    /// <summary>The <c>appsettings.json</c> value (no DB override present).</summary>
+    AppSettings,
+
+    /// <summary>The database singleton (overrides <c>appsettings</c>).</summary>
+    Database,
+}
+
+/// <summary>
+/// DB-overridable webhook retry tuning (ARCHITECTURE.md §15). The bootstrap
+/// operational knobs (<c>PollInterval</c>, <c>BatchSize</c>, <c>RequestTimeout</c>)
+/// stay <c>appsettings</c>-only on <c>WebhookOptions</c>; only the retry cadence
+/// is runtime-editable here. Defaults match <c>WebhookOptions</c>.
+/// </summary>
+public sealed class FeatlyWebhookSettings
+{
+    /// <summary>Total attempts before a delivery is dead-lettered.</summary>
+    public int MaxAttempts { get; set; } = 6;
+
+    /// <summary>Base delay (seconds) for exponential backoff: base * 2^(attempt-1), capped.</summary>
+    public int BaseRetryDelaySeconds { get; set; } = 10;
+
+    /// <summary>Upper bound (seconds) on a single retry delay.</summary>
+    public int MaxRetryDelaySeconds { get; set; } = 1800;
+}
