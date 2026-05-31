@@ -65,11 +65,12 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <!--
-      FluentAssertions 8.x changed to a commercial license. We pin to the last
-      Apache-2.0 release (7.x) and will evaluate Shouldly or AwesomeAssertions
-      via an ADR before bumping.
+      AwesomeAssertions is the Apache-2.0 community fork of FluentAssertions 7.x
+      (FluentAssertions 8.x went commercial). Same assertion API/idiom; the only
+      migration is the package-id swap plus `using FluentAssertions;` ->
+      `using AwesomeAssertions;` across the test projects. See ADR-0021.
     -->
-    <PackageVersion Include="FluentAssertions" Version="7.2.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

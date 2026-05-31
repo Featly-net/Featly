@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using AwesomeAssertions;
 using Featly.Sdk.Internal;
-using FluentAssertions;
 using Xunit;
 
 namespace Featly.Sdk.Tests;

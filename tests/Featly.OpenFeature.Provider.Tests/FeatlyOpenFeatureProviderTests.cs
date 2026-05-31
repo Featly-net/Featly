@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using OpenFeature;
 using OpenFeature.Constant;
 using OpenFeature.Model;

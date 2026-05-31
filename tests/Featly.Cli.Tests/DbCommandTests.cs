@@ -1,6 +1,6 @@
+using AwesomeAssertions;
 using Featly.Cli;
 using Featly.Storage.Sqlite;
-using FluentAssertions;
 using Xunit;
 
 namespace Featly.Cli.Tests;

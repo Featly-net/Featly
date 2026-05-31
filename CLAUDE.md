@@ -75,7 +75,7 @@ src/
 
 ## Testing conventions
 
-- xUnit + FluentAssertions + NSubstitute for unit tests.
+- xUnit + AwesomeAssertions + NSubstitute for unit tests. (AwesomeAssertions is the Apache-2.0 fork of FluentAssertions; same idiom, `using AwesomeAssertions;`. See ADR-0021.)
 - `WebApplicationFactory<T>` for server integration tests.
 - End-to-end tests instantiate both the server and the SDK in-process and verify sync correctness.
 - BenchmarkDotNet for hot-path microbenchmarks; results published on every release.
