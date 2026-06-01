@@ -66,12 +66,13 @@ public class WebhookEngineTests
     [Fact]
     public void Backoff_grows_exponentially_and_caps()
     {
-        var opts = new WebhookOptions { BaseRetryDelay = TimeSpan.FromSeconds(10), MaxRetryDelay = TimeSpan.FromMinutes(1) };
-        WebhookDeliveryWorker.Backoff(1, opts).Should().Be(TimeSpan.FromSeconds(10));
-        WebhookDeliveryWorker.Backoff(2, opts).Should().Be(TimeSpan.FromSeconds(20));
-        WebhookDeliveryWorker.Backoff(3, opts).Should().Be(TimeSpan.FromSeconds(40));
+        var baseDelay = TimeSpan.FromSeconds(10);
+        var maxDelay = TimeSpan.FromMinutes(1);
+        WebhookDeliveryWorker.Backoff(1, baseDelay, maxDelay).Should().Be(TimeSpan.FromSeconds(10));
+        WebhookDeliveryWorker.Backoff(2, baseDelay, maxDelay).Should().Be(TimeSpan.FromSeconds(20));
+        WebhookDeliveryWorker.Backoff(3, baseDelay, maxDelay).Should().Be(TimeSpan.FromSeconds(40));
         // 4th would be 80s but caps at 60s.
-        WebhookDeliveryWorker.Backoff(4, opts).Should().Be(TimeSpan.FromMinutes(1));
+        WebhookDeliveryWorker.Backoff(4, baseDelay, maxDelay).Should().Be(TimeSpan.FromMinutes(1));
     }
 
     // ---- Admin CRUD + dispatch ---------------------------------------------

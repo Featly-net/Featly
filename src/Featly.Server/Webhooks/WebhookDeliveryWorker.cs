@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
+using Featly.Server.Settings;
 using Featly.Server.Telemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,7 @@ internal sealed partial class WebhookDeliveryWorker(
     IHttpClientFactory httpClientFactory,
     StorageFacade store,
     IOptions<WebhookOptions> options,
+    IFeatlySettingsProvider settings,
     FeatlyServerMetrics metrics,
     ILogger<WebhookDeliveryWorker> logger) : BackgroundService
 {
@@ -135,6 +137,11 @@ internal sealed partial class WebhookDeliveryWorker(
         delivery.LastStatusCode = statusCode;
         delivery.UpdatedAt = now;
 
+        // Retry tuning is DB-overridable (ARCHITECTURE.md §15): the effective
+        // MaxAttempts + backoff bounds come from the settings provider (DB beats
+        // appsettings), not directly from WebhookOptions.
+        var tuning = settings.Webhook;
+
         if (error is null)
         {
             delivery.Status = WebhookDeliveryStatus.Succeeded;
@@ -142,7 +149,7 @@ internal sealed partial class WebhookDeliveryWorker(
             delivery.DeliveredAt = now;
             LogDelivered(logger, delivery.Id, endpoint.Url, statusCode ?? 0);
         }
-        else if (delivery.AttemptCount >= opts.MaxAttempts)
+        else if (delivery.AttemptCount >= tuning.MaxAttempts)
         {
             delivery.Status = WebhookDeliveryStatus.Dead;
             delivery.LastError = error;
@@ -152,7 +159,10 @@ internal sealed partial class WebhookDeliveryWorker(
         {
             delivery.Status = WebhookDeliveryStatus.Pending;
             delivery.LastError = error;
-            delivery.NextAttemptAt = now + Backoff(delivery.AttemptCount, opts);
+            delivery.NextAttemptAt = now + Backoff(
+                delivery.AttemptCount,
+                TimeSpan.FromSeconds(tuning.BaseRetryDelaySeconds),
+                TimeSpan.FromSeconds(tuning.MaxRetryDelaySeconds));
             LogRetry(logger, delivery.Id, endpoint.Url, delivery.AttemptCount, error);
         }
 
@@ -160,11 +170,11 @@ internal sealed partial class WebhookDeliveryWorker(
     }
 
     /// <summary>Exponential backoff: base * 2^(attempt-1), capped at the configured maximum.</summary>
-    internal static TimeSpan Backoff(int attemptCount, WebhookOptions opts)
+    internal static TimeSpan Backoff(int attemptCount, TimeSpan baseDelay, TimeSpan maxDelay)
     {
         var factor = Math.Pow(2, Math.Max(0, attemptCount - 1));
-        var ms = opts.BaseRetryDelay.TotalMilliseconds * factor;
-        var cappedMs = Math.Min(ms, opts.MaxRetryDelay.TotalMilliseconds);
+        var ms = baseDelay.TotalMilliseconds * factor;
+        var cappedMs = Math.Min(ms, maxDelay.TotalMilliseconds);
         return TimeSpan.FromMilliseconds(cappedMs);
     }
 
