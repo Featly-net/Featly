@@ -127,4 +127,7 @@ public static class FeatlyEventTypes
 
     /// <summary>An environment's definitions were imported from a bundle.</summary>
     public const string ConfigurationImported = "configuration.imported";
+
+    /// <summary>A DB-overridable settings singleton was changed (ARCHITECTURE.md §15).</summary>
+    public const string SettingChanged = "setting.changed";
 }
