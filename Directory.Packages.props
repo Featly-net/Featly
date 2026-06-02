@@ -15,20 +15,20 @@
   </PropertyGroup>
 
   <ItemGroup Label="Microsoft.Extensions.* (net8.0 and net10.0 compatible)">
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup Label="Storage — EF Core + SQLite (server-side only, net10.0)">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" />
     <!-- Pin away from the vulnerable 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf)
          that EF Core Design pulls in transitively via Microsoft.Build/MSBuild stack. -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.8" />
@@ -52,16 +52,16 @@
   </ItemGroup>
 
   <ItemGroup Label="CLI (net10.0)">
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.8" />
   </ItemGroup>
 
   <ItemGroup Label="SourceLink + MinVer (referenced by Directory.Build.props)">
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.300" />
     <PackageVersion Include="MinVer" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <!--
@@ -77,7 +77,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Integration testing">
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
   </ItemGroup>
 
