@@ -15,6 +15,12 @@ public interface IFeatlySettingsProvider
     /// <summary>Which precedence layer supplied <see cref="Webhook"/>.</summary>
     FeatlySettingsSource WebhookSource { get; }
 
+    /// <summary>The effective authorization policy (auto-provision mode).</summary>
+    FeatlyAuthorizationSettings Authorization { get; }
+
+    /// <summary>Which precedence layer supplied <see cref="Authorization"/>.</summary>
+    FeatlySettingsSource AuthorizationSource { get; }
+
     /// <summary>Re-reads the database layer and refreshes the cached effective values.</summary>
     Task ReloadAsync(CancellationToken ct = default);
 }

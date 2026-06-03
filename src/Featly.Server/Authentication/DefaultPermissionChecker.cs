@@ -40,7 +40,8 @@ namespace Featly.Server.Authentication;
 /// </remarks>
 internal sealed class DefaultFeatlyPermissionChecker(
     StorageFacade store,
-    IOptions<FeatlyAuthorizationOptions> options) : IFeatlyPermissionChecker
+    IOptions<FeatlyAuthorizationOptions> options,
+    Settings.IFeatlySettingsProvider settings) : IFeatlyPermissionChecker
 {
     // Matches the names emitted by FeatlyApiKeyAuthenticationHandler when a
     // legacy AdminApiKey / SdkApiKey is presented as Bearer.
@@ -94,8 +95,9 @@ internal sealed class DefaultFeatlyPermissionChecker(
             }
         }
 
-        // 3. No assignment granted it. Apply the auto-provision-mode floor.
-        var mode = options.Value.AutoProvisionMode ?? AutoProvisionMode.Open;
+        // 3. No assignment granted it. Apply the auto-provision-mode floor —
+        // DB-overridable via the settings provider (ADR-0024 / §15).
+        var mode = settings.Authorization.AutoProvisionMode;
         if (mode == AutoProvisionMode.Open)
         {
             var viewer = await store.Roles.GetByKeyAsync(SystemRoles.ViewerKey, ct).ConfigureAwait(false);

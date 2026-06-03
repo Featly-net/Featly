@@ -82,6 +82,47 @@ public class FeatlySettingsProviderTests
         provider.Webhook.MaxAttempts.Should().Be(15);
     }
 
+    [Fact]
+    public async Task Authorization_defaults_to_open_hardcoded()
+    {
+        var store = new InMemoryFeatlyStore();
+        var provider = Build(store, sectionPresent: false);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.AuthorizationSource.Should().Be(FeatlySettingsSource.HardcodedDefault);
+        provider.Authorization.AutoProvisionMode.Should().Be(Featly.Server.Authentication.AutoProvisionMode.Open);
+    }
+
+    [Fact]
+    public async Task Authorization_reads_appsettings_when_set()
+    {
+        var store = new InMemoryFeatlyStore();
+        var provider = Build(store, sectionPresent: false, configureAuthz: o => o.AutoProvisionMode = Featly.Server.Authentication.AutoProvisionMode.Closed);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.AuthorizationSource.Should().Be(FeatlySettingsSource.AppSettings);
+        provider.Authorization.AutoProvisionMode.Should().Be(Featly.Server.Authentication.AutoProvisionMode.Closed);
+    }
+
+    [Fact]
+    public async Task Authorization_database_overrides_appsettings()
+    {
+        var store = new InMemoryFeatlyStore();
+        await store.Settings.UpsertAsync(new SystemSetting
+        {
+            Key = FeatlySettingsKeys.Authorization,
+            Payload = JsonSerializer.SerializeToElement(new { autoProvisionMode = "Closed" }),
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UpdatedBy = "test",
+        }, CancellationToken.None);
+
+        var provider = Build(store, sectionPresent: false); // appsettings default = Open
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.AuthorizationSource.Should().Be(FeatlySettingsSource.Database);
+        provider.Authorization.AutoProvisionMode.Should().Be(Featly.Server.Authentication.AutoProvisionMode.Closed);
+    }
+
     private static async Task WriteDbWebhookAsync(InMemoryFeatlyStore store, FeatlyWebhookSettings value) =>
         await store.Settings.UpsertAsync(new SystemSetting
         {
@@ -91,7 +132,11 @@ public class FeatlySettingsProviderTests
             UpdatedBy = "test",
         }, CancellationToken.None);
 
-    private static DefaultFeatlySettingsProvider Build(InMemoryFeatlyStore store, bool sectionPresent, Action<WebhookOptions>? configure = null)
+    private static DefaultFeatlySettingsProvider Build(
+        InMemoryFeatlyStore store,
+        bool sectionPresent,
+        Action<WebhookOptions>? configure = null,
+        Action<Featly.Server.Authentication.FeatlyAuthorizationOptions>? configureAuthz = null)
     {
         var services = new ServiceCollection();
         var optionsBuilder = services.AddOptions<WebhookOptions>();
@@ -99,13 +144,20 @@ public class FeatlySettingsProviderTests
         {
             optionsBuilder.Configure(configure);
         }
-        var monitor = services.BuildServiceProvider().GetRequiredService<IOptionsMonitor<WebhookOptions>>();
+        var authzBuilder = services.AddOptions<Featly.Server.Authentication.FeatlyAuthorizationOptions>();
+        if (configureAuthz is not null)
+        {
+            authzBuilder.Configure(configureAuthz);
+        }
+        var sp = services.BuildServiceProvider();
+        var monitor = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>();
+        var authzMonitor = sp.GetRequiredService<IOptionsMonitor<Featly.Server.Authentication.FeatlyAuthorizationOptions>>();
 
         var configData = sectionPresent
             ? new Dictionary<string, string?> { ["Featly:Webhooks:MaxAttempts"] = "9" }
             : [];
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
 
-        return new DefaultFeatlySettingsProvider(store, monitor, configuration);
+        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, configuration);
     }
 }

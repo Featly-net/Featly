@@ -3090,6 +3090,9 @@
             '  <h2>Webhook delivery</h2>',
             '  <p class="sub">Retry tuning for outbound webhooks. Saved values are stored in the database and override <code>appsettings</code> (<em>DB beats config</em>).</p>',
             '  <div id="webhook-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '  <h2>Authorization</h2>',
+            '  <p class="sub">What happens when an authenticated identity has no role assignment: <code>Open</code> grants the Viewer floor, <code>Closed</code> denies. Saved to the database, overriding <code>appsettings</code>.</p>',
+            '  <div id="authz-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
         ].join("\n");
 
@@ -3109,6 +3112,38 @@
         });
 
         loadWebhookSettings();
+        loadAuthorizationSettings();
+
+        function loadAuthorizationSettings() {
+            api("GET", "/admin/settings/authorization").then(function (view) {
+                var v = (view && view.value) || {};
+                var mode = v.autoProvisionMode || "Open";
+                var source = (view && view.source) || "";
+                var prov = source === "Database"
+                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
+                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                document.getElementById("authz-settings").innerHTML = [
+                    '<div class="card-pad"><form id="authz-settings-form" class="row-form">',
+                    '  <label class="field"><span class="field__label">Auto-provision mode</span><select name="autoProvisionMode">'
+                    + '<option value="Open"' + (mode === "Open" ? " selected" : "") + '>Open</option>'
+                    + '<option value="Closed"' + (mode === "Closed" ? " selected" : "") + '>Closed</option></select></label>',
+                    '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="authz-settings-msg"></span></div>',
+                    '</form></div>',
+                ].join("\n");
+                document.getElementById("authz-settings-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("authz-settings-msg");
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/settings/authorization", { autoProvisionMode: f.autoProvisionMode.value })
+                        .then(function () { setMessageOn(msg, "success", "Saved."); loadAuthorizationSettings(); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            }).catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); return; }
+                document.getElementById("authz-settings").innerHTML = '<div class="empty"><p class="muted">' + esc(err.message) + '</p></div>';
+            });
+        }
 
         function loadWebhookSettings() {
             api("GET", "/admin/settings/webhook").then(function (view) {
