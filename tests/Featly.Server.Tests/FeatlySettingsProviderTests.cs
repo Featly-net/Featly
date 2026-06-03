@@ -153,6 +153,41 @@ public class FeatlySettingsProviderTests
         provider.Audit.RetentionDays.Should().Be(30);
     }
 
+    [Fact]
+    public async Task ApprovalDefaults_default_requires_no_approval()
+    {
+        var store = new InMemoryFeatlyStore();
+        var provider = Build(store, sectionPresent: false);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.ApprovalDefaultsSource.Should().Be(FeatlySettingsSource.HardcodedDefault);
+        provider.ApprovalDefaults.Prod.Required.Should().BeFalse();
+        provider.ApprovalDefaults.NonProd.Required.Should().BeFalse();
+        provider.ApprovalDefaults.TemplateFor("production").Should().BeSameAs(provider.ApprovalDefaults.Prod);
+        provider.ApprovalDefaults.TemplateFor("staging").Should().BeSameAs(provider.ApprovalDefaults.NonProd);
+    }
+
+    [Fact]
+    public async Task ApprovalDefaults_database_overrides_appsettings()
+    {
+        var store = new InMemoryFeatlyStore();
+        await store.Settings.UpsertAsync(new SystemSetting
+        {
+            Key = FeatlySettingsKeys.ApprovalDefaults,
+            Payload = JsonSerializer.SerializeToElement(new { prod = new { required = true, minApprovals = 2 }, nonProd = new { required = false } }),
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UpdatedBy = "test",
+        }, CancellationToken.None);
+
+        var provider = Build(store, sectionPresent: false);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.ApprovalDefaultsSource.Should().Be(FeatlySettingsSource.Database);
+        provider.ApprovalDefaults.Prod.Required.Should().BeTrue();
+        provider.ApprovalDefaults.Prod.MinApprovals.Should().Be(2);
+        provider.ApprovalDefaults.NonProd.Required.Should().BeFalse();
+    }
+
     private static async Task WriteDbWebhookAsync(InMemoryFeatlyStore store, FeatlyWebhookSettings value) =>
         await store.Settings.UpsertAsync(new SystemSetting
         {
@@ -180,16 +215,18 @@ public class FeatlySettingsProviderTests
             authzBuilder.Configure(configureAuthz);
         }
         services.AddOptions<FeatlyAuditOptions>();
+        services.AddOptions<FeatlyApprovalDefaultsSettings>();
         var sp = services.BuildServiceProvider();
         var monitor = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>();
         var authzMonitor = sp.GetRequiredService<IOptionsMonitor<Featly.Server.Authentication.FeatlyAuthorizationOptions>>();
         var auditMonitor = sp.GetRequiredService<IOptionsMonitor<FeatlyAuditOptions>>();
+        var apprMonitor = sp.GetRequiredService<IOptionsMonitor<FeatlyApprovalDefaultsSettings>>();
 
         var configData = sectionPresent
             ? new Dictionary<string, string?> { ["Featly:Webhooks:MaxAttempts"] = "9" }
             : [];
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
 
-        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, auditMonitor, configuration);
+        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, auditMonitor, apprMonitor, configuration);
     }
 }

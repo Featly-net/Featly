@@ -3096,6 +3096,9 @@
             '  <h2>Audit retention</h2>',
             '  <p class="sub">Days of audit history to keep. <code>0</code> keeps everything; a higher value lets a background trimmer delete older entries. Saved to the database, overriding <code>appsettings</code>.</p>',
             '  <div id="audit-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '  <h2>Approval defaults</h2>',
+            '  <p class="sub">Fallback approval policy for an environment that has no explicit policy. Production-named environments use the first template; everything else uses the second. Saved to the database, overriding <code>appsettings</code>.</p>',
+            '  <div id="apprdef-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
         ].join("\n");
 
@@ -3117,6 +3120,55 @@
         loadWebhookSettings();
         loadAuthorizationSettings();
         loadAuditSettings();
+        loadApprovalDefaultsSettings();
+
+        function approvalTemplateFields(prefix, t) {
+            t = t || {};
+            return [
+                '<fieldset class="card-pad"><legend>' + esc(prefix === "prod" ? "Production-named" : "Non-production") + '</legend>',
+                '  <label class="check"><input type="checkbox" data-f="' + prefix + '.required"' + (t.required ? " checked" : "") + ' /> Require approval</label>',
+                '  <label class="field"><span class="field__label">Min approvals</span><input type="number" min="1" data-f="' + prefix + '.minApprovals" value="' + esc(String(t.minApprovals != null ? t.minApprovals : 1)) + '" /></label>',
+                '  <label class="check"><input type="checkbox" data-f="' + prefix + '.authorCanApproveOwnChange"' + (t.authorCanApproveOwnChange ? " checked" : "") + ' /> Author may self-approve</label>',
+                '  <label class="check"><input type="checkbox" data-f="' + prefix + '.allowEmergencyBypass"' + (t.allowEmergencyBypass !== false ? " checked" : "") + ' /> Allow emergency bypass</label>',
+                '</fieldset>',
+            ].join("\n");
+        }
+        function loadApprovalDefaultsSettings() {
+            api("GET", "/admin/settings/approval-defaults").then(function (view) {
+                var v = (view && view.value) || {};
+                var source = (view && view.source) || "";
+                var prov = source === "Database"
+                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
+                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                document.getElementById("apprdef-settings").innerHTML = [
+                    '<form id="apprdef-form">',
+                    '  <div class="grid-2">' + approvalTemplateFields("prod", v.prod) + approvalTemplateFields("nonProd", v.nonProd) + '</div>',
+                    '  <div class="row-form__action" style="margin-top:10px"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="apprdef-msg"></span></div>',
+                    '</form>',
+                ].join("\n");
+                document.getElementById("apprdef-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    function tmpl(prefix) {
+                        var g = function (n) { return f.querySelector('[data-f="' + prefix + '.' + n + '"]'); };
+                        return {
+                            required: g("required").checked,
+                            minApprovals: parseInt(g("minApprovals").value, 10) || 1,
+                            authorCanApproveOwnChange: g("authorCanApproveOwnChange").checked,
+                            allowEmergencyBypass: g("allowEmergencyBypass").checked,
+                        };
+                    }
+                    var msg = document.getElementById("apprdef-msg");
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/settings/approval-defaults", { prod: tmpl("prod"), nonProd: tmpl("nonProd") })
+                        .then(function () { setMessageOn(msg, "success", "Saved."); loadApprovalDefaultsSettings(); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            }).catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); return; }
+                document.getElementById("apprdef-settings").innerHTML = '<div class="empty"><p class="muted">' + esc(err.message) + '</p></div>';
+            });
+        }
 
         function loadAuditSettings() {
             api("GET", "/admin/settings/audit").then(function (view) {

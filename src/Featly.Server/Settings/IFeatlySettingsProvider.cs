@@ -27,6 +27,12 @@ public interface IFeatlySettingsProvider
     /// <summary>Which precedence layer supplied <see cref="Audit"/>.</summary>
     FeatlySettingsSource AuditSource { get; }
 
+    /// <summary>The effective default approval-policy templates.</summary>
+    FeatlyApprovalDefaultsSettings ApprovalDefaults { get; }
+
+    /// <summary>Which precedence layer supplied <see cref="ApprovalDefaults"/>.</summary>
+    FeatlySettingsSource ApprovalDefaultsSource { get; }
+
     /// <summary>Re-reads the database layer and refreshes the cached effective values.</summary>
     Task ReloadAsync(CancellationToken ct = default);
 }

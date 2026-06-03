@@ -12,6 +12,9 @@ public static class FeatlySettingsKeys
     /// <summary>Audit aggregate key (log retention).</summary>
     public const string Audit = "audit";
 
+    /// <summary>Approval-defaults aggregate key (fallback policy templates).</summary>
+    public const string ApprovalDefaults = "approval-defaults";
+
     /// <summary>
     /// Entity type used on the <c>IChangeNotifier</c> notification emitted when a
     /// settings singleton changes, so other instances reload.
@@ -76,4 +79,54 @@ public sealed class FeatlyAuditSettings
 {
     /// <summary>Days of audit history to keep; <c>0</c> disables pruning (keep forever).</summary>
     public int RetentionDays { get; set; }
+}
+
+/// <summary>
+/// DB-overridable default approval policy applied to an environment that has no
+/// explicit <see cref="ApprovalPolicy"/> (ARCHITECTURE.md §15). Production-named
+/// and non-production environments get separate templates. Defaults keep the
+/// historical behavior — neither requires approval — so an operator opts into
+/// stricter defaults rather than having them imposed.
+/// </summary>
+public sealed class FeatlyApprovalDefaultsSettings
+{
+    /// <summary>Configuration section name (<c>Featly:ApprovalDefaults</c>).</summary>
+    public const string SectionName = "Featly:ApprovalDefaults";
+
+    /// <summary>Template for environments whose key contains <c>prod</c>.</summary>
+    public FeatlyApprovalPolicyTemplate Prod { get; set; } = new();
+
+    /// <summary>Template for all other (non-production) environments.</summary>
+    public FeatlyApprovalPolicyTemplate NonProd { get; set; } = new();
+
+    /// <summary>Picks the template for an environment key (prod-named vs the rest).</summary>
+    public FeatlyApprovalPolicyTemplate TemplateFor(string? environmentKey)
+        => (environmentKey ?? string.Empty).Contains("prod", StringComparison.OrdinalIgnoreCase) ? Prod : NonProd;
+}
+
+/// <summary>A default approval-policy shape (no approver rules — those stay per-environment).</summary>
+public sealed class FeatlyApprovalPolicyTemplate
+{
+    /// <summary>When <c>true</c>, mutations to a matching environment require approval.</summary>
+    public bool Required { get; set; }
+
+    /// <summary>Minimum approvals required.</summary>
+    public int MinApprovals { get; set; } = 1;
+
+    /// <summary>Whether the change author may approve their own change.</summary>
+    public bool AuthorCanApproveOwnChange { get; set; }
+
+    /// <summary>Whether an emergency bypass is allowed.</summary>
+    public bool AllowEmergencyBypass { get; set; } = true;
+
+    /// <summary>Materializes this template into an <see cref="ApprovalPolicy"/> for an environment.</summary>
+    public ApprovalPolicy ToPolicy(Guid environmentId) => new()
+    {
+        Id = Guid.Empty,
+        EnvironmentId = environmentId,
+        Required = Required,
+        MinApprovals = MinApprovals < 1 ? 1 : MinApprovals,
+        AuthorCanApproveOwnChange = AuthorCanApproveOwnChange,
+        AllowEmergencyBypass = AllowEmergencyBypass,
+    };
 }

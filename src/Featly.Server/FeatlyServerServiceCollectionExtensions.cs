@@ -110,6 +110,7 @@ public static class FeatlyServerServiceCollectionExtensions
         // values; the hosted service loads the DB layer at startup and reloads
         // on a settings change notification.
         services.AddOptions<FeatlyAuditOptions>().BindConfiguration(FeatlyAuditOptions.SectionName);
+        services.AddOptions<Settings.FeatlyApprovalDefaultsSettings>().BindConfiguration(Settings.FeatlyApprovalDefaultsSettings.SectionName);
         services.TryAddSingleton<Settings.IFeatlySettingsProvider, Settings.DefaultFeatlySettingsProvider>();
         services.AddHostedService<Settings.SettingsReloadHostedService>();
         services.AddHostedService<Settings.AuditRetentionWorker>();

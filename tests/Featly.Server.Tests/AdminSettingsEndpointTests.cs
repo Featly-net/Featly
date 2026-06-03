@@ -154,6 +154,32 @@ public class AdminSettingsEndpointTests
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task PUT_approval_defaults_persists_templates()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var def = await client.GetFromJsonAsync<JsonElement>("/api/admin/settings/approval-defaults", ct);
+        def.GetProperty("value").GetProperty("prod").GetProperty("required").GetBoolean().Should().BeFalse();
+
+        var put = await client.PutAsJsonAsync("/api/admin/settings/approval-defaults", new
+        {
+            prod = new { required = true, minApprovals = 2, authorCanApproveOwnChange = false, allowEmergencyBypass = true },
+            nonProd = new { required = false, minApprovals = 1, authorCanApproveOwnChange = false, allowEmergencyBypass = true },
+        }, ct);
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var view = await client.GetFromJsonAsync<JsonElement>("/api/admin/settings/approval-defaults", ct);
+        view.GetProperty("source").GetString().Should().Be("Database");
+        view.GetProperty("value").GetProperty("prod").GetProperty("required").GetBoolean().Should().BeTrue();
+        view.GetProperty("value").GetProperty("prod").GetProperty("minApprovals").GetInt32().Should().Be(2);
+
+        (await client.PutAsJsonAsync("/api/admin/settings/approval-defaults", new { prod = new { minApprovals = 0 }, nonProd = new { } }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
