@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Featly.Server.Authentication;
 using Featly.Server.Events;
 using Featly.Server.Settings;
@@ -20,7 +21,13 @@ namespace Featly.Server.Endpoints;
 /// </summary>
 internal static class AdminSettingsEndpoints
 {
-    private static readonly JsonSerializerOptions s_json = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions s_json = CreateJson();
+    private static JsonSerializerOptions CreateJson()
+    {
+        var o = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        o.Converters.Add(new JsonStringEnumConverter());
+        return o;
+    }
 
     public static RouteGroupBuilder MapAdminSettings(this RouteGroupBuilder group)
     {
@@ -28,8 +35,52 @@ internal static class AdminSettingsEndpoints
 
         admin.MapGet("/webhook", GetWebhookAsync).WithName("Featly.Admin.Settings.GetWebhook").RequirePermission(Permission.SettingsRead);
         admin.MapPut("/webhook", PutWebhookAsync).WithName("Featly.Admin.Settings.PutWebhook").RequirePermission(Permission.SettingsUpdate);
+        admin.MapGet("/authorization", GetAuthorizationAsync).WithName("Featly.Admin.Settings.GetAuthorization").RequirePermission(Permission.SettingsRead);
+        admin.MapPut("/authorization", PutAuthorizationAsync).WithName("Featly.Admin.Settings.PutAuthorization").RequirePermission(Permission.SettingsUpdate);
 
         return group;
+    }
+
+    private static IResult GetAuthorizationAsync(IFeatlySettingsProvider provider)
+        => Results.Ok(new SettingView<FeatlyAuthorizationSettings>(provider.Authorization, provider.AuthorizationSource.ToString()));
+
+    private static async Task<IResult> PutAuthorizationAsync(
+        FeatlyAuthorizationSettings body,
+        IFeatlySettingsProvider provider,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (!Enum.IsDefined(body.AutoProvisionMode))
+        {
+            return Results.BadRequest(new { error = "autoProvisionMode must be 'Open' or 'Closed'." });
+        }
+
+        await PersistAsync(FeatlySettingsKeys.Authorization, body, provider, store, events, principal, ct).ConfigureAwait(false);
+        return Results.Ok(new SettingView<FeatlyAuthorizationSettings>(provider.Authorization, provider.AuthorizationSource.ToString()));
+    }
+
+    // Persist a settings singleton, refresh this instance immediately, then audit
+    // and notify so other instances reload (ARCHITECTURE.md §15).
+    private static async Task PersistAsync<T>(
+        string key, T body, IFeatlySettingsProvider provider, StorageFacade store,
+        IFeatlyEventPublisher events, ClaimsPrincipal principal, CancellationToken ct)
+    {
+        await store.Settings.UpsertAsync(new SystemSetting
+        {
+            Key = key,
+            Payload = JsonSerializer.SerializeToElement(body, s_json),
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UpdatedBy = principal.Identity?.Name,
+        }, ct).ConfigureAwait(false);
+
+        await provider.ReloadAsync(ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.SettingChanged, FeatlySettingsKeys.ChangeEntityType, key, null, principal, body, ct).ConfigureAwait(false);
+        await store.Changes.NotifyAsync(
+            new ChangeNotification(null, FeatlySettingsKeys.ChangeEntityType, key, DateTimeOffset.UtcNow),
+            ct).ConfigureAwait(false);
     }
 
     private static IResult GetWebhookAsync(IFeatlySettingsProvider provider)
@@ -58,22 +109,7 @@ internal static class AdminSettingsEndpoints
             return Results.BadRequest(new { error = "maxRetryDelaySeconds must be greater than or equal to baseRetryDelaySeconds." });
         }
 
-        await store.Settings.UpsertAsync(new SystemSetting
-        {
-            Key = FeatlySettingsKeys.Webhook,
-            Payload = JsonSerializer.SerializeToElement(body, s_json),
-            UpdatedAt = DateTimeOffset.UtcNow,
-            UpdatedBy = principal.Identity?.Name,
-        }, ct).ConfigureAwait(false);
-
-        // Refresh this instance immediately so the response reflects the write,
-        // then audit and notify so other instances reload (ARCHITECTURE.md §15).
-        await provider.ReloadAsync(ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.SettingChanged, FeatlySettingsKeys.ChangeEntityType, FeatlySettingsKeys.Webhook, null, principal, body, ct).ConfigureAwait(false);
-        await store.Changes.NotifyAsync(
-            new ChangeNotification(null, FeatlySettingsKeys.ChangeEntityType, FeatlySettingsKeys.Webhook, DateTimeOffset.UtcNow),
-            ct).ConfigureAwait(false);
-
+        await PersistAsync(FeatlySettingsKeys.Webhook, body, provider, store, events, principal, ct).ConfigureAwait(false);
         return Results.Ok(new SettingView<FeatlyWebhookSettings>(provider.Webhook, provider.WebhookSource.ToString()));
     }
 }

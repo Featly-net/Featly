@@ -6,6 +6,9 @@ public static class FeatlySettingsKeys
     /// <summary>Webhook retry-tuning aggregate key.</summary>
     public const string Webhook = "webhook";
 
+    /// <summary>Authorization aggregate key (auto-provision policy).</summary>
+    public const string Authorization = "authorization";
+
     /// <summary>
     /// Entity type used on the <c>IChangeNotifier</c> notification emitted when a
     /// settings singleton changes, so other instances reload.
@@ -42,4 +45,20 @@ public sealed class FeatlyWebhookSettings
 
     /// <summary>Upper bound (seconds) on a single retry delay.</summary>
     public int MaxRetryDelaySeconds { get; set; } = 1800;
+}
+
+/// <summary>
+/// DB-overridable authorization policy (ARCHITECTURE.md §15). For now this is the
+/// auto-provision mode — what happens when an authenticated identifier has no
+/// matching user. The bootstrap-admin identifier stays bootstrap-only (it is
+/// consumed at startup), and default-role/default-project land in later slices.
+/// </summary>
+public sealed class FeatlyAuthorizationSettings
+{
+    /// <summary>
+    /// What to do for an authenticated identifier with no role assignment:
+    /// <c>Open</c> grants the Viewer floor, <c>Closed</c> denies.
+    /// </summary>
+    public Featly.Server.Authentication.AutoProvisionMode AutoProvisionMode { get; set; }
+        = Featly.Server.Authentication.AutoProvisionMode.Open;
 }

@@ -107,6 +107,33 @@ public class AdminSettingsEndpointTests
         audit[0].GetProperty("action").GetString().Should().Be("setting.changed");
     }
 
+    [Fact]
+    public async Task GET_authorization_returns_open_by_default()
+    {
+        using var host = await BuildHostAsync();
+        var view = await AdminClient(host).GetFromJsonAsync<JsonElement>("/api/admin/settings/authorization", TestContext.Current.CancellationToken);
+        view.GetProperty("value").GetProperty("autoProvisionMode").GetString().Should().Be("Open");
+        view.GetProperty("source").GetString().Should().BeOneOf("HardcodedDefault", "AppSettings");
+    }
+
+    [Fact]
+    public async Task PUT_authorization_persists_and_flips_source_to_database()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var put = await client.PutAsJsonAsync("/api/admin/settings/authorization", new { autoProvisionMode = "Closed" }, ct);
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+        var after = await put.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+        after.GetProperty("source").GetString().Should().Be("Database");
+        after.GetProperty("value").GetProperty("autoProvisionMode").GetString().Should().Be("Closed");
+
+        var view = await client.GetFromJsonAsync<JsonElement>("/api/admin/settings/authorization", ct);
+        view.GetProperty("source").GetString().Should().Be("Database");
+        view.GetProperty("value").GetProperty("autoProvisionMode").GetString().Should().Be("Closed");
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
