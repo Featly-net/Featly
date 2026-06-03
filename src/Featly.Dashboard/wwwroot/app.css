@@ -730,7 +730,17 @@ p:last-child { margin-bottom: 0; }
     align-items: center;
 }
 .variant-row > input { flex: 1 1 120px; min-width: 0; }
+.variant-row > .v-value { flex: 1 1 160px; min-width: 0; min-height: 2.25rem; resize: vertical; }
 .variant-row > .icon-btn { flex: 0 0 auto; }
+
+/* JSON value editors (#114): monospace, resizable, with inline invalid state. */
+.json-area { font-family: var(--font-mono); line-height: 1.5; tab-size: 2; }
+.json-area.invalid {
+    border-color: var(--danger-fg) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-fg) 18%, transparent);
+}
+.json-label { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.json-label .json-area { width: 100%; }
 
 /* Rules */
 .rules-list {
