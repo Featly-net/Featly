@@ -250,5 +250,4 @@ Dashboard UI in four sequenced PRs:
 
 ## Open follow-ups
 
-- `CODE_OF_CONDUCT.md` referenced by `CONTRIBUTING.md` but not yet added ([#94](https://github.com/Featly-net/Featly/issues/94))
-- Documentation overhaul + image-rich documentation site — do last, once the surface is stable ([#92](https://github.com/Featly-net/Featly/issues/92))
+_None open._
