@@ -16,7 +16,7 @@ namespace Featly.Server.Approval;
 /// <c>?dryRun=true</c> request never mutates and just reports whether approval
 /// would be required.
 /// </summary>
-internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier)
+internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier, Settings.IFeatlySettingsProvider settings)
 {
     /// <summary>
     /// Decides how a mutation should proceed. When <see cref="GateResult.Outcome"/>
@@ -37,7 +37,10 @@ internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService a
         string? reason,
         CancellationToken ct)
     {
-        var policy = await store.ApprovalPolicies.GetByEnvironmentAsync(environment.Id, ct).ConfigureAwait(false);
+        // Explicit per-environment policy wins; otherwise fall back to the
+        // DB-overridable default template for this environment (ARCHITECTURE.md §15).
+        var policy = await store.ApprovalPolicies.GetByEnvironmentAsync(environment.Id, ct).ConfigureAwait(false)
+            ?? settings.ApprovalDefaults.TemplateFor(environment.Key).ToPolicy(environment.Id);
         var requiresApproval = policy is { Required: true };
 
         if (dryRun)

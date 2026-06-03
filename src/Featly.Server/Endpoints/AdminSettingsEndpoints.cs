@@ -39,8 +39,31 @@ internal static class AdminSettingsEndpoints
         admin.MapPut("/authorization", PutAuthorizationAsync).WithName("Featly.Admin.Settings.PutAuthorization").RequirePermission(Permission.SettingsUpdate);
         admin.MapGet("/audit", GetAuditAsync).WithName("Featly.Admin.Settings.GetAudit").RequirePermission(Permission.SettingsRead);
         admin.MapPut("/audit", PutAuditAsync).WithName("Featly.Admin.Settings.PutAudit").RequirePermission(Permission.SettingsUpdate);
+        admin.MapGet("/approval-defaults", GetApprovalDefaultsAsync).WithName("Featly.Admin.Settings.GetApprovalDefaults").RequirePermission(Permission.SettingsRead);
+        admin.MapPut("/approval-defaults", PutApprovalDefaultsAsync).WithName("Featly.Admin.Settings.PutApprovalDefaults").RequirePermission(Permission.SettingsUpdate);
 
         return group;
+    }
+
+    private static IResult GetApprovalDefaultsAsync(IFeatlySettingsProvider provider)
+        => Results.Ok(new SettingView<FeatlyApprovalDefaultsSettings>(provider.ApprovalDefaults, provider.ApprovalDefaultsSource.ToString()));
+
+    private static async Task<IResult> PutApprovalDefaultsAsync(
+        FeatlyApprovalDefaultsSettings body,
+        IFeatlySettingsProvider provider,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if ((body.Prod ?? new()).MinApprovals < 1 || (body.NonProd ?? new()).MinApprovals < 1)
+        {
+            return Results.BadRequest(new { error = "minApprovals must be at least 1 for each template." });
+        }
+
+        await PersistAsync(FeatlySettingsKeys.ApprovalDefaults, body, provider, store, events, principal, ct).ConfigureAwait(false);
+        return Results.Ok(new SettingView<FeatlyApprovalDefaultsSettings>(provider.ApprovalDefaults, provider.ApprovalDefaultsSource.ToString()));
     }
 
     private static IResult GetAuditAsync(IFeatlySettingsProvider provider)

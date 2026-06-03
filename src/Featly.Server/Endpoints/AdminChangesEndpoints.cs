@@ -144,6 +144,7 @@ internal static class AdminChangesEndpoints
         DecisionWriteRequest body,
         StorageFacade store,
         IFeatlyEventPublisher events,
+        Settings.IFeatlySettingsProvider settings,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -176,7 +177,7 @@ internal static class AdminChangesEndpoints
         change.UpdatedAt = DateTimeOffset.UtcNow;
 
         var policy = await store.ApprovalPolicies.GetByEnvironmentAsync(change.EnvironmentId, ct).ConfigureAwait(false)
-            ?? DefaultPolicy(change.EnvironmentId);
+            ?? await DefaultPolicyAsync(store, settings, change.EnvironmentId, ct).ConfigureAwait(false);
 
         var matcher = await ApproverMatcher.BuildAsync(
             store,
@@ -309,13 +310,14 @@ internal static class AdminChangesEndpoints
         return Results.Ok(change);
     }
 
-    private static ApprovalPolicy DefaultPolicy(Guid environmentId) => new()
+    // Fallback policy for an environment with no explicit ApprovalPolicy — the
+    // DB-overridable default template for the environment (ARCHITECTURE.md §15).
+    private static async Task<ApprovalPolicy> DefaultPolicyAsync(
+        StorageFacade store, Settings.IFeatlySettingsProvider settings, Guid environmentId, CancellationToken ct)
     {
-        Id = Guid.Empty,
-        EnvironmentId = environmentId,
-        Required = true,
-        MinApprovals = 1,
-    };
+        var env = await store.Environments.GetByIdAsync(environmentId, ct).ConfigureAwait(false);
+        return settings.ApprovalDefaults.TemplateFor(env?.Key).ToPolicy(environmentId);
+    }
 
     private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
     {
