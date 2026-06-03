@@ -1,0 +1,26 @@
+/* Featly docs theme — purple accent matching the dashboard (#7c3aed light /
+   #a78bfa dark). See ADR-0002 / the dashboard design language. */
+
+:root {
+  /* Dark theme (Starlight default). */
+  --sl-color-accent-low: #271356;
+  --sl-color-accent: #7c3aed;
+  --sl-color-accent-high: #c9b8f5;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ece4fb;
+  --sl-color-accent: #6d28d9;
+  --sl-color-accent-high: #2f1065;
+}
+
+/* Slightly tighter, calmer hero on the splash page. */
+.hero > .copy {
+  max-width: 48rem;
+}
+
+/* Screenshots read better with a soft frame in both themes. */
+.sl-markdown-content img:not([data-no-frame]) {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+}

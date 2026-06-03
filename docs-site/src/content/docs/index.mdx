@@ -1,0 +1,53 @@
+---
+title: Featly
+description: Feature management for .NET — feature flags, dynamic configuration, segments, experiments, and enterprise governance, embedded in your ASP.NET Core app like Hangfire.
+template: splash
+hero:
+  tagline: Feature flags, dynamic configuration, segments, experiments, and enterprise governance — embedded in your ASP.NET Core app like Hangfire, or hosted centrally. Bring your own database.
+  image:
+    file: ../../assets/dashboard/dashboard-flags.png
+  actions:
+    - text: Get started
+      link: /Featly/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/Featly-net/Featly
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+:::caution[Early development]
+Featly is in early design and development. The architecture is documented and the implementation is well underway, but the public API is unstable and there are no stable releases yet. Stars, ideas, and pull requests are welcome.
+:::
+
+## What is Featly
+
+Featly is what you get when you combine three things into one open-source product for the .NET ecosystem:
+
+<CardGrid>
+  <Card title="The DX of Hangfire" icon="rocket">
+    Embed the server, dashboard, and SDK inside your ASP.NET Core process. Two registration calls and a middleware mount and you have a working feature-management platform.
+  </Card>
+  <Card title="The engine of LaunchDarkly / Unleash" icon="random">
+    Local evaluation in the SDK; the server supplies configuration. Decisions take microseconds with no network call on the hot path.
+  </Card>
+  <Card title="Enterprise governance" icon="approve-check">
+    Custom RBAC, approval workflows with per-environment policies, an audit log, ReadOnly environment locks, dry-run mutations, and database-overrides-config settings.
+  </Card>
+  <Card title="Open source, self-hosted" icon="open-book">
+    MIT-licensed. Run it embedded with SQLite or centrally with your own database. You own the data.
+  </Card>
+</CardGrid>
+
+No other project in the .NET open-source space combines these. That is Featly's niche.
+
+## Where to next
+
+<CardGrid>
+  <LinkCard title="Introduction" href="/Featly/introduction/" description="The core concepts in five minutes — flags, configs, targeting, governance." />
+  <LinkCard title="Getting started" href="/Featly/getting-started/" description="From nothing to a running dashboard with a live flag in a few minutes." />
+  <LinkCard title="Dashboard tour" href="/Featly/dashboard/" description="See every major screen and flow, with screenshots." />
+  <LinkCard title="OpenFeature" href="/Featly/integrate/openfeature/" description="Adopt the vendor-neutral OpenFeature API, backed by Featly." />
+</CardGrid>

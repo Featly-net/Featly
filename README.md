@@ -140,6 +140,8 @@ public class CheckoutController(IFeatlyClient featly) : ControllerBase
 
 ## Documentation
 
+**[Documentation site](https://featly-net.github.io/Featly/)** — the image-rich, searchable docs: concepts, a dashboard tour, configuration, deployment, OpenFeature, and more. The in-repo Markdown below is the contributor-facing source.
+
 - [Getting started](docs/GETTING_STARTED.md) — install and your first flag in minutes
 - [Configuration](docs/CONFIGURATION.md) — every setting, the three-layer precedence, environment variables, the CLI
 - [Deployment](docs/DEPLOYMENT.md) — the three deployment patterns and a production checklist

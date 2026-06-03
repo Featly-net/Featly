@@ -1350,6 +1350,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-022](docs/adr/0022-cli-hybrid-online-offline.md) | CLI is hybrid — `db` commands offline, admin commands online over HTTP | Accepted |
 | [ADR-023](docs/adr/0023-user-bound-api-keys.md) | API keys may bind to a real user; persisted keys authenticate over Bearer | Accepted |
 | [ADR-024](docs/adr/0024-modular-feature-areas.md) | Modular feature areas via DI toggles (hybrid; package split deferred) | Accepted |
+| [ADR-025](docs/adr/0025-documentation-site-astro-starlight.md) | Documentation site on Astro Starlight, hosted on GitHub Pages | Accepted |
 
 ---
 

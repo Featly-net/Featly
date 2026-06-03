@@ -1,0 +1,57 @@
+name: docs-site
+
+# Builds the Astro Starlight documentation site (docs-site/) and publishes it to
+# GitHub Pages. Runs on push to main that touches the site, and on demand. Build
+# also runs on PRs that touch the site (without deploying) so breakage is caught
+# in review. See ADR-0025.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs-site/**'
+      - '.github/workflows/docs-site.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs-site/**'
+      - '.github/workflows/docs-site.yml'
+  workflow_dispatch: {}
+
+# Allow the deploy job to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; never cancel an in-progress production deploy.
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build site
+        uses: withastro/action@v5
+        with:
+          path: docs-site
+
+  deploy:
+    name: deploy
+    # Only publish from main, never from a PR build.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
