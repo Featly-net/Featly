@@ -3093,6 +3093,9 @@
             '  <h2>Authorization</h2>',
             '  <p class="sub">What happens when an authenticated identity has no role assignment: <code>Open</code> grants the Viewer floor, <code>Closed</code> denies. Saved to the database, overriding <code>appsettings</code>.</p>',
             '  <div id="authz-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '  <h2>Audit retention</h2>',
+            '  <p class="sub">Days of audit history to keep. <code>0</code> keeps everything; a higher value lets a background trimmer delete older entries. Saved to the database, overriding <code>appsettings</code>.</p>',
+            '  <div id="audit-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
         ].join("\n");
 
@@ -3113,6 +3116,35 @@
 
         loadWebhookSettings();
         loadAuthorizationSettings();
+        loadAuditSettings();
+
+        function loadAuditSettings() {
+            api("GET", "/admin/settings/audit").then(function (view) {
+                var v = (view && view.value) || {};
+                var source = (view && view.source) || "";
+                var prov = source === "Database"
+                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
+                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                document.getElementById("audit-settings").innerHTML = [
+                    '<div class="card-pad"><form id="audit-settings-form" class="row-form">',
+                    '  <label class="field"><span class="field__label">Retention (days, 0 = forever)</span><input name="retentionDays" type="number" min="0" value="' + esc(String(v.retentionDays != null ? v.retentionDays : 0)) + '" /></label>',
+                    '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="audit-settings-msg"></span></div>',
+                    '</form></div>',
+                ].join("\n");
+                document.getElementById("audit-settings-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("audit-settings-msg");
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/settings/audit", { retentionDays: parseInt(f.retentionDays.value, 10) || 0 })
+                        .then(function () { setMessageOn(msg, "success", "Saved."); loadAuditSettings(); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            }).catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); return; }
+                document.getElementById("audit-settings").innerHTML = '<div class="empty"><p class="muted">' + esc(err.message) + '</p></div>';
+            });
+        }
 
         function loadAuthorizationSettings() {
             api("GET", "/admin/settings/authorization").then(function (view) {

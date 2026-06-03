@@ -22,4 +22,10 @@ public interface IAuditStore
         DateTimeOffset? to = null,
         int limit = 200,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes audit entries strictly older than <paramref name="cutoff"/> and
+    /// returns how many were removed. Used by the audit-retention trimmer.
+    /// </summary>
+    Task<int> PruneOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct);
 }

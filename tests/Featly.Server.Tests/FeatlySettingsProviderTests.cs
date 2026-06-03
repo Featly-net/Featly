@@ -123,6 +123,36 @@ public class FeatlySettingsProviderTests
         provider.Authorization.AutoProvisionMode.Should().Be(Featly.Server.Authentication.AutoProvisionMode.Closed);
     }
 
+    [Fact]
+    public async Task Audit_defaults_to_keep_forever()
+    {
+        var store = new InMemoryFeatlyStore();
+        var provider = Build(store, sectionPresent: false);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.AuditSource.Should().Be(FeatlySettingsSource.HardcodedDefault);
+        provider.Audit.RetentionDays.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Audit_database_overrides_appsettings()
+    {
+        var store = new InMemoryFeatlyStore();
+        await store.Settings.UpsertAsync(new SystemSetting
+        {
+            Key = FeatlySettingsKeys.Audit,
+            Payload = JsonSerializer.SerializeToElement(new { retentionDays = 30 }),
+            UpdatedAt = DateTimeOffset.UtcNow,
+            UpdatedBy = "test",
+        }, CancellationToken.None);
+
+        var provider = Build(store, sectionPresent: false);
+        await provider.ReloadAsync(TestContext.Current.CancellationToken);
+
+        provider.AuditSource.Should().Be(FeatlySettingsSource.Database);
+        provider.Audit.RetentionDays.Should().Be(30);
+    }
+
     private static async Task WriteDbWebhookAsync(InMemoryFeatlyStore store, FeatlyWebhookSettings value) =>
         await store.Settings.UpsertAsync(new SystemSetting
         {
@@ -149,15 +179,17 @@ public class FeatlySettingsProviderTests
         {
             authzBuilder.Configure(configureAuthz);
         }
+        services.AddOptions<FeatlyAuditOptions>();
         var sp = services.BuildServiceProvider();
         var monitor = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>();
         var authzMonitor = sp.GetRequiredService<IOptionsMonitor<Featly.Server.Authentication.FeatlyAuthorizationOptions>>();
+        var auditMonitor = sp.GetRequiredService<IOptionsMonitor<FeatlyAuditOptions>>();
 
         var configData = sectionPresent
             ? new Dictionary<string, string?> { ["Featly:Webhooks:MaxAttempts"] = "9" }
             : [];
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
 
-        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, configuration);
+        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, auditMonitor, configuration);
     }
 }

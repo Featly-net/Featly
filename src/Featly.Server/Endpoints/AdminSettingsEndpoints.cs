@@ -37,8 +37,31 @@ internal static class AdminSettingsEndpoints
         admin.MapPut("/webhook", PutWebhookAsync).WithName("Featly.Admin.Settings.PutWebhook").RequirePermission(Permission.SettingsUpdate);
         admin.MapGet("/authorization", GetAuthorizationAsync).WithName("Featly.Admin.Settings.GetAuthorization").RequirePermission(Permission.SettingsRead);
         admin.MapPut("/authorization", PutAuthorizationAsync).WithName("Featly.Admin.Settings.PutAuthorization").RequirePermission(Permission.SettingsUpdate);
+        admin.MapGet("/audit", GetAuditAsync).WithName("Featly.Admin.Settings.GetAudit").RequirePermission(Permission.SettingsRead);
+        admin.MapPut("/audit", PutAuditAsync).WithName("Featly.Admin.Settings.PutAudit").RequirePermission(Permission.SettingsUpdate);
 
         return group;
+    }
+
+    private static IResult GetAuditAsync(IFeatlySettingsProvider provider)
+        => Results.Ok(new SettingView<FeatlyAuditSettings>(provider.Audit, provider.AuditSource.ToString()));
+
+    private static async Task<IResult> PutAuditAsync(
+        FeatlyAuditSettings body,
+        IFeatlySettingsProvider provider,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (body.RetentionDays < 0)
+        {
+            return Results.BadRequest(new { error = "retentionDays must be 0 (keep forever) or a positive number of days." });
+        }
+
+        await PersistAsync(FeatlySettingsKeys.Audit, body, provider, store, events, principal, ct).ConfigureAwait(false);
+        return Results.Ok(new SettingView<FeatlyAuditSettings>(provider.Audit, provider.AuditSource.ToString()));
     }
 
     private static IResult GetAuthorizationAsync(IFeatlySettingsProvider provider)
