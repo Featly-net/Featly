@@ -164,7 +164,7 @@ public class FeatlyOpenFeatureProviderTests
     public async Task End_to_end_through_the_openfeature_client()
     {
         var flags = new FakeFlagClient().Set("new-checkout", true, variant: "on");
-        await Api.Instance.SetProviderAsync(new FeatlyOpenFeatureProvider(flags));
+        await Api.Instance.SetProviderAsync(new FeatlyOpenFeatureProvider(flags), TestContext.Current.CancellationToken);
         try
         {
             var client = Api.Instance.GetClient();
