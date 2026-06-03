@@ -21,6 +21,12 @@ public interface IFeatlySettingsProvider
     /// <summary>Which precedence layer supplied <see cref="Authorization"/>.</summary>
     FeatlySettingsSource AuthorizationSource { get; }
 
+    /// <summary>The effective audit-log retention.</summary>
+    FeatlyAuditSettings Audit { get; }
+
+    /// <summary>Which precedence layer supplied <see cref="Audit"/>.</summary>
+    FeatlySettingsSource AuditSource { get; }
+
     /// <summary>Re-reads the database layer and refreshes the cached effective values.</summary>
     Task ReloadAsync(CancellationToken ct = default);
 }

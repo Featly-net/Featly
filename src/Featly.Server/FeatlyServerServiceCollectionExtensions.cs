@@ -109,8 +109,10 @@ public static class FeatlyServerServiceCollectionExtensions
         // hardcoded default -> appsettings -> database and caches the effective
         // values; the hosted service loads the DB layer at startup and reloads
         // on a settings change notification.
+        services.AddOptions<FeatlyAuditOptions>().BindConfiguration(FeatlyAuditOptions.SectionName);
         services.TryAddSingleton<Settings.IFeatlySettingsProvider, Settings.DefaultFeatlySettingsProvider>();
         services.AddHostedService<Settings.SettingsReloadHostedService>();
+        services.AddHostedService<Settings.AuditRetentionWorker>();
 
         services.TryAddSingleton<IFeatlyPermissionChecker, DefaultFeatlyPermissionChecker>();
         services.TryAddSingleton<ApiKeyHasher>();

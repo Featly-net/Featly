@@ -28,27 +28,35 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
     private readonly StorageFacade _store;
     private readonly IOptionsMonitor<WebhookOptions> _webhookOptions;
     private readonly IOptionsMonitor<FeatlyAuthorizationOptions> _authzOptions;
+    private readonly IOptionsMonitor<FeatlyAuditOptions> _auditOptions;
     private readonly bool _webhookSectionExists;
+    private readonly bool _auditSectionExists;
     private readonly Lock _gate = new();
 
     private FeatlyWebhookSettings _webhook;
     private FeatlySettingsSource _webhookSource;
     private FeatlyAuthorizationSettings _authorization;
     private FeatlySettingsSource _authorizationSource;
+    private FeatlyAuditSettings _audit;
+    private FeatlySettingsSource _auditSource;
 
     public DefaultFeatlySettingsProvider(
         StorageFacade store,
         IOptionsMonitor<WebhookOptions> webhookOptions,
         IOptionsMonitor<FeatlyAuthorizationOptions> authzOptions,
+        IOptionsMonitor<FeatlyAuditOptions> auditOptions,
         IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         _store = store;
         _webhookOptions = webhookOptions;
         _authzOptions = authzOptions;
+        _auditOptions = auditOptions;
         _webhookSectionExists = configuration.GetSection(WebhookOptions.SectionName).Exists();
+        _auditSectionExists = configuration.GetSection(FeatlyAuditOptions.SectionName).Exists();
         (_webhook, _webhookSource) = WebhookFromAppSettings();
         (_authorization, _authorizationSource) = AuthorizationFromAppSettings();
+        (_audit, _auditSource) = AuditFromAppSettings();
     }
 
     public FeatlyWebhookSettings Webhook
@@ -71,6 +79,16 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
         get { lock (_gate) { return _authorizationSource; } }
     }
 
+    public FeatlyAuditSettings Audit
+    {
+        get { lock (_gate) { return _audit; } }
+    }
+
+    public FeatlySettingsSource AuditSource
+    {
+        get { lock (_gate) { return _auditSource; } }
+    }
+
     public async Task ReloadAsync(CancellationToken ct = default)
     {
         var webhookDb = await _store.Settings.GetAsync(FeatlySettingsKeys.Webhook, ct).ConfigureAwait(false);
@@ -83,13 +101,26 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
             ? (a, FeatlySettingsSource.Database)
             : AuthorizationFromAppSettings();
 
+        var auditDb = await _store.Settings.GetAsync(FeatlySettingsKeys.Audit, ct).ConfigureAwait(false);
+        var audit = auditDb is not null && auditDb.Payload.Deserialize<FeatlyAuditSettings>(s_json) is { } au
+            ? (au, FeatlySettingsSource.Database)
+            : AuditFromAppSettings();
+
         lock (_gate)
         {
             _webhook = webhook.Item1;
             _webhookSource = webhook.Item2;
             _authorization = authz.Item1;
             _authorizationSource = authz.Item2;
+            _audit = audit.Item1;
+            _auditSource = audit.Item2;
         }
+    }
+
+    private (FeatlyAuditSettings Value, FeatlySettingsSource Source) AuditFromAppSettings()
+    {
+        var value = new FeatlyAuditSettings { RetentionDays = _auditOptions.CurrentValue.RetentionDays };
+        return (value, _auditSectionExists ? FeatlySettingsSource.AppSettings : FeatlySettingsSource.HardcodedDefault);
     }
 
     private (FeatlyAuthorizationSettings Value, FeatlySettingsSource Source) AuthorizationFromAppSettings()

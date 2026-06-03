@@ -134,6 +134,26 @@ public class AdminSettingsEndpointTests
         view.GetProperty("value").GetProperty("autoProvisionMode").GetString().Should().Be("Closed");
     }
 
+    [Fact]
+    public async Task PUT_audit_persists_retention_and_rejects_negative()
+    {
+        using var host = await BuildHostAsync();
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var def = await client.GetFromJsonAsync<JsonElement>("/api/admin/settings/audit", ct);
+        def.GetProperty("value").GetProperty("retentionDays").GetInt32().Should().Be(0);
+
+        var put = await client.PutAsJsonAsync("/api/admin/settings/audit", new { retentionDays = 30 }, ct);
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+        var after = await put.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+        after.GetProperty("source").GetString().Should().Be("Database");
+        after.GetProperty("value").GetProperty("retentionDays").GetInt32().Should().Be(30);
+
+        (await client.PutAsJsonAsync("/api/admin/settings/audit", new { retentionDays = -1 }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();

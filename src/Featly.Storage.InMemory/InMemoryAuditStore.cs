@@ -13,6 +13,27 @@ internal sealed class InMemoryAuditStore : IAuditStore
         return Task.CompletedTask;
     }
 
+    public Task<int> PruneOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct)
+    {
+        // Drain, keep the survivors (in order), re-enqueue. The lock guards
+        // against an interleaved Append losing an entry.
+        lock (_entries)
+        {
+            var kept = new List<AuditEntry>(_entries.Count);
+            var removed = 0;
+            while (_entries.TryDequeue(out var entry))
+            {
+                if (entry.At < cutoff)
+                { removed++; }
+                else
+                { kept.Add(entry); }
+            }
+            foreach (var e in kept)
+            { _entries.Enqueue(e); }
+            return Task.FromResult(removed);
+        }
+    }
+
     public Task<IReadOnlyList<AuditEntry>> QueryAsync(
         string? entityType = null,
         string? entityKey = null,

@@ -126,6 +126,24 @@ public class SqliteWebhookAndAuditStoreTests
             .Should().ContainSingle().Which.EntityType.Should().Be("Flag");
     }
 
+    [Fact]
+    public async Task Prune_removes_entries_older_than_the_cutoff()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+
+        await host.Store.Audit.AppendAsync(new AuditEntry { Id = Guid.NewGuid(), At = now.AddDays(-40), Action = "flag.updated", EntityType = "Flag" }, ct);
+        await host.Store.Audit.AppendAsync(new AuditEntry { Id = Guid.NewGuid(), At = now.AddDays(-1), Action = "flag.updated", EntityType = "Flag" }, ct);
+
+        var removed = await host.Store.Audit.PruneOlderThanAsync(now.AddDays(-30), ct);
+        removed.Should().Be(1);
+
+        var remaining = await host.Store.Audit.QueryAsync(ct: ct);
+        remaining.Should().ContainSingle();
+        remaining[0].At.Should().BeCloseTo(now.AddDays(-1), TimeSpan.FromSeconds(2));
+    }
+
     private static WebhookDelivery NewDelivery(Guid endpointId, DateTimeOffset nextAttempt) => new()
     {
         Id = Guid.NewGuid(),

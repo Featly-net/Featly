@@ -9,6 +9,9 @@ public static class FeatlySettingsKeys
     /// <summary>Authorization aggregate key (auto-provision policy).</summary>
     public const string Authorization = "authorization";
 
+    /// <summary>Audit aggregate key (log retention).</summary>
+    public const string Audit = "audit";
+
     /// <summary>
     /// Entity type used on the <c>IChangeNotifier</c> notification emitted when a
     /// settings singleton changes, so other instances reload.
@@ -61,4 +64,16 @@ public sealed class FeatlyAuthorizationSettings
     /// </summary>
     public Featly.Server.Authentication.AutoProvisionMode AutoProvisionMode { get; set; }
         = Featly.Server.Authentication.AutoProvisionMode.Open;
+}
+
+/// <summary>
+/// DB-overridable audit-log retention (ARCHITECTURE.md §15). When
+/// <see cref="RetentionDays"/> is greater than zero, a background trimmer deletes
+/// audit entries older than that many days. Zero (the default) keeps the log
+/// forever — preserving the historical behavior.
+/// </summary>
+public sealed class FeatlyAuditSettings
+{
+    /// <summary>Days of audit history to keep; <c>0</c> disables pruning (keep forever).</summary>
+    public int RetentionDays { get; set; }
 }

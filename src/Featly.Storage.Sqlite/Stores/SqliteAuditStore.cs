@@ -12,6 +12,12 @@ internal sealed class SqliteAuditStore(IDbContextFactory<FeatlyDbContext> contex
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task<int> PruneOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+        return await db.AuditEntries.Where(a => a.At < cutoff).ExecuteDeleteAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<AuditEntry>> QueryAsync(
         string? entityType = null,
         string? entityKey = null,
