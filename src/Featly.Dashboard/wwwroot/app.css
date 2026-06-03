@@ -730,17 +730,63 @@ p:last-child { margin-bottom: 0; }
     align-items: center;
 }
 .variant-row > input { flex: 1 1 120px; min-width: 0; }
-.variant-row > .v-value { flex: 1 1 160px; min-width: 0; min-height: 2.25rem; resize: vertical; }
+.variant-row > .json-editor { flex: 1 1 160px; min-width: 0; }
 .variant-row > .icon-btn { flex: 0 0 auto; }
 
-/* JSON value editors (#114): monospace, resizable, with inline invalid state. */
-.json-area { font-family: var(--font-mono); line-height: 1.5; tab-size: 2; }
-.json-area.invalid {
-    border-color: var(--danger-fg) !important;
+/* JSON value editor (#114/#121): a syntax-highlighted <pre> overlay behind a
+   transparent textarea. Both layers MUST share identical box metrics so the
+   colored text under the caret aligns exactly. */
+.json-editor { position: relative; display: block; width: 100%; }
+.json-editor > .json-hl,
+.json-editor > .json-area {
+    margin: 0;
+    box-sizing: border-box;
+    font: 13px/1.5 var(--font-mono);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 2;
+}
+.json-editor > .json-hl {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--color-bg);
+    color: var(--color-fg);
+}
+.json-editor > .json-area {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 2.5rem;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--color-fg);
+    border-color: var(--color-border);
+    resize: vertical;
+}
+.variant-row .json-editor > .json-area { min-height: 2.25rem; }
+.json-editor > .json-area:hover { border-color: var(--color-accent); }
+.json-editor > .json-area:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+.json-editor > .json-area.invalid {
+    border-color: var(--danger-fg);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-fg) 18%, transparent);
 }
 .json-label { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
-.json-label .json-area { width: 100%; }
+
+/* Token colors — mid-tones chosen to read on both light and dark backgrounds. */
+.json-hl .json-key { color: var(--color-accent); }
+.json-hl .json-str { color: #3aa757; }
+.json-hl .json-num { color: #3b82f6; }
+.json-hl .json-bool { color: #a855f7; }
+.json-hl .json-null { color: var(--fg-muted); }
 
 /* Rules */
 .rules-list {
