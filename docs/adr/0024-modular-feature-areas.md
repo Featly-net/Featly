@@ -1,6 +1,6 @@
 # ADR-0024: Modular feature areas via DI toggles
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-03
 - **Deciders:** @thiagoluga
 - **Supersedes:** _(none)_
@@ -24,7 +24,7 @@ We will make feature areas **opt-out toggles on `FeatlyServerOptions.Features`**
 
 Gating is **surface-level**: disabling an area removes its endpoints and screens; it does **not** drop the storage tables (the schema stays uniform across deployments, so enabling an area later needs no migration). The dashboard reads the enabled set from a tiny bootstrap endpoint (or an injected config blob) and renders only what is on. The OpenFeature provider is flags-centric and unaffected.
 
-Package-level modularity (separate `Featly.Server.Experiments` etc.) is **not** adopted now; it can be layered on later for the heaviest areas if a real footprint need appears, without changing the toggle API.
+This is a **hybrid** stance (the chosen direction): DI toggles ship now; package-level modularity (separate `Featly.Server.Experiments` etc.) is **not** adopted now but can be layered on later for the heaviest areas if a real footprint need appears, without changing the toggle API.
 
 ## Alternatives considered
 
