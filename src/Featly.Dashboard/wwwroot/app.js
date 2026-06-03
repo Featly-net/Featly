@@ -797,6 +797,7 @@
         }
         viewEl.innerHTML = flagListMarkup([], true);
         hydrateIcons(viewEl);
+        wireFlagNew();
         api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key) + (flagListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
@@ -838,7 +839,7 @@
             '<div class="page">',
             '  <div class="page-head"><div class="title-wrap"><h1>Flags</h1>',
             '    <span class="sub">Boolean and multivariate feature flags evaluated in <code>' + esc(currentEnv.key) + '</code>.</span>',
-            '  </div></div>',
+            '  </div><div class="actions"><button type="button" class="btn primary" id="flag-new">New flag</button></div></div>',
             '  <div class="tabs">' + tabsHtml + '</div>',
             '  <div class="page-body tight">' + body + '</div>',
             '</div>',
@@ -895,6 +896,63 @@
             });
         }
         wireArchiveControls("/admin/flags", flagListArchived, function (v) { flagListArchived = v; }, renderFlagList);
+        wireFlagNew();
+    }
+
+    function wireFlagNew() {
+        var btn = document.getElementById("flag-new");
+        if (btn) { btn.addEventListener("click", openCreateFlagModal); }
+    }
+
+    // Seed a minimal valid variant set so a new flag is creatable in one step;
+    // the user refines variants/rules in the detail editor afterwards.
+    function seedFlagVariants(type) {
+        switch (type) {
+            case "Boolean": return { variants: [{ key: "on", name: "On", value: true }, { key: "off", name: "Off", value: false }], defaultVariantKey: "off" };
+            case "Number": return { variants: [{ key: "default", name: "Default", value: 0 }], defaultVariantKey: "default" };
+            case "Json": return { variants: [{ key: "default", name: "Default", value: {} }], defaultVariantKey: "default" };
+            default: return { variants: [{ key: "default", name: "Default", value: "" }], defaultVariantKey: "default" };
+        }
+    }
+
+    function openCreateFlagModal() {
+        if (!currentEnv) { return; }
+        openModal("New flag", [
+            '<form id="flag-create-form" class="editor">',
+            field("Key", '<input name="key" required placeholder="new-checkout" autocomplete="off" spellcheck="false" />'),
+            field("Name", '<input name="name" placeholder="New checkout" autocomplete="off" />'),
+            field("Type", '<select name="type"><option>Boolean</option><option>String</option><option>Number</option><option>Json</option></select>'),
+            field("Description", '<input name="description" placeholder="optional" autocomplete="off" />'),
+            field("Tags", '<input name="tags" placeholder="comma, separated" autocomplete="off" />'),
+            '<div class="editor__footer"><button type="submit" class="btn primary">Create flag</button><span class="save-msg" id="flag-create-msg"></span></div>',
+            '</form>',
+        ].join("\n"));
+
+        document.getElementById("flag-create-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("flag-create-msg");
+            var key = f.key.value.trim();
+            if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
+            var type = f.type.value;
+            var seed = seedFlagVariants(type);
+            var tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+            setMessageOn(msg, "loading", "Creating…");
+            api("POST", "/admin/flags?env=" + encodeURIComponent(currentEnv.key), {
+                key: key,
+                name: f.name.value.trim() || key,
+                description: f.description.value.trim() || null,
+                type: type,
+                enabled: false,
+                defaultVariantKey: seed.defaultVariantKey,
+                variants: seed.variants,
+                tags: tags,
+            }).then(function () { closeModal(); navigate("/flags/" + encodeURIComponent(key)); })
+                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
+
+        var keyInput = document.querySelector("#flag-create-form [name=key]");
+        if (keyInput) { keyInput.focus(); }
     }
 
     // ---------- Shared list helpers (redesign, step 5) ----------
