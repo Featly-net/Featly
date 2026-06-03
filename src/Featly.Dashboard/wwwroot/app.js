@@ -1222,13 +1222,14 @@
             field("Key", '<input name="key" required placeholder="checkout.timeout" autocomplete="off" spellcheck="false" />'),
             field("Name", '<input name="name" placeholder="Checkout timeout" autocomplete="off" />'),
             field("Type", '<select name="type">' + typeOpts + '</select>'),
-            field("Default value", '<input name="defaultValue" placeholder="30" autocomplete="off" />'),
+            field("Default value", '<textarea name="defaultValue" class="json-area" rows="2" spellcheck="false" placeholder="30"></textarea>'),
             field("Description", '<input name="description" placeholder="optional" autocomplete="off" />'),
             field("Tags", '<input name="tags" placeholder="comma, separated" autocomplete="off" />'),
             '<div class="editor__footer"><button type="submit" class="btn primary">Create config</button><span class="save-msg" id="config-create-msg"></span></div>',
             '</form>',
         ].join("\n"));
 
+        wireJsonAreas(document.getElementById("config-create-form"));
         document.getElementById("config-create-form").addEventListener("submit", function (e) {
             e.preventDefault();
             var f = e.target;
@@ -1388,13 +1389,37 @@
         return '<div class="variant-row">'
             + '<input class="v-key" placeholder="key" value="' + esc(v.key) + '" />'
             + '<input class="v-name" placeholder="name" value="' + esc(v.name) + '" />'
-            + '<input class="v-value" placeholder="value (JSON)" value="' + esc(JSON.stringify(v.value)) + '" />'
+            + '<textarea class="v-value json-area" rows="1" spellcheck="false" placeholder="value (JSON)">' + esc(jsonPretty(v.value)) + '</textarea>'
             + '<button type="button" class="icon-btn" data-action="remove-variant" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
 
+    // Pretty-print a value as JSON for a multiline editor. Scalars stay one-line.
+    function jsonPretty(v) {
+        try { return JSON.stringify(v, null, 2); } catch (_) { return ""; }
+    }
+
+    // Live format + validate for .json-area textareas: on blur, reformat valid
+    // JSON and flag invalid JSON inline. Delegated so dynamically-added rule
+    // cards/variants are covered. Wired once per editor form.
+    function wireJsonAreas(form) {
+        form.addEventListener("focusout", function (e) {
+            var ta = e.target.closest(".json-area");
+            if (!ta) { return; }
+            var raw = ta.value.trim();
+            if (raw === "") { ta.classList.remove("invalid"); return; }
+            try {
+                ta.value = JSON.stringify(JSON.parse(raw), null, 2);
+                ta.classList.remove("invalid");
+            } catch (_) {
+                ta.classList.add("invalid");
+            }
+        });
+    }
+
     function wireFlagEditor(flag) {
         var form = document.getElementById("flag-form");
+        wireJsonAreas(form);
         // Wire any pre-existing split toggles (rules loaded with splits).
         Array.prototype.slice.call(form.querySelectorAll(".rule-card")).forEach(function (card) {
             var toggle = card.querySelector(".split-toggle");
@@ -1477,9 +1502,9 @@
             field("Description", '<textarea name="description" rows="2">' + esc(config.description || "") + '</textarea>'),
             '<div class="grid-2">',
             field("Type", '<input value="' + esc(config.type) + '" readonly disabled />'),
-            field("Default value (JSON)", '<input name="defaultValue" required value="' + esc(JSON.stringify(config.defaultValue)) + '" />'),
-            '</div>',
             field("Tags", '<input name="tags" value="' + esc((config.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
+            '</div>',
+            field("Default value (JSON)", '<textarea name="defaultValue" class="json-area" rows="4" spellcheck="false" required>' + esc(jsonPretty(config.defaultValue)) + '</textarea>'),
             '<h2>Rules</h2>',
             renderRulesEditor(config.rules || [], { kind: "config" }),
             '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
@@ -1501,6 +1526,7 @@
         hydrateIcons(viewEl);
         wirePreviewPanel("config", config.key);
         var form = document.getElementById("config-form");
+        wireJsonAreas(form);
         form.addEventListener("click", function (e) {
             var action = e.target.closest("[data-action]")?.getAttribute("data-action");
             if (action === "add-rule") {
@@ -3217,7 +3243,7 @@
         } else {
             outcomeHtml =
                 '<div class="outcome">'
-                + '<label>Value (JSON) <input class="r-value" value="' + esc(JSON.stringify(rule.value)) + '" /></label>'
+                + '<label class="json-label">Value (JSON) <textarea class="r-value json-area" rows="2" spellcheck="false">' + esc(jsonPretty(rule.value)) + '</textarea></label>'
                 + '</div>';
         }
 
