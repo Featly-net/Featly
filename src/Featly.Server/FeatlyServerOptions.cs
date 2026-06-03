@@ -43,4 +43,11 @@ public sealed class FeatlyServerOptions
     /// hosts can override via configuration.
     /// </summary>
     public string DefaultEnvironmentKey { get; set; } = "development";
+
+    /// <summary>
+    /// Opt-out toggles for the server's feature areas (ADR-0024). Every area is
+    /// enabled by default; disable one to drop its admin endpoint group and hide
+    /// its dashboard UI (for example a flags-only or configs-only deployment).
+    /// </summary>
+    public FeatlyFeatureOptions Features { get; set; } = new();
 }

@@ -2,6 +2,8 @@ using Featly.Server.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Featly.Server;
 
@@ -28,6 +30,8 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
+        var features = endpoints.ServiceProvider.GetRequiredService<IOptions<FeatlyServerOptions>>().Value.Features;
+
         var group = endpoints.MapGroup("/").WithTags("Featly");
 
         group.MapGet("/health/live", () => Results.Ok(new HealthResponse("live")))
@@ -35,29 +39,62 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
              .WithDescription("Liveness probe. Returns 200 if the host process can respond.");
 
         var apiGroup = group.MapGroup("/api");
+
+        // Always-on core: the rest of the product depends on these.
         apiGroup.MapAuth();
         apiGroup.MapBootstrap();
-        apiGroup.MapAdminFlags();
-        apiGroup.MapAdminSegments();
-        apiGroup.MapAdminConfigs();
+        apiGroup.MapMeta(features);
         apiGroup.MapAdminEnvironments();
         apiGroup.MapAdminProjects();
-        apiGroup.MapAdminPreview();
-        apiGroup.MapAdminUsers();
         apiGroup.MapAdminApiKeys();
-        apiGroup.MapAdminRoles();
-        apiGroup.MapAdminGroups();
-        apiGroup.MapAdminRoleAssignments();
-        apiGroup.MapAdminRoleUpgradeRequests();
-        apiGroup.MapAdminChanges();
-        apiGroup.MapAdminApprovalPolicies();
-        apiGroup.MapAdminExperiments();
-        apiGroup.MapAdminAudit();
-        apiGroup.MapAdminWebhooks();
         apiGroup.MapAdminSettings();
         apiGroup.MapAdminExport();
         apiGroup.MapSdkEndpoints();
         apiGroup.MapSdkEvents();
+
+        // Opt-out feature areas (ADR-0024). Default: all on.
+        if (features.Flags)
+        {
+            apiGroup.MapAdminFlags();
+        }
+        if (features.Configs)
+        {
+            apiGroup.MapAdminConfigs();
+        }
+        if (features.Segments)
+        {
+            apiGroup.MapAdminSegments();
+        }
+        if (features.Flags || features.Configs)
+        {
+            // "Test this context" preview covers flags and configs.
+            apiGroup.MapAdminPreview();
+        }
+        if (features.Experiments)
+        {
+            apiGroup.MapAdminExperiments();
+        }
+        if (features.Approvals)
+        {
+            apiGroup.MapAdminChanges();
+            apiGroup.MapAdminApprovalPolicies();
+        }
+        if (features.Webhooks)
+        {
+            apiGroup.MapAdminWebhooks();
+        }
+        if (features.Audit)
+        {
+            apiGroup.MapAdminAudit();
+        }
+        if (features.Rbac)
+        {
+            apiGroup.MapAdminUsers();
+            apiGroup.MapAdminRoles();
+            apiGroup.MapAdminGroups();
+            apiGroup.MapAdminRoleAssignments();
+            apiGroup.MapAdminRoleUpgradeRequests();
+        }
 
         return group;
     }
