@@ -127,15 +127,28 @@ grouped by area (flags/configs/segments/experiments, access, platform, system),
 breadcrumbs, an environment pill, a light/dark toggle, and a command palette.
 
 The **Flags** screen lists every flag with status, type, variants, tags, and
-last-modified, with quick filters and a tab split by enabled/disabled:
+last-modified, with quick filters and a tab split by enabled/disabled. **New
+flag** (and the equivalent on Configs/Segments) opens a quick create modal:
 
-![Flags list](images/dashboard-flags.png)
+![New flag](images/dashboard-flag-create.png)
 
 Opening a flag gives you the editable detail plus a **visual rule editor** —
 each rule is a collapsible card of AND-ed conditions (attribute, operator,
 value, optional segment) resolving to a variant or a weighted split:
 
 ![Flag detail with the rule editor](images/dashboard-flag-detail.png)
+
+JSON-typed values (a `Json` flag variant or config value) use a
+syntax-highlighted editor that validates and pretty-prints as you type:
+
+![Config detail with the JSON editor](images/dashboard-config-json.png)
+
+The **Settings** screen edits runtime settings with *database-overrides-config*
+precedence — webhook retry tuning, auto-provision policy, audit retention, and
+approval defaults — each showing whether the value comes from the database or
+`appsettings`:
+
+![Settings](images/dashboard-settings.png)
 
 When an environment requires approval, mutations become **pending changes**. The
 **Inbox** collects what needs your attention — approvals and role-upgrade

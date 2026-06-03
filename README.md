@@ -49,10 +49,27 @@ audit — everything reachable in the UI is also reachable via the HTTP API.
 
 ![Flags list](docs/images/dashboard-flags.png)
 
+Create flags, configs, and segments straight from the list — a quick modal seeds
+a valid entity and drops you into its editor:
+
+![New flag](docs/images/dashboard-flag-create.png)
+
 A visual, collapsible rule editor builds targeting rules (conditions, operators,
 segments, weighted splits) without touching JSON:
 
 ![Flag detail with the visual rule editor](docs/images/dashboard-flag-detail.png)
+
+JSON-typed values get a syntax-highlighted editor that validates and pretty-prints
+as you type:
+
+![Config detail with the JSON editor](docs/images/dashboard-config-json.png)
+
+Runtime-editable settings follow the *database-overrides-config* precedence —
+webhook retry tuning, the auto-provision policy, audit retention, and approval
+defaults are all editable in the UI, each showing whether the effective value
+comes from the database or `appsettings`:
+
+![Settings with DB-overridable sections](docs/images/dashboard-settings.png)
 
 Governance is first-class: the Inbox surfaces changes awaiting your approval,
 each change review shows a line-level current → proposed diff, and the audit log
@@ -64,6 +81,10 @@ A command palette (`Cmd`/`Ctrl`-K) jumps to any screen or searches flags,
 configs, and segments:
 
 ![Command palette](docs/images/dashboard-command-palette.png)
+
+Running flags-only or configs-only? Feature areas are opt-out toggles
+(`Featly:Server:Features`) — disabled areas drop their endpoints and disappear
+from the dashboard ([ADR-0024](docs/adr/0024-modular-feature-areas.md)).
 
 ## Three deployment patterns
 
