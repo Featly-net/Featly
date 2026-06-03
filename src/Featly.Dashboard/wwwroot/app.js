@@ -427,6 +427,55 @@
         return "/";
     }
 
+    // ---------- Feature toggles (ADR-0024) ----------
+    // Populated from GET /api/meta at boot; null until loaded (treat all as on).
+    var featureFlags = null;
+    // Maps a nav/base route to the feature area(s) it needs. Routes not listed
+    // are core (always shown). An array means "enabled if any is on".
+    var NAV_FEATURE = {
+        "/flags": "flags",
+        "/configs": "configs",
+        "/segments": "segments",
+        "/experiments": "experiments",
+        "/webhooks": "webhooks",
+        "/approvals": "approvals",
+        "/audit": "audit",
+        "/users": "rbac",
+        "/groups": "rbac",
+        "/roles": "rbac",
+        "/inbox": ["approvals", "rbac"],
+    };
+    function featureOn(key) { return !featureFlags || featureFlags[key] !== false; }
+    function isNavEnabled(navRoute) {
+        var f = NAV_FEATURE[navRoute];
+        if (!f) { return true; }
+        return Array.isArray(f) ? f.some(featureOn) : featureOn(f);
+    }
+    function loadMeta() {
+        return fetch("/api/meta", { credentials: "include" })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (m) { featureFlags = (m && m.features) || null; })
+            .catch(function () { featureFlags = null; });
+    }
+    function applyNavGating() {
+        navLinks.forEach(function (link) {
+            link.style.display = isNavEnabled(link.getAttribute("data-route")) ? "" : "none";
+        });
+        // Hide a section header when every item under it (until the next header) is hidden.
+        var nav = document.querySelector(".sb-scroll");
+        if (!nav) { return; }
+        var kids = Array.prototype.slice.call(nav.children);
+        kids.forEach(function (el, i) {
+            if (!el.classList.contains("sb-section")) { return; }
+            var anyVisible = false;
+            for (var j = i + 1; j < kids.length; j++) {
+                if (kids[j].classList.contains("sb-section")) { break; }
+                if (kids[j].classList.contains("sb-item") && kids[j].style.display !== "none") { anyVisible = true; break; }
+            }
+            el.style.display = anyVisible ? "" : "none";
+        });
+    }
+
     function navigate(path) {
         window.history.pushState({}, "", mountPath + path);
         render();
@@ -519,10 +568,11 @@
         if (!envKey) { paletteEntityCache = { env: null, items: [] }; return Promise.resolve(); }
         if (paletteEntityCache.env === envKey && paletteEntityCache.items) { return Promise.resolve(); }
         var q = "?env=" + encodeURIComponent(envKey);
+        var none = Promise.resolve([]);
         return Promise.all([
-            api("GET", "/admin/flags" + q).catch(function () { return []; }),
-            api("GET", "/admin/configs" + q).catch(function () { return []; }),
-            api("GET", "/admin/segments" + q).catch(function () { return []; }),
+            featureOn("flags") ? api("GET", "/admin/flags" + q).catch(function () { return []; }) : none,
+            featureOn("configs") ? api("GET", "/admin/configs" + q).catch(function () { return []; }) : none,
+            featureOn("segments") ? api("GET", "/admin/segments" + q).catch(function () { return []; }) : none,
         ]).then(function (res) {
             var items = [];
             (res[0] || []).forEach(function (f) { items.push({ label: f.key, sub: f.name || "", kind: "Flag", route: "/flags/" + encodeURIComponent(f.key), ti: "flag" }); });
@@ -534,7 +584,7 @@
 
     function paletteFilter(q) {
         q = (q || "").trim().toLowerCase();
-        var nav = NAV_COMMANDS.filter(function (c) { return !q || c.label.toLowerCase().indexOf(q) >= 0; })
+        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().indexOf(q) >= 0); })
             .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
         var ents = (paletteEntityCache.items || []).filter(function (e) {
             return !q || e.label.toLowerCase().indexOf(q) >= 0 || (e.sub && e.sub.toLowerCase().indexOf(q) >= 0);
@@ -631,9 +681,10 @@
     }
     function toggleNotif() { if (notifOpen) { closeNotif(); } else { openNotif(); } }
     function fetchNotifications() {
+        var none = Promise.resolve([]);
         return Promise.all([
-            api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
-            api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
+            featureOn("approvals") ? api("GET", "/admin/changes?status=Pending").catch(function () { return []; }) : none,
+            featureOn("rbac") ? api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }) : none,
         ]).then(function (res) {
             return { changes: Array.isArray(res[0]) ? res[0] : [], upgrades: Array.isArray(res[1]) ? res[1] : [] };
         }).catch(function () { return { changes: [], upgrades: [] }; });
@@ -695,6 +746,12 @@
     function render() {
         if (!isAuthenticated()) { showAuthPrompt(); return; }
         var route = currentRoute();
+        // A disabled feature area is not navigable — fall back to Overview.
+        if (route.key !== "overview" && !isNavEnabled(route.navRoute)) {
+            navLinks.forEach(function (l) { l.classList.remove("active"); l.removeAttribute("aria-current"); });
+            views.overview();
+            return;
+        }
         var view = views[route.key];
         if (!view) { views.overview(); return; }
         navLinks.forEach(function (link) {
@@ -2499,9 +2556,10 @@
     function renderInbox() {
         viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
             '<div class="empty"><p class="muted">Loading…</p></div>');
+        var none = Promise.resolve([]);
         Promise.all([
-            api("GET", "/admin/changes?status=Pending").catch(function () { return []; }),
-            api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }),
+            featureOn("approvals") ? api("GET", "/admin/changes?status=Pending").catch(function () { return []; }) : none,
+            featureOn("rbac") ? api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }) : none,
         ]).then(function (res) {
             var changes = Array.isArray(res[0]) ? res[0] : [];
             var upgrades = Array.isArray(res[1]) ? res[1] : [];
@@ -3503,11 +3561,13 @@
         if (sbUserName) { sbUserName.textContent = who; }
         if (sbUserRole) { sbUserRole.textContent = session.identifier || "Admin"; }
         if (sbAvatar) { sbAvatar.textContent = (who.charAt(0) || "F"); }
-        refreshNotifBadge();
-        loadEnvironments().then(render).catch(function (err) {
-            if (err.kind === "auth") { showAuthPrompt(); }
-            else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
-        });
+        loadMeta()
+            .then(function () { applyNavGating(); refreshNotifBadge(); return loadEnvironments(); })
+            .then(render)
+            .catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); }
+                else { viewEl.innerHTML = '<h1>Boot error</h1><div class="error">' + esc(err.message) + '</div>'; }
+            });
     }
     // Fill the static shell icons and wire the theme toggle before first paint.
     hydrateIcons();
