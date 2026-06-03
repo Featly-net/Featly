@@ -956,12 +956,12 @@
     }
 
     // ---------- Shared list helpers (redesign, step 5) ----------
-    function listPageShell(title, subHtml, bodyHtml) {
+    function listPageShell(title, subHtml, bodyHtml, actionsHtml) {
         return [
             '<div class="page">',
             '  <div class="page-head"><div class="title-wrap"><h1>' + esc(title) + '</h1>',
             subHtml ? '    <span class="sub">' + subHtml + '</span>' : '',
-            '  </div></div>',
+            '  </div>' + (actionsHtml ? '<div class="actions">' + actionsHtml + '</div>' : '') + '</div>',
             '  <div class="page-body tight">' + bodyHtml + '</div>',
             '</div>',
         ].join("");
@@ -1119,6 +1119,7 @@
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Configs"); return; }
         viewEl.innerHTML = configListMarkup([], true);
         hydrateIcons(viewEl);
+        wireConfigNew();
         api("GET", "/admin/configs?env=" + encodeURIComponent(currentEnv.key) + (configListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
@@ -1126,6 +1127,7 @@
                 hydrateIcons(viewEl);
                 wireSimpleList(rows, "/configs", "configs", ["key", "name", "tags"], configRow, 7);
                 wireArchiveControls("/admin/configs", configListArchived, function (v) { configListArchived = v; }, renderConfigList);
+                wireConfigNew();
             })
             .catch(handleErrOnView("Configs"));
     }
@@ -1139,7 +1141,8 @@
             '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(configRow).join("") : emptyListRow(configListArchived ? "No archived configs." : "No configs yet.", 7)) + '</tbody></table></div>',
             listFoot(all.length, "configs"),
         ].join("");
-        return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body);
+        return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body,
+            '<button type="button" class="btn primary" id="config-new">New config</button>');
     }
 
     // ---------- Segments list (redesign) ----------
@@ -1156,6 +1159,7 @@
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Segments"); return; }
         viewEl.innerHTML = segmentListMarkup([], true);
         hydrateIcons(viewEl);
+        wireSegmentNew();
         api("GET", "/admin/segments?env=" + encodeURIComponent(currentEnv.key) + (segmentListArchived ? "&archived=true" : ""))
             .then(function (rows) {
                 rows = rows || [];
@@ -1163,6 +1167,7 @@
                 hydrateIcons(viewEl);
                 wireSimpleList(rows, "/segments", "segments", ["key", "name"], segmentRow, 4);
                 wireArchiveControls("/admin/segments", segmentListArchived, function (v) { segmentListArchived = v; }, renderSegmentList);
+                wireSegmentNew();
             })
             .catch(handleErrOnView("Segments"));
     }
@@ -1175,7 +1180,116 @@
             '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(segmentRow).join("") : emptyListRow(segmentListArchived ? "No archived segments." : "No segments yet.", 4)) + '</tbody></table></div>',
             listFoot(all.length, "segments"),
         ].join("");
-        return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body);
+        return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body,
+            '<button type="button" class="btn primary" id="segment-new">New segment</button>');
+    }
+
+    // ---------- Config create ----------
+    var CONFIG_TYPES = ["String", "Int", "Long", "Double", "Decimal", "Bool", "DateTime", "TimeSpan", "Json"];
+
+    function wireConfigNew() {
+        var b = document.getElementById("config-new");
+        if (b) { b.addEventListener("click", openCreateConfigModal); }
+    }
+
+    // Coerce the raw default-value input to the JS type the server stores as the
+    // typed JsonElement. Throws a friendly message on a malformed number/JSON.
+    function coerceConfigDefault(type, raw) {
+        raw = raw == null ? "" : raw;
+        switch (type) {
+            case "Int": case "Long": {
+                var i = parseInt(raw, 10);
+                if (isNaN(i)) { throw new Error("Default value must be an integer."); }
+                return i;
+            }
+            case "Double": case "Decimal": {
+                var n = parseFloat(raw);
+                if (isNaN(n)) { throw new Error("Default value must be a number."); }
+                return n;
+            }
+            case "Bool": return raw === "true" || raw === true;
+            case "Json":
+                try { return JSON.parse(raw || "null"); } catch (_) { throw new Error("Default value must be valid JSON."); }
+            default: return String(raw); // String, DateTime, TimeSpan
+        }
+    }
+
+    function openCreateConfigModal() {
+        if (!currentEnv) { return; }
+        var typeOpts = CONFIG_TYPES.map(function (t) { return '<option>' + t + '</option>'; }).join("");
+        openModal("New config", [
+            '<form id="config-create-form" class="editor">',
+            field("Key", '<input name="key" required placeholder="checkout.timeout" autocomplete="off" spellcheck="false" />'),
+            field("Name", '<input name="name" placeholder="Checkout timeout" autocomplete="off" />'),
+            field("Type", '<select name="type">' + typeOpts + '</select>'),
+            field("Default value", '<input name="defaultValue" placeholder="30" autocomplete="off" />'),
+            field("Description", '<input name="description" placeholder="optional" autocomplete="off" />'),
+            field("Tags", '<input name="tags" placeholder="comma, separated" autocomplete="off" />'),
+            '<div class="editor__footer"><button type="submit" class="btn primary">Create config</button><span class="save-msg" id="config-create-msg"></span></div>',
+            '</form>',
+        ].join("\n"));
+
+        document.getElementById("config-create-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("config-create-msg");
+            var key = f.key.value.trim();
+            if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
+            var defaultValue;
+            try { defaultValue = coerceConfigDefault(f.type.value, f.defaultValue.value.trim()); }
+            catch (err) { setMessageOn(msg, "error", err.message); return; }
+            var tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+            setMessageOn(msg, "loading", "Creating…");
+            api("POST", "/admin/configs?env=" + encodeURIComponent(currentEnv.key), {
+                key: key,
+                name: f.name.value.trim() || key,
+                description: f.description.value.trim() || null,
+                type: f.type.value,
+                defaultValue: defaultValue,
+                tags: tags,
+            }).then(function () { closeModal(); navigate("/configs/" + encodeURIComponent(key)); })
+                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
+
+        var k = document.querySelector("#config-create-form [name=key]");
+        if (k) { k.focus(); }
+    }
+
+    // ---------- Segment create ----------
+    function wireSegmentNew() {
+        var b = document.getElementById("segment-new");
+        if (b) { b.addEventListener("click", openCreateSegmentModal); }
+    }
+
+    function openCreateSegmentModal() {
+        if (!currentEnv) { return; }
+        openModal("New segment", [
+            '<form id="segment-create-form" class="editor">',
+            field("Key", '<input name="key" required placeholder="beta-testers" autocomplete="off" spellcheck="false" />'),
+            field("Name", '<input name="name" placeholder="Beta testers" autocomplete="off" />'),
+            field("Description", '<input name="description" placeholder="optional" autocomplete="off" />'),
+            '<div class="editor__footer"><button type="submit" class="btn primary">Create segment</button><span class="save-msg" id="segment-create-msg"></span></div>',
+            '</form>',
+        ].join("\n"));
+
+        document.getElementById("segment-create-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var f = e.target;
+            var msg = document.getElementById("segment-create-msg");
+            var key = f.key.value.trim();
+            if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
+            setMessageOn(msg, "loading", "Creating…");
+            api("POST", "/admin/segments?env=" + encodeURIComponent(currentEnv.key), {
+                key: key,
+                name: f.name.value.trim() || key,
+                description: f.description.value.trim() || null,
+                conditions: [],
+            }).then(function () { closeModal(); navigate("/segments/" + encodeURIComponent(key)); })
+                .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+        });
+
+        var k = document.querySelector("#segment-create-form [name=key]");
+        if (k) { k.focus(); }
     }
 
     // ============================================================
