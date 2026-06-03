@@ -13,41 +13,40 @@ internal static class ApiKeyCommand
     public static Command Build()
     {
         var apikey = new Command("apikey", "Manage API keys against a running Featly server (online).");
-        apikey.AddCommand(BuildGenerate());
+        apikey.Subcommands.Add(BuildGenerate());
         return apikey;
     }
 
     private static Command BuildGenerate()
     {
-        var name = new Option<string>(["--name", "-n"], "Human-readable label for the key.") { IsRequired = true };
-        var user = new Option<string?>(["--user", "-u"], "Bind the key to this user identifier (the key then acts as that user).");
-        var scope = new Option<string?>("--scope", "Key scope: AdminWrite (default) or SdkRead.");
-        var environment = new Option<string?>(["--environment", "-e"], "Environment key the key is scoped to (defaults to the server's default environment).");
+        var name = new Option<string>("--name", "-n") { Description = "Human-readable label for the key.", Required = true };
+        var user = new Option<string?>("--user", "-u") { Description = "Bind the key to this user identifier (the key then acts as that user)." };
+        var scope = new Option<string?>("--scope") { Description = "Key scope: AdminWrite (default) or SdkRead." };
+        var environment = new Option<string?>("--environment", "-e") { Description = "Environment key the key is scoped to (defaults to the server's default environment)." };
         var server = CliOptions.ServerUrl();
         var apiKey = CliOptions.ApiKey();
 
         var command = new Command("generate", "Mint a new API key. The plaintext token is printed once.");
-        command.AddOption(name);
-        command.AddOption(user);
-        command.AddOption(scope);
-        command.AddOption(environment);
-        command.AddOption(server);
-        command.AddOption(apiKey);
+        command.Options.Add(name);
+        command.Options.Add(user);
+        command.Options.Add(scope);
+        command.Options.Add(environment);
+        command.Options.Add(server);
+        command.Options.Add(apiKey);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var parsed = context.ParseResult;
-            var serverUrl = ServerConnection.ResolveServerUrl(parsed.GetValueForOption(server));
-            var key = ServerConnection.ResolveApiKey(parsed.GetValueForOption(apiKey))
+            var serverUrl = ServerConnection.ResolveServerUrl(parseResult.GetValue(server));
+            var key = ServerConnection.ResolveApiKey(parseResult.GetValue(apiKey))
                 ?? throw new InvalidOperationException($"an admin API key is required (--api-key or {ServerConnection.ApiKeyEnv}).");
 
             using var http = ServerConnection.CreateClient(serverUrl, key);
             var client = new AdminApiClient(http);
             var minted = await client.MintApiKeyAsync(
-                parsed.GetValueForOption(name)!,
-                parsed.GetValueForOption(scope),
-                parsed.GetValueForOption(user),
-                parsed.GetValueForOption(environment),
+                parseResult.GetValue(name)!,
+                parseResult.GetValue(scope),
+                parseResult.GetValue(user),
+                parseResult.GetValue(environment),
                 ct).ConfigureAwait(false);
 
             Console.WriteLine("API key created.");
@@ -58,7 +57,7 @@ internal static class ApiKeyCommand
             Console.WriteLine();
             Console.WriteLine("Token (shown once — store it now):");
             Console.WriteLine($"  {minted.Token}");
-        }));
+        }, cancellationToken));
 
         return command;
     }
