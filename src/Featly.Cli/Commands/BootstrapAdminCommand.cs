@@ -13,26 +13,25 @@ internal static class BootstrapAdminCommand
 {
     public static Command Build()
     {
-        var identifier = new Option<string>(["--identifier", "-i"], "Identifier for the first admin (email / OIDC subject / username).") { IsRequired = true };
-        var display = new Option<string?>(["--display", "-d"], "Display name for the admin (defaults to the identifier).");
+        var identifier = new Option<string>("--identifier", "-i") { Description = "Identifier for the first admin (email / OIDC subject / username).", Required = true };
+        var display = new Option<string?>("--display", "-d") { Description = "Display name for the admin (defaults to the identifier)." };
         var server = CliOptions.ServerUrl();
 
         var command = new Command("bootstrap-admin", "Provision the first admin on a fresh server. Prints an admin token once.");
-        command.AddOption(identifier);
-        command.AddOption(display);
-        command.AddOption(server);
+        command.Options.Add(identifier);
+        command.Options.Add(display);
+        command.Options.Add(server);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var parsed = context.ParseResult;
-            var serverUrl = ServerConnection.ResolveServerUrl(parsed.GetValueForOption(server));
+            var serverUrl = ServerConnection.ResolveServerUrl(parseResult.GetValue(server));
 
             // No API key: the bootstrap endpoint is unauthenticated and self-guarded.
             using var http = ServerConnection.CreateClient(serverUrl, apiKey: null);
             var client = new AdminApiClient(http);
             var admin = await client.BootstrapAsync(
-                parsed.GetValueForOption(identifier)!,
-                parsed.GetValueForOption(display),
+                parseResult.GetValue(identifier)!,
+                parseResult.GetValue(display),
                 ct).ConfigureAwait(false);
 
             Console.WriteLine("Bootstrap admin created.");
@@ -42,7 +41,7 @@ internal static class BootstrapAdminCommand
             Console.WriteLine();
             Console.WriteLine("Admin API key (shown once — store it now):");
             Console.WriteLine($"  {admin.Token}");
-        }));
+        }, cancellationToken));
 
         return command;
     }

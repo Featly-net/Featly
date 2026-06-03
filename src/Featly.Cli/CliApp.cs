@@ -16,7 +16,7 @@ public static class CliApp
     /// <returns>The process exit code.</returns>
     public static Task<int> RunAsync(string[] args)
     {
-        return BuildRootCommand().InvokeAsync(args);
+        return BuildRootCommand().Parse(args).InvokeAsync();
     }
 
     /// <summary>
@@ -27,12 +27,12 @@ public static class CliApp
     {
         var root = new RootCommand(
             "Featly CLI — operate the Featly SQLite store and server from the command line.");
-        root.AddCommand(DbCommand.Build());
-        root.AddCommand(ApiKeyCommand.Build());
-        root.AddCommand(BootstrapAdminCommand.Build());
-        root.AddCommand(EnvCommand.Build());
-        root.AddCommand(ExportImportCommand.BuildExport());
-        root.AddCommand(ExportImportCommand.BuildImport());
+        root.Subcommands.Add(DbCommand.Build());
+        root.Subcommands.Add(ApiKeyCommand.Build());
+        root.Subcommands.Add(BootstrapAdminCommand.Build());
+        root.Subcommands.Add(EnvCommand.Build());
+        root.Subcommands.Add(ExportImportCommand.BuildExport());
+        root.Subcommands.Add(ExportImportCommand.BuildImport());
         return root;
     }
 }

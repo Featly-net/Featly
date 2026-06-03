@@ -18,10 +18,10 @@ internal static class DbCommand
             "db",
             "Manage the Featly SQLite schema offline (operates directly on the database file).");
 
-        db.AddCommand(BuildMigrate());
-        db.AddCommand(BuildStatus());
-        db.AddCommand(BuildRollback());
-        db.AddCommand(BuildDrop());
+        db.Subcommands.Add(BuildMigrate());
+        db.Subcommands.Add(BuildStatus());
+        db.Subcommands.Add(BuildRollback());
+        db.Subcommands.Add(BuildDrop());
         return db;
     }
 
@@ -29,11 +29,11 @@ internal static class DbCommand
     {
         var connection = CliOptions.ConnectionString();
         var command = new Command("migrate", "Apply all pending migrations so the schema matches this build.");
-        command.AddOption(connection);
+        command.Options.Add(connection);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var connectionString = ConnectionStringResolver.Resolve(context.ParseResult.GetValueForOption(connection));
+            var connectionString = ConnectionStringResolver.Resolve(parseResult.GetValue(connection));
             var status = await SqliteMigrationRunner.GetStatusAsync(connectionString, ct).ConfigureAwait(false);
 
             if (status.Pending.Count == 0)
@@ -50,7 +50,7 @@ internal static class DbCommand
 
             await SqliteMigrationRunner.MigrateAsync(connectionString, ct).ConfigureAwait(false);
             Console.WriteLine("Done. Schema is up to date.");
-        }));
+        }, cancellationToken));
 
         return command;
     }
@@ -59,11 +59,11 @@ internal static class DbCommand
     {
         var connection = CliOptions.ConnectionString();
         var command = new Command("status", "Show applied and pending migrations.");
-        command.AddOption(connection);
+        command.Options.Add(connection);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var connectionString = ConnectionStringResolver.Resolve(context.ParseResult.GetValueForOption(connection));
+            var connectionString = ConnectionStringResolver.Resolve(parseResult.GetValue(connection));
             var status = await SqliteMigrationRunner.GetStatusAsync(connectionString, ct).ConfigureAwait(false);
 
             Console.WriteLine($"Applied ({status.Applied.Count}):");
@@ -81,28 +81,29 @@ internal static class DbCommand
             Console.WriteLine(status.Pending.Count == 0
                 ? "Schema is up to date."
                 : "Run 'featly db migrate' to apply pending migrations.");
-        }));
+        }, cancellationToken));
 
         return command;
     }
 
     private static Command BuildRollback()
     {
-        var target = new Argument<string>(
-            "target",
-            $"Migration to roll back to. Use '{SqliteMigrationRunner.InitialDatabaseTarget}' to revert every migration.");
+        var target = new Argument<string>("target")
+        {
+            Description = $"Migration to roll back to. Use '{SqliteMigrationRunner.InitialDatabaseTarget}' to revert every migration.",
+        };
         var connection = CliOptions.ConnectionString();
         var yes = CliOptions.Yes();
         var command = new Command("rollback", "Revert the schema down to a target migration. Destructive.");
-        command.AddArgument(target);
-        command.AddOption(connection);
-        command.AddOption(yes);
+        command.Arguments.Add(target);
+        command.Options.Add(connection);
+        command.Options.Add(yes);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var connectionString = ConnectionStringResolver.Resolve(context.ParseResult.GetValueForOption(connection));
-            var targetMigration = context.ParseResult.GetValueForArgument(target);
-            var autoYes = context.ParseResult.GetValueForOption(yes);
+            var connectionString = ConnectionStringResolver.Resolve(parseResult.GetValue(connection));
+            var targetMigration = parseResult.GetValue(target)!;
+            var autoYes = parseResult.GetValue(yes);
 
             var label = targetMigration == SqliteMigrationRunner.InitialDatabaseTarget
                 ? "the initial (empty) schema"
@@ -116,7 +117,7 @@ internal static class DbCommand
 
             await SqliteMigrationRunner.RollbackAsync(connectionString, targetMigration, ct).ConfigureAwait(false);
             Console.WriteLine($"Rolled back to {label}.");
-        }));
+        }, cancellationToken));
 
         return command;
     }
@@ -126,13 +127,13 @@ internal static class DbCommand
         var connection = CliOptions.ConnectionString();
         var yes = CliOptions.Yes();
         var command = new Command("drop", "Delete the entire database (all tables and the migration history). Irreversible.");
-        command.AddOption(connection);
-        command.AddOption(yes);
+        command.Options.Add(connection);
+        command.Options.Add(yes);
 
-        command.SetHandler(context => CliRunner.RunAsync(context, async ct =>
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(async ct =>
         {
-            var connectionString = ConnectionStringResolver.Resolve(context.ParseResult.GetValueForOption(connection));
-            var autoYes = context.ParseResult.GetValueForOption(yes);
+            var connectionString = ConnectionStringResolver.Resolve(parseResult.GetValue(connection));
+            var autoYes = parseResult.GetValue(yes);
 
             if (!CliRunner.Confirm("Drop the entire Featly database? This is irreversible.", autoYes))
             {
@@ -144,7 +145,7 @@ internal static class DbCommand
             Console.WriteLine(dropped
                 ? "Database dropped."
                 : "No database existed; nothing to drop.");
-        }));
+        }, cancellationToken));
 
         return command;
     }

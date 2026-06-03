@@ -1,5 +1,3 @@
-using System.CommandLine.Invocation;
-
 namespace Featly.Cli.Infrastructure;
 
 /// <summary>
@@ -11,26 +9,27 @@ internal static class CliRunner
 {
     /// <summary>
     /// Executes <paramref name="action"/> with the invocation's cancellation
-    /// token and sets <see cref="InvocationContext.ExitCode"/> accordingly:
-    /// <c>0</c> on success, <c>130</c> on cancellation, <c>1</c> on any error.
+    /// token and returns the process exit code: <c>0</c> on success, <c>130</c>
+    /// on cancellation, <c>1</c> on any error. Wire it into a command action with
+    /// <c>command.SetAction((parseResult, ct) =&gt; CliRunner.RunAsync(..., ct))</c>.
     /// </summary>
-    public static async Task RunAsync(InvocationContext context, Func<CancellationToken, Task> action)
+    public static async Task<int> RunAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
     {
         try
         {
-            await action(context.GetCancellationToken()).ConfigureAwait(false);
-            context.ExitCode = 0;
+            await action(cancellationToken).ConfigureAwait(false);
+            return 0;
         }
         catch (OperationCanceledException)
         {
             Console.Error.WriteLine("featly: operation canceled.");
-            context.ExitCode = 130;
+            return 130;
         }
 #pragma warning disable CA1031 // CLI boundary: any failure is surfaced as a friendly one-line error, never a stack trace.
         catch (Exception ex)
         {
             Console.Error.WriteLine($"featly: {ex.Message}");
-            context.ExitCode = 1;
+            return 1;
         }
 #pragma warning restore CA1031
     }
