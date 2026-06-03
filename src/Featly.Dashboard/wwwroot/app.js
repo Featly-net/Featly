@@ -1279,7 +1279,7 @@
             field("Key", '<input name="key" required placeholder="checkout.timeout" autocomplete="off" spellcheck="false" />'),
             field("Name", '<input name="name" placeholder="Checkout timeout" autocomplete="off" />'),
             field("Type", '<select name="type">' + typeOpts + '</select>'),
-            field("Default value", '<textarea name="defaultValue" class="json-area" rows="2" spellcheck="false" placeholder="30"></textarea>'),
+            field("Default value", jsonField('<textarea name="defaultValue" class="json-area" rows="2" spellcheck="false" placeholder="30"></textarea>')),
             field("Description", '<input name="description" placeholder="optional" autocomplete="off" />'),
             field("Tags", '<input name="tags" placeholder="comma, separated" autocomplete="off" />'),
             '<div class="editor__footer"><button type="submit" class="btn primary">Create config</button><span class="save-msg" id="config-create-msg"></span></div>',
@@ -1446,7 +1446,7 @@
         return '<div class="variant-row">'
             + '<input class="v-key" placeholder="key" value="' + esc(v.key) + '" />'
             + '<input class="v-name" placeholder="name" value="' + esc(v.name) + '" />'
-            + '<textarea class="v-value json-area" rows="1" spellcheck="false" placeholder="value (JSON)">' + esc(jsonPretty(v.value)) + '</textarea>'
+            + jsonField('<textarea class="v-value json-area" rows="1" spellcheck="false" placeholder="value (JSON)">' + esc(jsonPretty(v.value)) + '</textarea>')
             + '<button type="button" class="icon-btn" data-action="remove-variant" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
     }
@@ -1456,22 +1456,71 @@
         try { return JSON.stringify(v, null, 2); } catch (_) { return ""; }
     }
 
-    // Live format + validate for .json-area textareas: on blur, reformat valid
-    // JSON and flag invalid JSON inline. Delegated so dynamically-added rule
-    // cards/variants are covered. Wired once per editor form.
+    // Wrap a .json-area textarea in a highlight overlay: a <pre> mirrors the text
+    // with syntax colors behind a transparent textarea. wireJsonAreas keeps them
+    // in sync.
+    function jsonField(textareaHtml) {
+        return '<div class="json-editor"><pre class="json-hl" aria-hidden="true"></pre>' + textareaHtml + '</div>';
+    }
+
+    // Regex tokenizer -> colored spans. Operates on the raw string, escaping
+    // each segment, so it is safe to inject as HTML.
+    function highlightJson(src) {
+        function e(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        var re = /"(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+        var out = "", last = 0, m;
+        while ((m = re.exec(src)) !== null) {
+            out += e(src.slice(last, m.index));
+            var tok = m[0], cls;
+            if (tok.charAt(0) === '"') { cls = m[1] ? "json-key" : "json-str"; }
+            else if (tok === "true" || tok === "false") { cls = "json-bool"; }
+            else if (tok === "null") { cls = "json-null"; }
+            else { cls = "json-num"; }
+            out += '<span class="' + cls + '">' + e(tok) + '</span>';
+            last = re.lastIndex;
+        }
+        out += e(src.slice(last));
+        return out;
+    }
+
+    function jsonHlFor(ta) {
+        return ta.parentElement && ta.parentElement.classList.contains("json-editor")
+            ? ta.parentElement.querySelector(".json-hl") : null;
+    }
+    // Paint one editor's highlight overlay (the textarea text is transparent, so
+    // an unpainted overlay would show nothing — every .json-area must be painted).
+    function paintJsonArea(ta) {
+        var hl = jsonHlFor(ta);
+        if (hl) { hl.innerHTML = highlightJson(ta.value); hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; }
+    }
+    function repaintJson(root) {
+        Array.prototype.forEach.call((root || document).querySelectorAll(".json-area"), paintJsonArea);
+    }
+
+    // Live highlight + format/validate for .json-area editors. Delegated so
+    // dynamically-added rule cards/variants are covered; wired once per form.
     function wireJsonAreas(form) {
+        form.addEventListener("input", function (e) {
+            var ta = e.target.closest(".json-area");
+            if (ta) { paintJsonArea(ta); }
+        });
+        form.addEventListener("scroll", function (e) {
+            var ta = e.target.closest && e.target.closest(".json-area");
+            if (ta) { var hl = jsonHlFor(ta); if (hl) { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; } }
+        }, true);
         form.addEventListener("focusout", function (e) {
             var ta = e.target.closest(".json-area");
             if (!ta) { return; }
             var raw = ta.value.trim();
-            if (raw === "") { ta.classList.remove("invalid"); return; }
-            try {
-                ta.value = JSON.stringify(JSON.parse(raw), null, 2);
+            if (raw !== "") {
+                try { ta.value = JSON.stringify(JSON.parse(raw), null, 2); ta.classList.remove("invalid"); }
+                catch (_) { ta.classList.add("invalid"); }
+            } else {
                 ta.classList.remove("invalid");
-            } catch (_) {
-                ta.classList.add("invalid");
             }
+            paintJsonArea(ta);
         });
+        repaintJson(form);
     }
 
     function wireFlagEditor(flag) {
@@ -1493,11 +1542,13 @@
             if (action === "add-variant") {
                 var list = form.querySelector(".variant-list");
                 list.insertAdjacentHTML("beforeend", renderVariantRow({ key: "", name: "", value: false }));
+                repaintJson(list);
             } else if (action === "remove-variant") {
                 e.target.closest(".variant-row").remove();
             } else if (action === "add-rule") {
                 var rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], outcome: { variantKey: flag.defaultVariantKey } }, { kind: "flag", variants: flag.variants || [] }));
+                repaintJson(rulesEl);
             } else {
                 handleRuleAction(e, form, { kind: "flag", variants: flag.variants || [] });
             }
@@ -1561,7 +1612,7 @@
             field("Type", '<input value="' + esc(config.type) + '" readonly disabled />'),
             field("Tags", '<input name="tags" value="' + esc((config.tags || []).join(", ")) + '" placeholder="comma,separated" />'),
             '</div>',
-            field("Default value (JSON)", '<textarea name="defaultValue" class="json-area" rows="4" spellcheck="false" required>' + esc(jsonPretty(config.defaultValue)) + '</textarea>'),
+            field("Default value (JSON)", jsonField('<textarea name="defaultValue" class="json-area" rows="4" spellcheck="false" required>' + esc(jsonPretty(config.defaultValue)) + '</textarea>')),
             '<h2>Rules</h2>',
             renderRulesEditor(config.rules || [], { kind: "config" }),
             '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
@@ -1589,6 +1640,7 @@
             if (action === "add-rule") {
                 var rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], value: config.defaultValue }, { kind: "config" }));
+                repaintJson(rulesEl);
             } else {
                 handleRuleAction(e, form, { kind: "config" });
             }
@@ -3301,7 +3353,7 @@
         } else {
             outcomeHtml =
                 '<div class="outcome">'
-                + '<label class="json-label">Value (JSON) <textarea class="r-value json-area" rows="2" spellcheck="false">' + esc(jsonPretty(rule.value)) + '</textarea></label>'
+                + '<label class="json-label">Value (JSON) ' + jsonField('<textarea class="r-value json-area" rows="2" spellcheck="false">' + esc(jsonPretty(rule.value)) + '</textarea>') + '</label>'
                 + '</div>';
         }
 
