@@ -83,7 +83,13 @@ internal static class AdminExperimentsEndpoints
             .QueryAsync(environment.Id, type: EventType.Custom, ct: ct)
             .ConfigureAwait(false);
 
-        var analytics = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customEvents);
+        // The flag's default variant is the natural control arm for the
+        // significance test; a variant with no exposures falls back inside
+        // the aggregator to the first observed one.
+        var flag = await store.Flags.GetAsync(environment.Id, experiment.FlagKey, ct).ConfigureAwait(false);
+
+        var analytics = ExperimentAnalyticsAggregator.Aggregate(
+            experiment, exposures, customEvents, baselineVariantKey: flag?.DefaultVariantKey);
         return Results.Ok(analytics);
     }
 

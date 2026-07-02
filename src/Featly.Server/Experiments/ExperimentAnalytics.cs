@@ -15,7 +15,9 @@ public sealed record ExperimentAnalytics(
     DateTimeOffset? StoppedAt,
     int TotalExposureEvents,
     int TotalExposedSubjects,
-    IReadOnlyList<VariantAnalytics> Variants);
+    string? BaselineVariantKey,
+    IReadOnlyList<VariantAnalytics> Variants,
+    IReadOnlyList<MetricWinner> Winners);
 
 /// <summary>Exposure + conversion rollup for a single variant.</summary>
 public sealed record VariantAnalytics(
@@ -24,12 +26,30 @@ public sealed record VariantAnalytics(
     int ExposedSubjects,
     IReadOnlyList<MetricAnalytics> Metrics);
 
-/// <summary>Conversion rollup for one metric within a variant.</summary>
+/// <summary>
+/// Conversion rollup for one metric within a variant. <paramref name="PValue"/>
+/// is the two-sided two-proportion z-test against the baseline variant
+/// (<c>null</c> on the baseline itself, or when the test is undefined —
+/// empty arm / zero variance); <paramref name="IsSignificant"/> applies the
+/// conventional 0.05 threshold; <paramref name="UpliftVsBaseline"/> is the
+/// relative rate change vs the baseline (0.25 = +25%), <c>null</c> when the
+/// baseline rate is zero.
+/// </summary>
 public sealed record MetricAnalytics(
     string MetricKey,
     int Conversions,
     int ConversionEvents,
-    double ConversionRate);
+    double ConversionRate,
+    double? PValue = null,
+    bool IsSignificant = false,
+    double? UpliftVsBaseline = null);
+
+/// <summary>
+/// Per-metric verdict: the variant with the highest conversion rate among those
+/// significantly better than the baseline, or <c>null</c> while no variant
+/// clears the bar.
+/// </summary>
+public sealed record MetricWinner(string MetricKey, string? VariantKey, double? PValue);
 
 /// <summary>
 /// Pure aggregation over raw events. Kept storage-free and side-effect-free so
@@ -39,16 +59,23 @@ public sealed record MetricAnalytics(
 public static class ExperimentAnalyticsAggregator
 {
     /// <summary>
-    /// Rolls exposures + custom events into per-variant counts and conversion
-    /// rates for <paramref name="experiment"/>.
+    /// Rolls exposures + custom events into per-variant counts, conversion
+    /// rates, and per-metric significance against a baseline variant for
+    /// <paramref name="experiment"/>.
     /// </summary>
     /// <param name="experiment">The experiment whose metric keys define conversions.</param>
     /// <param name="exposures">Exposure events for the experiment's flag, ordered by time ascending.</param>
     /// <param name="customEvents">Candidate custom events in the environment; filtered to the metric keys here.</param>
+    /// <param name="baselineVariantKey">
+    /// The control arm the other variants are tested against — the caller passes
+    /// the flag's default variant. <c>null</c> (or a key with no exposures)
+    /// falls back to the first observed variant in ordinal order.
+    /// </param>
     public static ExperimentAnalytics Aggregate(
         Experiment experiment,
         IReadOnlyList<Event> exposures,
-        IReadOnlyList<Event> customEvents)
+        IReadOnlyList<Event> customEvents,
+        string? baselineVariantKey = null)
     {
         ArgumentNullException.ThrowIfNull(experiment);
         ArgumentNullException.ThrowIfNull(exposures);
@@ -82,11 +109,17 @@ public static class ExperimentAnalyticsAggregator
             .OrderBy(k => k, StringComparer.Ordinal)
             .ToList();
 
-        var variants = new List<VariantAnalytics>(variantKeys.Count);
+        // Resolve the baseline: the caller's choice when it actually has
+        // exposures, else the first observed variant (deterministic ordinal
+        // order). Null when nothing has been observed at all.
+        var baseline = baselineVariantKey is not null && variantKeys.Contains(baselineVariantKey, StringComparer.Ordinal)
+            ? baselineVariantKey
+            : variantKeys.FirstOrDefault();
+
+        // First pass: raw counts per (variant, metric).
+        var counts = new Dictionary<(string Variant, string Metric), (int Conversions, int ConversionEvents)>();
         foreach (var variant in variantKeys)
         {
-            var exposedSubjects = exposedSubjectsByVariant.GetValueOrDefault(variant);
-            var metrics = new List<MetricAnalytics>(metricKeys.Count);
             foreach (var metric in metricKeys)
             {
                 // Custom events for this metric whose subject was exposed to this variant.
@@ -96,14 +129,39 @@ public static class ExperimentAnalyticsAggregator
                         && string.Equals(v, variant, StringComparison.Ordinal))
                     .ToList();
 
-                var conversionEvents = attributed.Count;
-                var conversions = attributed
-                    .Select(c => c.SubjectKey)
-                    .Distinct(StringComparer.Ordinal)
-                    .Count();
+                counts[(variant, metric)] = (
+                    attributed.Select(c => c.SubjectKey).Distinct(StringComparer.Ordinal).Count(),
+                    attributed.Count);
+            }
+        }
+
+        // Second pass: rates + two-proportion z-test against the baseline arm.
+        var variants = new List<VariantAnalytics>(variantKeys.Count);
+        foreach (var variant in variantKeys)
+        {
+            var exposedSubjects = exposedSubjectsByVariant.GetValueOrDefault(variant);
+            var isBaseline = string.Equals(variant, baseline, StringComparison.Ordinal);
+            var metrics = new List<MetricAnalytics>(metricKeys.Count);
+            foreach (var metric in metricKeys)
+            {
+                var (conversions, conversionEvents) = counts[(variant, metric)];
                 var rate = exposedSubjects == 0 ? 0d : (double)conversions / exposedSubjects;
 
-                metrics.Add(new MetricAnalytics(metric, conversions, conversionEvents, rate));
+                double? pValue = null;
+                double? uplift = null;
+                if (!isBaseline && baseline is not null)
+                {
+                    var baselineSubjects = exposedSubjectsByVariant.GetValueOrDefault(baseline);
+                    var (baselineConversions, _) = counts[(baseline, metric)];
+                    pValue = SignificanceCalculator.TwoProportionPValue(
+                        baselineConversions, baselineSubjects, conversions, exposedSubjects);
+                    var baselineRate = baselineSubjects == 0 ? 0d : (double)baselineConversions / baselineSubjects;
+                    uplift = baselineRate > 0d ? (rate - baselineRate) / baselineRate : null;
+                }
+
+                metrics.Add(new MetricAnalytics(
+                    metric, conversions, conversionEvents, rate,
+                    pValue, SignificanceCalculator.IsSignificant(pValue), uplift));
             }
 
             variants.Add(new VariantAnalytics(
@@ -111,6 +169,22 @@ public static class ExperimentAnalyticsAggregator
                 exposureEventsByVariant.GetValueOrDefault(variant),
                 exposedSubjects,
                 metrics));
+        }
+
+        // Per-metric verdict: best-rate variant among those significantly
+        // *better* than the baseline (positive uplift).
+        var winners = new List<MetricWinner>(metricKeys.Count);
+        foreach (var metric in metricKeys)
+        {
+            var best = variants
+                .SelectMany(v => v.Metrics
+                    .Where(m => string.Equals(m.MetricKey, metric, StringComparison.Ordinal)
+                        && m.IsSignificant
+                        && m.UpliftVsBaseline > 0d)
+                    .Select(m => (v.VariantKey, m.ConversionRate, m.PValue)))
+                .OrderByDescending(x => x.ConversionRate)
+                .FirstOrDefault();
+            winners.Add(new MetricWinner(metric, best.VariantKey, best.VariantKey is null ? null : best.PValue));
         }
 
         return new ExperimentAnalytics(
@@ -121,6 +195,8 @@ public static class ExperimentAnalyticsAggregator
             experiment.StoppedAt,
             TotalExposureEvents: exposureEventsByVariant.Values.Sum(),
             TotalExposedSubjects: subjectVariant.Count,
-            variants);
+            baseline,
+            variants,
+            winners);
     }
 }

@@ -50,6 +50,22 @@ if (await featly.Flags.IsEnabledAsync("new-checkout", ctx))
 Bucketing being deterministic and shared between the SDK and the server means
 exposure attribution is consistent no matter where evaluation happens.
 
+### Statistical significance
+
+The analytics endpoint (and the Experiments dashboard) reports, per metric, a
+two-proportion z-test comparing each variant's conversion rate against a
+**baseline** — the flag's default variant, or the first variant observed if the
+default was never exposed. A variant crossing the conventional `p < 0.05`
+threshold is flagged `isSignificant`, and the highest-converting variant among
+those *significantly better* than the baseline is named the metric's winner (a
+significant *drop* never wins).
+
+This is a **fixed-horizon** test: it assumes you decide on a sample size (or a
+running duration) in advance and look once. Checking a running experiment
+repeatedly and stopping as soon as it turns significant inflates the
+false-positive rate — a well-known pitfall with fixed-horizon tests. Sequential
+analysis, which is safe to peek at anytime, is a possible future addition.
+
 :::note
 Experiments are an opt-in feature area. If you only need flags and configs, you
 can disable experiments to shrink the footprint — see
