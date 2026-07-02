@@ -21,6 +21,7 @@ internal static class AdminFlagsEndpoints
         var admin = group.MapGroup("/admin/flags").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
         admin.MapGet("/", ListFlagsAsync).WithName("Featly.Admin.Flags.List").RequirePermission(Permission.FlagRead);
+        admin.MapGet("/stale", GetStaleFlagsAsync).WithName("Featly.Admin.Flags.Stale").RequirePermission(Permission.FlagRead);
         admin.MapGet("/{key}", GetFlagAsync).WithName("Featly.Admin.Flags.Get").RequirePermission(Permission.FlagRead);
         admin.MapPost("/", CreateFlagAsync).WithName("Featly.Admin.Flags.Create").RequirePermission(Permission.FlagCreate);
         admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update").RequirePermission(Permission.FlagUpdate);
@@ -239,6 +240,43 @@ internal static class AdminFlagsEndpoints
             "Flag", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
 
         return Results.Ok(updated);
+    }
+
+    // GET /admin/flags/stale?staleDays= — cleanup candidates: no targeting
+    // rules left, a stalled experiment, or an archived flag whose experiment
+    // is still active. Pure aggregation (Flags.StaleFlagAnalyzer) over data
+    // already in storage — no new tracking.
+    private static async Task<IResult> GetStaleFlagsAsync(
+        StorageFacade store,
+        string? env,
+        CancellationToken ct,
+        int staleDays = 30)
+    {
+        if (staleDays < 1)
+        {
+            return Results.BadRequest(new { error = "staleDays must be at least 1." });
+        }
+
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+
+        var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var archived = await store.Flags.ListArchivedAsync(environment.Id, ct).ConfigureAwait(false);
+        var experiments = await store.Experiments.ListAsync(environment.Id, ct).ConfigureAwait(false);
+        var exposures = await store.Events.QueryAsync(environment.Id, type: EventType.Exposure, ct: ct).ConfigureAwait(false);
+
+        var lastExposureByFlagKey = exposures
+            .Where(e => e.FlagKey is not null)
+            .GroupBy(e => e.FlagKey!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (DateTimeOffset?)g.Max(e => e.At), StringComparer.Ordinal);
+
+        var candidates = Flags.StaleFlagAnalyzer.FindCandidates(
+            [.. flags, .. archived], experiments, lastExposureByFlagKey, TimeSpan.FromDays(staleDays), DateTimeOffset.UtcNow);
+
+        return Results.Ok(candidates);
     }
 
     // GET /admin/flags/{key}/activity — last exposure + count, aggregated on
