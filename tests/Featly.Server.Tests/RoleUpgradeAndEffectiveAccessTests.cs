@@ -247,6 +247,7 @@ public class RoleUpgradeAndEffectiveAccessTests
         var login = await client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new LoginRequest(plaintext), ct);
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         var cookie = login.Headers.GetValues("Set-Cookie").First().Split(';')[0];
+        var me = await login.Content.ReadFromJsonAsync<MeResponse>(TestJson.Options, ct);
 
         var editor = await store.Roles.GetByKeyAsync(SystemRoles.EditorKey, ct);
         using var file = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/admin/role-upgrade-requests", UriKind.Relative))
@@ -254,6 +255,8 @@ public class RoleUpgradeAndEffectiveAccessTests
             Content = JsonContent.Create(new RoleUpgradeRequestWriteRequest(editor!.Id, Justification: "Please")),
         };
         file.Headers.Add("Cookie", cookie);
+        // Cookie-authenticated mutations must echo the session's anti-forgery token.
+        file.Headers.Add("X-Featly-Csrf", me!.CsrfToken);
 
         var resp = await client.SendAsync(file, ct);
         resp.StatusCode.Should().Be(HttpStatusCode.Created);

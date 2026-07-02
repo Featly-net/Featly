@@ -142,6 +142,11 @@
         var url = path.startsWith("http") ? path : "/api" + path;
         var headers = {};
         var init = { method: method, headers: headers, credentials: "include" };
+        // Cookie-authenticated mutations must echo the session's anti-forgery
+        // token (synchronizer token, minted at login and returned by /me).
+        if (method !== "GET" && session && session.csrfToken) {
+            headers["X-Featly-Csrf"] = session.csrfToken;
+        }
         if (body !== undefined) {
             headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(body);
