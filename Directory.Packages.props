@@ -40,7 +40,7 @@
   </ItemGroup>
 
   <ItemGroup Label="OpenFeature provider">
-    <PackageVersion Include="OpenFeature" Version="2.13.0" />
+    <PackageVersion Include="OpenFeature" Version="2.14.0" />
   </ItemGroup>
 
   <ItemGroup Label="Observability — OpenTelemetry (server-side only, net10.0)">
