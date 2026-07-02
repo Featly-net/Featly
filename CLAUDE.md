@@ -100,6 +100,37 @@ CI green is necessary but not sufficient. **Always** check both before merging:
 
 This applies to every PR, including ones the assistant authored.
 
+## Autonomous PR workflow
+
+When the assistant is working through a backlog autonomously, every change follows
+this cycle:
+
+1. **One branch per topic/feature.** Never mix unrelated changes in a branch or PR.
+2. Create the branch, commit (Conventional Commits), and open the PR without
+   waiting to be prompted.
+3. **Wait for the full CI run and check every result** — build, tests, CodeQL,
+   dashboard smoke, and Sonar when configured (quality gate *and* individual
+   issues). Fix everything the analysis raises; the target is zero new issues.
+4. **Check for review comments on every PR.** For each comment, decide whether the
+   requested change makes sense. Apply it or don't — either way, reply on the
+   thread with the decision taken and the reasoning, and resolve the thread once
+   it is addressed.
+5. Stay in this cycle until everything is green: all CI checks passing, no
+   outstanding analysis issues, no unresolved review threads. Only then is the PR
+   eligible to merge (see "Before merging a PR" above).
+
+## Model policy
+
+- Sessions start on Sonnet 5.
+- If a well-scoped subtask needs more capability (architectural decisions,
+  hard debugging, deep review), delegate it to an Opus or Fable subagent
+  with a self-contained prompt, then integrate the result back into the
+  session.
+- If the whole session is stuck (2+ failed attempts at the same root cause),
+  stop and recommend to me that I switch the session itself to Opus 4.8 or
+  Fable 5.
+- Never escalate the session model without my explicit authorization.
+
 ## When making architectural decisions
 
 Document them as an ADR in `docs/adr/`. Use the template at `docs/adr/0000-template.md`. Number sequentially. Status flow: Proposed → Accepted → (Deprecated | Superseded by ADR-N).
