@@ -92,6 +92,21 @@ featly env unlock production    # unfreeze
 Use the lock to freeze an environment during an incident. See
 [Governance](/Featly/concepts/governance/#readonly-environment-lock).
 
+## `featly flags` — list and toggle (online)
+
+```bash
+featly flags list --environment production
+featly flags enable checkout-v2 --environment production
+featly flags disable checkout-v2 --environment production
+```
+
+`list` prints a table (key, enabled, type, variant count, name). `enable` /
+`disable` flip a flag's master switch — everything else about the flag
+(variants, rules, tags) is read back from the server and re-sent untouched, so
+this is safe to script without knowing the flag's full definition. For
+anything beyond the master switch (rules, variants), use the dashboard or the
+admin API directly.
+
 ## `featly export` / `featly import` — definitions (online)
 
 Move flag/config/segment **definitions** (never users, keys, or audit) between

@@ -130,6 +130,52 @@ public sealed class AdminApiClientTests
             .WithMessage("*409*").WithMessage("*a user already exists.*");
     }
 
+    [Fact]
+    public async Task ListFlags_gets_the_env_scoped_list_and_parses_it()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
+            """[{"key":"checkout","name":"Checkout","type":"Boolean","enabled":true,"variants":[{"key":"on"},{"key":"off"}]}]"""));
+        var client = new AdminApiClient(Client(handler));
+
+        var flags = await client.ListFlagsAsync("production", Ct);
+
+        flags.Should().ContainSingle();
+        flags[0].Key.Should().Be("checkout");
+        flags[0].Enabled.Should().BeTrue();
+        flags[0].Variants.Should().HaveCount(2);
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Get);
+        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/api/admin/flags?env=production");
+    }
+
+    [Fact]
+    public async Task SetFlagEnabled_gets_then_puts_back_only_the_enabled_field_changed()
+    {
+        var handler = new StubHandler(req => req.Method == HttpMethod.Get
+            ? Json(HttpStatusCode.OK, """{"key":"checkout","name":"Checkout","type":"Boolean","enabled":false,"defaultVariantKey":"off","variants":[{"key":"off","name":"Off","value":false}],"tags":["core"]}""")
+            : Json(HttpStatusCode.OK, """{"key":"checkout","name":"Checkout","type":"Boolean","enabled":true,"defaultVariantKey":"off","variants":[{"key":"off","name":"Off","value":false}],"tags":["core"]}"""));
+        var client = new AdminApiClient(Client(handler));
+
+        await client.SetFlagEnabledAsync("checkout", enabled: true, "production", Ct);
+
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Put);
+        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/api/admin/flags/checkout?env=production");
+        // Every other field the GET returned is echoed back verbatim.
+        handler.LastBody.Should().Contain("\"enabled\":true")
+            .And.Contain("\"defaultVariantKey\":\"off\"")
+            .And.Contain("\"tags\":[\"core\"]");
+    }
+
+    [Fact]
+    public async Task SetFlagEnabled_surfaces_a_NotFound_from_the_initial_GET()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.NotFound, """{"error":"Flag 'ghost' not found."}"""));
+        var client = new AdminApiClient(Client(handler));
+
+        var act = async () => await client.SetFlagEnabledAsync("ghost", enabled: true, null, Ct);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*not found*");
+    }
+
     private static HttpClient Client(StubHandler handler) =>
         new(handler) { BaseAddress = new Uri("http://localhost:5080") };
 

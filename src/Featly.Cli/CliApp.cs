@@ -31,6 +31,7 @@ public static class CliApp
         root.Subcommands.Add(ApiKeyCommand.Build());
         root.Subcommands.Add(BootstrapAdminCommand.Build());
         root.Subcommands.Add(EnvCommand.Build());
+        root.Subcommands.Add(FlagsCommand.Build());
         root.Subcommands.Add(ExportImportCommand.BuildExport());
         root.Subcommands.Add(ExportImportCommand.BuildImport());
         return root;
