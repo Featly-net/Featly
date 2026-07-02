@@ -58,6 +58,13 @@ public sealed class ApiKey
     /// </summary>
     public Guid? UserId { get; init; }
 
+    /// <summary>
+    /// Moment (UTC) after which the key stops authenticating, or <c>null</c> for
+    /// a key that never expires. Expiry is enforced by the auth pipeline on every
+    /// request; the row stays in the table for audit, like a revoked key.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
     /// <summary>Set to <c>true</c> when an admin revokes the key. Revoked keys remain in the table for audit.</summary>
     public bool Revoked { get; set; }
 

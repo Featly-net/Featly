@@ -93,6 +93,13 @@ public sealed class FeatlyApiKeyAuthenticationHandler(
                     continue;
                 }
 
+                // The hash matched, so this *is* the presented key — an expired
+                // key fails outright rather than falling through to "invalid".
+                if (candidate.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow)
+                {
+                    return AuthenticateResult.Fail("The API key has expired.");
+                }
+
                 // Bound keys act as their user (real identity for RBAC + audit +
                 // approvals); unbound keys are service principals named after the key.
                 string name;

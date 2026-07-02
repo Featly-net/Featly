@@ -70,6 +70,17 @@ featly apikey generate \
 Mints a key and prints the plaintext token **once**. `--scope` is `AdminWrite`
 (default) or `SdkRead`. Binding `--user` makes the key act as that person in RBAC,
 the audit log, and approvals ([ADR-0023](https://github.com/Featly-net/Featly/blob/main/docs/adr/0023-user-bound-api-keys.md)).
+Add `--expires-in <days>` to mint a key that stops authenticating after that many
+days; omit it for a key that never expires.
+
+```bash
+featly apikey rotate <id> --expires-in 90
+```
+
+Rotates a key: mints a replacement with the same name, scope, environment, and
+user binding, then revokes the old key. The replacement's token is printed
+**once**. Without `--expires-in` the replacement inherits the old key's expiry.
+Find the `<id>` in the dashboard's API keys screen or via `GET /api/admin/apikeys`.
 
 ## `featly env` — environment lock (online)
 

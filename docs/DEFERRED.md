@@ -51,8 +51,11 @@ M10 plan but deliberately left out:
 
 Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
 
-- **API-key rotation / expiry.** Keys are minted and manually revoked; there is
-  no built-in rotation or automatic expiry.
+- **API-key rotation / expiry.** ~~Keys are minted and manually revoked; there is
+  no built-in rotation or automatic expiry.~~ **Shipped post-preview.2:** keys
+  accept an optional `expiresAt` (enforced by the auth pipeline), and
+  `POST /api/admin/apikeys/{id}/rotate` / `featly apikey rotate` mint a
+  replacement and revoke the old key.
 - **Request rate limiting.** No built-in throttling on the admin/SDK APIs;
   operators rely on a reverse proxy for now.
 - **Synchronizer-token CSRF layer.** Dashboard state-changing calls rely on the

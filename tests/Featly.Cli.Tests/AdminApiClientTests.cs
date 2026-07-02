@@ -22,13 +22,42 @@ public sealed class AdminApiClientTests
             """{"id":"00000000-0000-0000-0000-000000000001","name":"ci","prefix":"featly_AAA","scope":"AdminWrite","userId":null,"token":"featly_secret"}"""));
         var client = new AdminApiClient(Client(handler));
 
-        var minted = await client.MintApiKeyAsync("ci", scope: null, userIdentifier: "alice@x.io", environmentKey: null, Ct);
+        var minted = await client.MintApiKeyAsync("ci", scope: null, userIdentifier: "alice@x.io", environmentKey: null, expiresAt: null, Ct);
 
         minted.Token.Should().Be("featly_secret");
         minted.Name.Should().Be("ci");
         handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
         handler.LastRequest.RequestUri!.AbsolutePath.Should().Be("/api/admin/apikeys");
         handler.LastBody.Should().Contain("\"name\":\"ci\"").And.Contain("\"userIdentifier\":\"alice@x.io\"");
+    }
+
+    [Fact]
+    public async Task MintApiKey_sends_the_expiry_when_given()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.Created,
+            """{"id":"00000000-0000-0000-0000-000000000001","name":"ci","prefix":"featly_AAA","scope":"AdminWrite","userId":null,"expiresAt":"2027-01-01T00:00:00+00:00","token":"featly_secret"}"""));
+        var client = new AdminApiClient(Client(handler));
+
+        var expiry = new DateTimeOffset(2027, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var minted = await client.MintApiKeyAsync("ci", scope: null, userIdentifier: null, environmentKey: null, expiresAt: expiry, Ct);
+
+        minted.ExpiresAt.Should().Be(expiry);
+        handler.LastBody.Should().Contain("\"expiresAt\":\"2027-01-01T00:00:00+00:00\"");
+    }
+
+    [Fact]
+    public async Task RotateApiKey_posts_to_rotate_and_parses_the_replacement_token()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.Created,
+            """{"id":"00000000-0000-0000-0000-000000000009","name":"ci","prefix":"featly_BBB","scope":"AdminWrite","userId":null,"expiresAt":null,"token":"featly_rotated"}"""));
+        var client = new AdminApiClient(Client(handler));
+
+        var oldId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var minted = await client.RotateApiKeyAsync(oldId, expiresAt: null, Ct);
+
+        minted.Token.Should().Be("featly_rotated");
+        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
+        handler.LastRequest.RequestUri!.AbsolutePath.Should().Be($"/api/admin/apikeys/{oldId}/rotate");
     }
 
     [Fact]

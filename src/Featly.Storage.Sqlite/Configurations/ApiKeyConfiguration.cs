@@ -31,6 +31,10 @@ internal sealed class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
             .HasConversion(
                 static v => v.HasValue ? v.Value.UtcTicks : (long?)null,
                 static t => t.HasValue ? new DateTimeOffset(t.Value, TimeSpan.Zero) : (DateTimeOffset?)null);
+        builder.Property(k => k.ExpiresAt)
+            .HasConversion(
+                static v => v.HasValue ? v.Value.UtcTicks : (long?)null,
+                static t => t.HasValue ? new DateTimeOffset(t.Value, TimeSpan.Zero) : (DateTimeOffset?)null);
 
         // Lookup path: WHERE Prefix = ? AND Revoked = false. Indexing Prefix
         // keeps that O(log n).

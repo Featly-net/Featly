@@ -23,6 +23,7 @@ internal sealed class AdminApiClient(HttpClient http)
         string? scope,
         string? userIdentifier,
         string? environmentKey,
+        DateTimeOffset? expiresAt,
         CancellationToken ct)
     {
         var body = new
@@ -31,8 +32,19 @@ internal sealed class AdminApiClient(HttpClient http)
             scope,
             userIdentifier,
             environmentKey,
+            expiresAt,
         };
         return PostAsync<MintedKey>("/api/admin/apikeys", body, ct);
+    }
+
+    /// <summary>
+    /// Rotates an API key: mints a replacement (same name/scope/environment/user
+    /// binding) and revokes the old key. Returns the replacement's one-time token.
+    /// </summary>
+    public Task<MintedKey> RotateApiKeyAsync(Guid id, DateTimeOffset? expiresAt, CancellationToken ct)
+    {
+        var body = new { expiresAt };
+        return PostAsync<MintedKey>($"/api/admin/apikeys/{id}/rotate", body, ct);
     }
 
     /// <summary>Provisions the first admin (only valid while the server has no users).</summary>
@@ -139,7 +151,7 @@ internal sealed class AdminApiClient(HttpClient http)
 }
 
 /// <summary>A freshly minted API key. <see cref="Token"/> is the one-time plaintext.</summary>
-internal sealed record MintedKey(Guid Id, string Name, string Prefix, string Scope, Guid? UserId, string Token);
+internal sealed record MintedKey(Guid Id, string Name, string Prefix, string Scope, Guid? UserId, DateTimeOffset? ExpiresAt, string Token);
 
 /// <summary>The bootstrapped first admin. <see cref="Token"/> is the one-time admin key.</summary>
 internal sealed record BootstrappedAdmin(string Identifier, Guid UserId, Guid ApiKeyId, string Token);

@@ -8,6 +8,10 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+### Added
+
+- **API-key expiry + rotation.** `ApiKey` gains an optional `ExpiresAt` (UTC): an expired key stops authenticating on the next request while its row stays for audit, and the mint endpoint/dashboard/CLI accept the new expiry (`featly apikey generate --expires-in <days>`). New `POST /api/admin/apikeys/{id}/rotate` (gated by `ApiKeyCreate` + `ApiKeyRevoke`) mints a replacement carrying the old key's name, scope, environment, and user binding, then revokes the old key — the replacement token is returned exactly once; `featly apikey rotate <id>` drives it from the CLI and the dashboard API-keys screen gets a Rotate action plus an "expired" status badge. Publishes a new `apikey.rotated` domain event (audit + webhooks). Migration `AddApiKeyExpiry`. Closes the "API-key rotation / expiry" security follow-up from the v0.1.0 audit.
+
 ## [0.1.0-preview.2] - 2026-05-30
 
 The dashboard preview. A full redesign of the embedded UI to a high-fidelity design system, the screens and admin endpoints that close the remaining management gaps (Projects, Environments, custom roles, group membership, archive/restore, webhook event-types + resend), before/after audit snapshots with a line-level diff view, and an end-to-end + headless smoke test of the dashboard in CI. Also adds server-side OpenTelemetry, a container story for the centralized sample, and refreshed docs. Everything is additive and opt-in — no breaking change. 367 tests passing.
