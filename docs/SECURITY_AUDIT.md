@@ -38,9 +38,12 @@ the HMAC (`sig_ok=True`).
 - The API is **Bearer-token** based; token auth is not ambiently sent by browsers, so the admin/SDK HTTP surface is not CSRF-exposed.
 - Auth failures return **401/403 as JSON**, never a redirect to a login URL, keeping the API shape clean and avoiding open-redirect vectors.
 
-**NOTE:** state-changing dashboard calls rely on `SameSite=Strict` rather than a
-per-request anti-forgery token. For the embedded/admin audience this is adequate;
-a synchronizer-token layer is a possible future hardening (FOLLOW-UP).
+**RESOLVED (was a follow-up):** a synchronizer-token layer now sits on top of
+`SameSite=Strict`: login mints a random per-session token stored as a claim
+inside the HttpOnly cookie and echoed in the login/`/me` JSON; every
+cookie-authenticated mutation must present it in `X-Featly-Csrf`
+(`FeatlyCsrfFilter`, constant-time compare). Bearer requests are exempt — a
+header credential is not ambiently attached by browsers.
 
 ## 4. Secret handling — **OK / NOTE**
 
@@ -88,5 +91,5 @@ the system Admin role by default; grant them to a custom role for backup tooling
 
 Recorded in [DEFERRED.md](DEFERRED.md): API-key rotation/expiry (**shipped**),
 request rate limiting (**shipped** — opt-in `Featly:RateLimiting`, DB-overridable),
-a synchronizer-token CSRF layer, and a dedicated backup/import permission
-(**shipped**). None block v0.1.0.
+a synchronizer-token CSRF layer (**shipped** — `X-Featly-Csrf`), and a dedicated
+backup/import permission (**shipped**). All four v0.1.0-audit follow-ups are closed.

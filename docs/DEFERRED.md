@@ -60,9 +60,11 @@ Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
   operators rely on a reverse proxy for now.~~ **Shipped post-preview.2:**
   opt-in fixed-window throttling per surface (auth/admin/SDK) and per client,
   bound from `Featly:RateLimiting` and DB-overridable via the settings API.
-- **Synchronizer-token CSRF layer.** Dashboard state-changing calls rely on the
+- **Synchronizer-token CSRF layer.** ~~Dashboard state-changing calls rely on the
   `SameSite=Strict` cookie; a per-request anti-forgery token is possible future
-  hardening.
+  hardening.~~ **Shipped post-preview.2:** login mints a per-session token
+  (claim inside the HttpOnly cookie, echoed by login/`/me`); cookie-authenticated
+  mutations must present it in `X-Featly-Csrf`; Bearer requests are exempt.
 - **Dedicated backup/import permission.** ~~`export`/`import` are gated by
   `FlagRead` / `FlagCreate`; a dedicated `BackupImport` permission would tighten
   the gate for bundles carrying configs/segments.~~ **Shipped post-preview.2:**

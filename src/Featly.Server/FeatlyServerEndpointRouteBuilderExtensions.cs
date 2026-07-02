@@ -45,6 +45,11 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
         // pipeline change; disabled it forwards straight through.
         apiGroup.AddEndpointFilter(new RateLimiting.FeatlyRateLimitFilter());
 
+        // Synchronizer-token CSRF layer: cookie-authenticated mutations must
+        // echo the session token in X-Featly-Csrf. Bearer and anonymous
+        // requests pass through (see FeatlyCsrfFilter).
+        apiGroup.AddEndpointFilter(new Authentication.FeatlyCsrfFilter());
+
         // Always-on core: the rest of the product depends on these.
         apiGroup.MapAuth();
         apiGroup.MapBootstrap();

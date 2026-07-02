@@ -49,9 +49,11 @@ supply one.
 - Auth failures return **401/403 as JSON**, never a redirect to a login URL,
   keeping the API shape clean and avoiding open-redirect vectors.
 
-**NOTE:** state-changing dashboard calls rely on `SameSite=Strict` rather than a
-per-request anti-forgery token. For the embedded/admin audience this is adequate;
-a synchronizer-token layer is a possible future hardening (FOLLOW-UP).
+A **synchronizer-token layer** sits on top of `SameSite=Strict`: login mints a
+random per-session token stored as a claim inside the HttpOnly cookie and echoed
+in the login/`/me` JSON; every cookie-authenticated mutation must present it in
+the `X-Featly-Csrf` header (constant-time compare). Bearer requests are exempt —
+a header credential is not ambiently attached by browsers.
 
 ## Secret handling — OK / NOTE
 

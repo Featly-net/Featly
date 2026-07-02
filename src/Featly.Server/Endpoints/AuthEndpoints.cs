@@ -81,7 +81,8 @@ internal static class AuthEndpoints
 
         return Results.Ok(new MeResponse(
             Identifier: identity.Name ?? "",
-            DisplayName: identity.FindFirst("featly:display")?.Value ?? identity.Name ?? ""));
+            DisplayName: identity.FindFirst("featly:display")?.Value ?? identity.Name ?? "",
+            CsrfToken: identity.FindFirst(FeatlyAuthenticationDefaults.CsrfClaim)?.Value ?? ""));
     }
 
     private static async Task<IResult> LogoutAsync(HttpContext http)
@@ -104,7 +105,8 @@ internal static class AuthEndpoints
         }
         var name = result.Principal.Identity.Name;
         var display = result.Principal.FindFirst("featly:display")?.Value ?? name;
-        return Results.Ok(new MeResponse(name, display));
+        var csrf = result.Principal.FindFirst(FeatlyAuthenticationDefaults.CsrfClaim)?.Value ?? "";
+        return Results.Ok(new MeResponse(name, display, csrf));
     }
 
     private static async Task<ClaimsIdentity?> ResolveAsync(
@@ -147,6 +149,10 @@ internal static class AuthEndpoints
         var identity = new ClaimsIdentity(scheme);
         identity.AddClaim(new Claim(ClaimTypes.Name, name));
         identity.AddClaim(new Claim("featly:display", display));
+        // Per-session anti-forgery token: lives inside the HttpOnly cookie as
+        // a claim and is returned by login//me so the dashboard can echo it in
+        // the X-Featly-Csrf header on every mutation (FeatlyCsrfFilter).
+        identity.AddClaim(new Claim(FeatlyAuthenticationDefaults.CsrfClaim, FeatlyCsrfFilter.MintToken()));
         return identity;
     }
 
@@ -168,5 +174,9 @@ internal static class AuthEndpoints
 /// <summary>Inbound shape for <c>POST /api/auth/login</c>.</summary>
 public sealed record LoginRequest(string ApiKey);
 
-/// <summary>Outbound shape for <c>POST /api/auth/login</c> and <c>GET /api/auth/me</c>.</summary>
-public sealed record MeResponse(string Identifier, string DisplayName);
+/// <summary>
+/// Outbound shape for <c>POST /api/auth/login</c> and <c>GET /api/auth/me</c>.
+/// <paramref name="CsrfToken"/> must be echoed in the <c>X-Featly-Csrf</c>
+/// header on every cookie-authenticated mutation.
+/// </summary>
+public sealed record MeResponse(string Identifier, string DisplayName, string CsrfToken = "");

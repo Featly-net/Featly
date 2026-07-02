@@ -317,6 +317,10 @@ public class ChangeWorkflowEndpointsTests
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         var cookie = login.Headers.GetValues("Set-Cookie").First().Split(';')[0];
         client.DefaultRequestHeaders.Add("Cookie", cookie);
+        // Cookie-authenticated mutations must echo the session's anti-forgery
+        // token (FeatlyCsrfFilter), exactly like the dashboard does.
+        var me = await login.Content.ReadFromJsonAsync<MeResponse>(TestJson.Options, ct);
+        client.DefaultRequestHeaders.Add("X-Featly-Csrf", me!.CsrfToken);
         return client;
     }
 

@@ -24,6 +24,16 @@ public static class FeatlyAuthenticationDefaults
     /// <summary>Claim type identifying which API key scope authenticated the request.</summary>
     public const string ScopeClaim = "featly:scope";
 
+    /// <summary>
+    /// Claim type carrying the per-session anti-forgery token inside the
+    /// dashboard cookie. Mutating requests authenticated by the cookie must
+    /// echo it in the <see cref="CsrfHeader"/> header (synchronizer token).
+    /// </summary>
+    public const string CsrfClaim = "featly:csrf";
+
+    /// <summary>Request header that must echo the session's <see cref="CsrfClaim"/> on cookie-authenticated mutations.</summary>
+    public const string CsrfHeader = "X-Featly-Csrf";
+
     /// <summary>Authorization policy name protecting <c>/api/admin/*</c> endpoints.</summary>
     public const string AdminPolicy = "Featly.Admin";
 
