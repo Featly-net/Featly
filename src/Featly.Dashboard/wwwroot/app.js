@@ -1438,6 +1438,7 @@
             '    <dt>Rules</dt><dd>' + (flag.rules || []).length + '</dd>',
             '    <dt>Created</dt><dd>' + (formatDate(flag.createdAt) || "—") + '</dd>',
             '    <dt>Updated</dt><dd>' + (formatDate(flag.updatedAt) || "—") + '</dd>',
+            '    <dt>Last evaluated</dt><dd id="flag-last-evaluated" class="muted">…</dd>',
             '  </dl></div>',
             '</aside></div></div></div>',
         ].join("\n");
@@ -1445,6 +1446,22 @@
         wireFlagEditor(flag);
         wirePreviewPanel("flag", flag.key);
         hydrateIcons(viewEl);
+
+        // Derived from exposure events (an experiment must have run this flag
+        // through the server at least once) — never from evaluation itself,
+        // which stays local-only. Best-effort: leave the placeholder on error.
+        api("GET", "/admin/flags/" + encodeURIComponent(flag.key) + "/activity?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (a) {
+                var cell = document.getElementById("flag-last-evaluated");
+                if (!cell) { return; }
+                if (a.lastExposureAt) {
+                    cell.textContent = formatDate(a.lastExposureAt) + " (" + a.totalExposureEvents + " exposure(s))";
+                    cell.classList.remove("muted");
+                } else {
+                    cell.textContent = "No experiment data";
+                }
+            })
+            .catch(function () { /* best-effort */ });
     }
 
     function renderVariantRow(v) {
@@ -3353,6 +3370,7 @@
                     + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
                     + '<td>' + esc(e.name) + '</td>'
                     + '<td>' + (frozen ? '<span class="badge danger">read-only</span>' : '<span class="badge success"><span class="dot"></span>writable</span>') + '</td>'
+                    + '<td class="mono" id="env-sdk-' + esc(e.key) + '" style="font-size:11px">…</td>'
                     + '<td class="col-actions" style="white-space:nowrap">'
                     + '<button type="button" class="' + btnClass + '" data-env-action="' + action + '" data-env-key="' + esc(e.key) + '">' + label + '</button> '
                     + '<button type="button" class="btn outline xs" data-env-action="rename" data-env-key="' + esc(e.key) + '" data-env-name="' + esc(e.name) + '">Rename</button>'
@@ -3361,9 +3379,22 @@
                     + '</tr>';
             }).join("");
             document.getElementById("env-settings").innerHTML = [
-                '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key</th><th>Name</th><th>State</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key</th><th>Name</th><th>State</th><th>SDK clients</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                 '<span class="save-msg" id="env-msg"></span>',
             ].join("\n");
+
+            // Best-effort, in-process SDK activity per environment (see the
+            // "Scaling out" note in the Centralized deployment docs — a
+            // multi-replica server only reflects the clients on this replica).
+            envs.forEach(function (e) {
+                api("GET", "/admin/environments/" + encodeURIComponent(e.key) + "/sdk-activity").then(function (a) {
+                    var cell = document.getElementById("env-sdk-" + e.key);
+                    if (!cell) { return; }
+                    var conns = a.activeStreamConnections || 0;
+                    var synced = a.lastConfigSyncAt ? formatDate(a.lastConfigSyncAt) : "never synced";
+                    cell.textContent = conns + " connected · " + synced;
+                }).catch(function () { /* best-effort; leave the placeholder */ });
+            });
 
             Array.prototype.slice.call(document.querySelectorAll("#env-settings [data-env-action]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {

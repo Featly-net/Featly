@@ -1,0 +1,190 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using AwesomeAssertions;
+using Featly.Server;
+using Featly.Server.Endpoints;
+using Featly.Server.Telemetry;
+using Featly.Storage.InMemory;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Xunit;
+
+namespace Featly.Server.Tests;
+
+/// <summary>
+/// In-process SDK activity: config-sync timestamps and active SSE connection
+/// counts per environment (<c>GET /api/admin/environments/{key}/sdk-activity</c>),
+/// and exposure-derived flag activity (<c>GET /api/admin/flags/{key}/activity</c>).
+/// Neither touches the SDK's local evaluation hot path — both observe calls
+/// that are already a network round-trip by design.
+/// </summary>
+public class SdkActivityTests
+{
+    private const string AdminKey = "admin-key-test";
+    private const string SdkKey = "sdk-key-test";
+
+    [Fact]
+    public async Task Sdk_activity_is_empty_before_any_client_connects()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var activity = await admin.GetFromJsonAsync<SdkActivitySnapshot>(
+            "/api/admin/environments/development/sdk-activity", TestJson.Options, ct);
+
+        activity!.ActiveStreamConnections.Should().Be(0);
+        activity.LastConfigSyncAt.Should().BeNull();
+        activity.LastStreamConnectedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Config_sync_records_the_timestamp_without_opening_a_connection()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var sdk = SdkClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var activity = await admin.GetFromJsonAsync<SdkActivitySnapshot>(
+            "/api/admin/environments/development/sdk-activity", TestJson.Options, ct);
+
+        activity!.LastConfigSyncAt.Should().NotBeNull();
+        activity.ActiveStreamConnections.Should().Be(0, "a config poll is not a stream connection");
+    }
+
+    [Fact]
+    public async Task Sdk_activity_rejects_sdk_scope_key()
+    {
+        using var host = await BuildHostAsync();
+        var sdk = SdkClient(host);
+
+        var resp = await sdk.GetAsync(new Uri("/api/admin/environments/development/sdk-activity", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Sdk_activity_returns_NotFound_for_unknown_environment()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+
+        var resp = await admin.GetAsync(new Uri("/api/admin/environments/ghost/sdk-activity", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Flag_activity_is_null_for_a_flag_with_no_experiment_history()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await admin.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "never-experimented",
+            name = "Never experimented",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var activity = await admin.GetFromJsonAsync<FlagActivityView>(
+            "/api/admin/flags/never-experimented/activity", TestJson.Options, ct);
+
+        activity!.LastExposureAt.Should().BeNull();
+        activity.TotalExposureEvents.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Flag_activity_reports_the_most_recent_exposure()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var sdk = SdkClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await admin.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "checkout",
+            name = "Checkout",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var ingest = await sdk.PostAsJsonAsync("/api/sdk/events", new
+        {
+            events = new object[]
+            {
+                new { type = "Exposure", subjectKey = "s1", flagKey = "checkout", variantKey = "on" },
+                new { type = "Exposure", subjectKey = "s2", flagKey = "checkout", variantKey = "off" },
+            },
+        }, ct);
+        ingest.StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var activity = await admin.GetFromJsonAsync<FlagActivityView>(
+            "/api/admin/flags/checkout/activity", TestJson.Options, ct);
+
+        activity!.LastExposureAt.Should().NotBeNull();
+        activity.TotalExposureEvents.Should().Be(2);
+    }
+
+    private static HttpClient AdminClient(IHost host)
+    {
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        return client;
+    }
+
+    private static HttpClient SdkClient(IHost host)
+    {
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
+        return client;
+    }
+
+    private static async Task<IHost> BuildHostAsync()
+    {
+        var builder = new HostBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Featly:Server:AdminApiKey"] = AdminKey,
+                    ["Featly:Server:SdkApiKey"] = SdkKey,
+                }));
+                web.ConfigureServices(services =>
+                {
+                    services.AddFeatlyInMemoryStore();
+                    services.AddFeatlyServer();
+                    services.AddRouting();
+                });
+                web.Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseAuthentication();
+                    app.UseAuthorization();
+                    app.UseEndpoints(e => e.MapFeatlyApi());
+                });
+            });
+
+        return await builder.StartAsync(TestContext.Current.CancellationToken);
+    }
+}

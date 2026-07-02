@@ -835,6 +835,8 @@ Selected non-CRUD endpoints:
 - `POST /api/admin/environments/{id}/lock` / `unlock` — toggle `ReadOnly`
 - `GET /api/admin/inbox?userId=` — pending changes and role upgrade requests awaiting the user
 - `GET /api/admin/audit?from=&to=&entity=` — audit log search
+- `GET /api/admin/environments/{key}/sdk-activity` — connected SSE clients + last config sync (in-process, best-effort)
+- `GET /api/admin/flags/{key}/activity` — a flag's last exposure timestamp + count, aggregated on read from the `Event` store
 
 ### Dry-run
 

@@ -25,6 +25,7 @@ internal static class AdminEnvironmentsEndpoints
         admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Environments.Delete").RequirePermission(Permission.EnvironmentUpdate);
         admin.MapPost("/{key}/lock", LockAsync).WithName("Featly.Admin.Environments.Lock").RequirePermission(Permission.EnvironmentLock);
         admin.MapPost("/{key}/unlock", UnlockAsync).WithName("Featly.Admin.Environments.Unlock").RequirePermission(Permission.EnvironmentLock);
+        admin.MapGet("/{key}/sdk-activity", SdkActivityAsync).WithName("Featly.Admin.Environments.SdkActivity").RequirePermission(Permission.EnvironmentRead);
 
         return group;
     }
@@ -160,6 +161,30 @@ internal static class AdminEnvironmentsEndpoints
             "Environment", environment.Key, environment.Id, user, new { environment.Key, readOnly }, ct).ConfigureAwait(false);
 
         return Results.Ok(updated);
+    }
+
+    // GET /admin/environments/{key}/sdk-activity — in-process, best-effort
+    // view of connected SDK clients (see SdkActivityTracker for the
+    // multi-replica caveat).
+    private static async Task<IResult> SdkActivityAsync(
+        string key,
+        StorageFacade store,
+        Telemetry.SdkActivityTracker activity,
+        CancellationToken ct)
+    {
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return Results.NotFound(new { error = "No default project." });
+        }
+
+        var environment = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+        }
+
+        return Results.Ok(activity.GetSnapshot(environment.Id));
     }
 }
 
