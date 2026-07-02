@@ -136,12 +136,18 @@ public class ExperimentAnalyticsAggregatorTests
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("c" + i, "control"));
-            if (i < 10) { customs.Add(Custom("c" + i, "checkout.completed")); }
+            if (i < 10)
+            {
+                customs.Add(Custom("c" + i, "checkout.completed"));
+            }
         }
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("t" + i, "treatment"));
-            if (i < 25) { customs.Add(Custom("t" + i, "checkout.completed")); }
+            if (i < 25)
+            {
+                customs.Add(Custom("t" + i, "checkout.completed"));
+            }
         }
 
         var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
@@ -173,12 +179,18 @@ public class ExperimentAnalyticsAggregatorTests
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("c" + i, "control"));
-            if (i < 10) { customs.Add(Custom("c" + i, "m")); }
+            if (i < 10)
+            {
+                customs.Add(Custom("c" + i, "m"));
+            }
         }
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("t" + i, "treatment"));
-            if (i < 11) { customs.Add(Custom("t" + i, "m")); }
+            if (i < 11)
+            {
+                customs.Add(Custom("t" + i, "m"));
+            }
         }
 
         var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
@@ -200,12 +212,18 @@ public class ExperimentAnalyticsAggregatorTests
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("c" + i, "control"));
-            if (i < 40) { customs.Add(Custom("c" + i, "m")); }
+            if (i < 40)
+            {
+                customs.Add(Custom("c" + i, "m"));
+            }
         }
         for (var i = 0; i < 100; i++)
         {
             exposures.Add(Exposure("t" + i, "treatment"));
-            if (i < 5) { customs.Add(Custom("t" + i, "m")); }
+            if (i < 5)
+            {
+                customs.Add(Custom("t" + i, "m"));
+            }
         }
 
         var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
