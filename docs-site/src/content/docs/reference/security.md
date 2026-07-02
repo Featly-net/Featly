@@ -84,11 +84,10 @@ first credential) but **self-guards**: it succeeds only while the instance has
 ## Export / import — NOTE
 
 `export`/`import` move **definitions only** (flags, configs, segments) — never
-users, keys, role assignments, webhooks, or audit. Export is gated by `FlagRead`
-and import by `FlagCreate`; import emits a `configuration.imported` audit event.
-
-**FOLLOW-UP:** the import gate is a single coarse permission (`FlagCreate`); a
-dedicated `BackupImport` permission is a possible future refinement.
+users, keys, role assignments, webhooks, or audit. Export is gated by the
+dedicated `BackupExport` permission and import by `BackupImport` (held only by
+the system Admin role by default; grant them to a custom role for backup
+tooling); import emits a `configuration.imported` audit event.
 
 ## Dependency posture
 

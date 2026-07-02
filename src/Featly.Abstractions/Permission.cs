@@ -136,4 +136,9 @@ public enum Permission
     SettingsRead,
     /// <summary>Update DB-overridable settings.</summary>
     SettingsUpdate,
+
+    /// <summary>Export an environment's flag/config/segment definitions as a bundle.</summary>
+    BackupExport,
+    /// <summary>Import a definitions bundle into an environment (bulk upsert).</summary>
+    BackupImport,
 }

@@ -131,6 +131,30 @@ public class AdminExportEndpointTests
         flags!.Should().Contain(f => f.Key == "imported-flag");
     }
 
+    [Fact]
+    public async Task Export_and_import_require_the_dedicated_backup_permissions()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+
+        // A viewer-floor identity holds every *Read permission (including
+        // FlagRead, the old export gate) but not BackupExport/BackupImport.
+        var mint = await admin.PostAsJsonAsync("/api/admin/apikeys", new { name = "viewer-key", userIdentifier = "viewer@example.com" }, ct);
+        var minted = await mint.Content.ReadFromJsonAsync<ApiKeyMintResponse>(TestJson.Options, ct);
+
+        var viewer = host.GetTestClient();
+        viewer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", minted!.Token);
+
+        // Sanity: the viewer floor can read flags...
+        (await viewer.GetAsync(new Uri("/api/admin/flags", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // ...but can neither export nor import a bundle.
+        (await viewer.GetAsync(ExportUri, ct)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var content = new StringContent("""{"environmentKey":"development","flags":[],"configs":[],"segments":[]}""", System.Text.Encoding.UTF8, "application/json");
+        (await viewer.PostAsync(ImportUri, content, ct)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
