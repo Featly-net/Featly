@@ -134,6 +134,13 @@ internal static class AuthEndpoints
             }
             if (ApiKeyHasher.Verify(apiKey, candidate.Hash))
             {
+                // Expiry is enforced here exactly like the Bearer handler does:
+                // an expired key must not open a (7-day sliding) cookie session.
+                if (candidate.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow)
+                {
+                    return null;
+                }
+
                 // Touch lastUsed best-effort.
                 _ = store.ApiKeys.TouchLastUsedAsync(candidate.Id, DateTimeOffset.UtcNow, CancellationToken.None);
                 return BuildIdentity(name: candidate.Name, display: candidate.Name, scheme: FeatlyAuthenticationDefaults.CookieScheme);
