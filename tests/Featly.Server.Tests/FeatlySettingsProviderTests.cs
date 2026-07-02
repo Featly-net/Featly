@@ -216,17 +216,19 @@ public class FeatlySettingsProviderTests
         }
         services.AddOptions<FeatlyAuditOptions>();
         services.AddOptions<FeatlyApprovalDefaultsSettings>();
+        services.AddOptions<Featly.Server.RateLimiting.FeatlyRateLimitOptions>();
         var sp = services.BuildServiceProvider();
         var monitor = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>();
         var authzMonitor = sp.GetRequiredService<IOptionsMonitor<Featly.Server.Authentication.FeatlyAuthorizationOptions>>();
         var auditMonitor = sp.GetRequiredService<IOptionsMonitor<FeatlyAuditOptions>>();
         var apprMonitor = sp.GetRequiredService<IOptionsMonitor<FeatlyApprovalDefaultsSettings>>();
+        var rateMonitor = sp.GetRequiredService<IOptionsMonitor<Featly.Server.RateLimiting.FeatlyRateLimitOptions>>();
 
         var configData = sectionPresent
             ? new Dictionary<string, string?> { ["Featly:Webhooks:MaxAttempts"] = "9" }
             : [];
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
 
-        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, auditMonitor, apprMonitor, configuration);
+        return new DefaultFeatlySettingsProvider(store, monitor, authzMonitor, auditMonitor, apprMonitor, rateMonitor, configuration);
     }
 }

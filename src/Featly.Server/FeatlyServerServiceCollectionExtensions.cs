@@ -111,6 +111,8 @@ public static class FeatlyServerServiceCollectionExtensions
         // on a settings change notification.
         services.AddOptions<FeatlyAuditOptions>().BindConfiguration(FeatlyAuditOptions.SectionName);
         services.AddOptions<Settings.FeatlyApprovalDefaultsSettings>().BindConfiguration(Settings.FeatlyApprovalDefaultsSettings.SectionName);
+        services.AddOptions<RateLimiting.FeatlyRateLimitOptions>().BindConfiguration(RateLimiting.FeatlyRateLimitOptions.SectionName);
+        services.TryAddSingleton<RateLimiting.FeatlyRateLimiter>();
         services.TryAddSingleton<Settings.IFeatlySettingsProvider, Settings.DefaultFeatlySettingsProvider>();
         services.AddHostedService<Settings.SettingsReloadHostedService>();
         services.AddHostedService<Settings.AuditRetentionWorker>();

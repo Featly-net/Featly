@@ -30,9 +30,11 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
     private readonly IOptionsMonitor<FeatlyAuthorizationOptions> _authzOptions;
     private readonly IOptionsMonitor<FeatlyAuditOptions> _auditOptions;
     private readonly IOptionsMonitor<FeatlyApprovalDefaultsSettings> _apprDefaultsOptions;
+    private readonly IOptionsMonitor<RateLimiting.FeatlyRateLimitOptions> _rateLimitOptions;
     private readonly bool _webhookSectionExists;
     private readonly bool _auditSectionExists;
     private readonly bool _apprDefaultsSectionExists;
+    private readonly bool _rateLimitSectionExists;
     private readonly Lock _gate = new();
 
     private FeatlyWebhookSettings _webhook;
@@ -43,6 +45,8 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
     private FeatlySettingsSource _auditSource;
     private FeatlyApprovalDefaultsSettings _approvalDefaults;
     private FeatlySettingsSource _approvalDefaultsSource;
+    private FeatlyRateLimitSettings _rateLimit;
+    private FeatlySettingsSource _rateLimitSource;
 
     public DefaultFeatlySettingsProvider(
         StorageFacade store,
@@ -50,6 +54,7 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
         IOptionsMonitor<FeatlyAuthorizationOptions> authzOptions,
         IOptionsMonitor<FeatlyAuditOptions> auditOptions,
         IOptionsMonitor<FeatlyApprovalDefaultsSettings> approvalDefaultsOptions,
+        IOptionsMonitor<RateLimiting.FeatlyRateLimitOptions> rateLimitOptions,
         IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -58,13 +63,16 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
         _authzOptions = authzOptions;
         _auditOptions = auditOptions;
         _apprDefaultsOptions = approvalDefaultsOptions;
+        _rateLimitOptions = rateLimitOptions;
         _webhookSectionExists = configuration.GetSection(WebhookOptions.SectionName).Exists();
         _auditSectionExists = configuration.GetSection(FeatlyAuditOptions.SectionName).Exists();
         _apprDefaultsSectionExists = configuration.GetSection(FeatlyApprovalDefaultsSettings.SectionName).Exists();
+        _rateLimitSectionExists = configuration.GetSection(RateLimiting.FeatlyRateLimitOptions.SectionName).Exists();
         (_webhook, _webhookSource) = WebhookFromAppSettings();
         (_authorization, _authorizationSource) = AuthorizationFromAppSettings();
         (_audit, _auditSource) = AuditFromAppSettings();
         (_approvalDefaults, _approvalDefaultsSource) = ApprovalDefaultsFromAppSettings();
+        (_rateLimit, _rateLimitSource) = RateLimitFromAppSettings();
     }
 
     public FeatlyWebhookSettings Webhook
@@ -107,6 +115,16 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
         get { lock (_gate) { return _approvalDefaultsSource; } }
     }
 
+    public FeatlyRateLimitSettings RateLimit
+    {
+        get { lock (_gate) { return _rateLimit; } }
+    }
+
+    public FeatlySettingsSource RateLimitSource
+    {
+        get { lock (_gate) { return _rateLimitSource; } }
+    }
+
     public async Task ReloadAsync(CancellationToken ct = default)
     {
         var webhookDb = await _store.Settings.GetAsync(FeatlySettingsKeys.Webhook, ct).ConfigureAwait(false);
@@ -129,6 +147,11 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
             ? (ad, FeatlySettingsSource.Database)
             : ApprovalDefaultsFromAppSettings();
 
+        var rateDb = await _store.Settings.GetAsync(FeatlySettingsKeys.RateLimit, ct).ConfigureAwait(false);
+        var rate = rateDb is not null && rateDb.Payload.Deserialize<FeatlyRateLimitSettings>(s_json) is { } r
+            ? (r, FeatlySettingsSource.Database)
+            : RateLimitFromAppSettings();
+
         lock (_gate)
         {
             _webhook = webhook.Item1;
@@ -139,6 +162,8 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
             _auditSource = audit.Item2;
             _approvalDefaults = appr.Item1;
             _approvalDefaultsSource = appr.Item2;
+            _rateLimit = rate.Item1;
+            _rateLimitSource = rate.Item2;
         }
     }
 
@@ -150,6 +175,19 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
 
     private (FeatlyApprovalDefaultsSettings Value, FeatlySettingsSource Source) ApprovalDefaultsFromAppSettings()
         => (_apprDefaultsOptions.CurrentValue, _apprDefaultsSectionExists ? FeatlySettingsSource.AppSettings : FeatlySettingsSource.HardcodedDefault);
+
+    private (FeatlyRateLimitSettings Value, FeatlySettingsSource Source) RateLimitFromAppSettings()
+    {
+        var o = _rateLimitOptions.CurrentValue;
+        var value = new FeatlyRateLimitSettings
+        {
+            Enabled = o.Enabled,
+            AuthPermitsPerMinute = o.AuthPermitsPerMinute,
+            AdminPermitsPerMinute = o.AdminPermitsPerMinute,
+            SdkPermitsPerMinute = o.SdkPermitsPerMinute,
+        };
+        return (value, _rateLimitSectionExists ? FeatlySettingsSource.AppSettings : FeatlySettingsSource.HardcodedDefault);
+    }
 
     private (FeatlyAuthorizationSettings Value, FeatlySettingsSource Source) AuthorizationFromAppSettings()
     {

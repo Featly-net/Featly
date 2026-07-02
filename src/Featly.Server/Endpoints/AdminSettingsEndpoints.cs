@@ -41,8 +41,31 @@ internal static class AdminSettingsEndpoints
         admin.MapPut("/audit", PutAuditAsync).WithName("Featly.Admin.Settings.PutAudit").RequirePermission(Permission.SettingsUpdate);
         admin.MapGet("/approval-defaults", GetApprovalDefaultsAsync).WithName("Featly.Admin.Settings.GetApprovalDefaults").RequirePermission(Permission.SettingsRead);
         admin.MapPut("/approval-defaults", PutApprovalDefaultsAsync).WithName("Featly.Admin.Settings.PutApprovalDefaults").RequirePermission(Permission.SettingsUpdate);
+        admin.MapGet("/rate-limit", GetRateLimitAsync).WithName("Featly.Admin.Settings.GetRateLimit").RequirePermission(Permission.SettingsRead);
+        admin.MapPut("/rate-limit", PutRateLimitAsync).WithName("Featly.Admin.Settings.PutRateLimit").RequirePermission(Permission.SettingsUpdate);
 
         return group;
+    }
+
+    private static IResult GetRateLimitAsync(IFeatlySettingsProvider provider)
+        => Results.Ok(new SettingView<FeatlyRateLimitSettings>(provider.RateLimit, provider.RateLimitSource.ToString()));
+
+    private static async Task<IResult> PutRateLimitAsync(
+        FeatlyRateLimitSettings body,
+        IFeatlySettingsProvider provider,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (body.AuthPermitsPerMinute < 0 || body.AdminPermitsPerMinute < 0 || body.SdkPermitsPerMinute < 0)
+        {
+            return Results.BadRequest(new { error = "permits-per-minute values must be 0 (unlimited) or positive." });
+        }
+
+        await PersistAsync(FeatlySettingsKeys.RateLimit, body, provider, store, events, principal, ct).ConfigureAwait(false);
+        return Results.Ok(new SettingView<FeatlyRateLimitSettings>(provider.RateLimit, provider.RateLimitSource.ToString()));
     }
 
     private static IResult GetApprovalDefaultsAsync(IFeatlySettingsProvider provider)

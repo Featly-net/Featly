@@ -40,6 +40,11 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
 
         var apiGroup = group.MapGroup("/api");
 
+        // Request throttling (opt-in via Featly:RateLimiting / the settings API).
+        // One filter at the /api root covers every Featly endpoint with no host
+        // pipeline change; disabled it forwards straight through.
+        apiGroup.AddEndpointFilter(new RateLimiting.FeatlyRateLimitFilter());
+
         // Always-on core: the rest of the product depends on these.
         apiGroup.MapAuth();
         apiGroup.MapBootstrap();
