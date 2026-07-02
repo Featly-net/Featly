@@ -28,6 +28,23 @@ scaled independently.
 - Consumer process packages: `Featly.Sdk` only, with `UseServer("https://featly.internal", "<sdk key>")`.
 - Samples: **`samples/Centralized.Sample`** (the server) + **`samples/WebApi.Sample`** (a consumer).
 
+#### Scaling out: one writable replica for now
+
+The server's live-update backbone (`IChangeNotifier`) is **in-process**: a
+mutation applied on one replica raises the SSE change notification only for the
+SDK clients connected to *that* replica. Running several centralized-server
+replicas behind a load balancer therefore weakens live updates — an SDK
+connected to replica A does not get the SSE nudge for a change written through
+replica B. It does **not** break correctness: every SDK also polls with an ETag,
+so all clients converge within one polling interval; only the "instant" push is
+per-replica.
+
+Until a distributed notifier ships (a Redis-backed `IChangeNotifier` is on the
+post-1.0 roadmap), run **one** centralized-server instance, or accept
+polling-interval freshness across replicas. SQLite's single-writer model points
+the same way — multi-replica deployments are the target of the post-1.0
+Postgres provider.
+
 ### 3. Consumer (SDK only)
 
 An app that only reads flags from a remote Featly server. No server or dashboard
