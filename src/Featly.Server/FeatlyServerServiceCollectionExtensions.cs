@@ -104,6 +104,7 @@ public static class FeatlyServerServiceCollectionExtensions
         // AddFeatlyServerTelemetry(configuration).
         services.AddMetrics();
         services.TryAddSingleton<Telemetry.FeatlyServerMetrics>();
+        services.TryAddSingleton<Telemetry.SdkActivityTracker>();
 
         // DB-overridable settings (ARCHITECTURE.md §15): the provider merges
         // hardcoded default -> appsettings -> database and caches the effective

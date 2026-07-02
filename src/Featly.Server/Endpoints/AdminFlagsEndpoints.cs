@@ -26,6 +26,7 @@ internal static class AdminFlagsEndpoints
         admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update").RequirePermission(Permission.FlagUpdate);
         admin.MapPost("/{key}/archive", ArchiveFlagAsync).WithName("Featly.Admin.Flags.Archive").RequirePermission(Permission.FlagArchive);
         admin.MapPost("/{key}/unarchive", UnarchiveFlagAsync).WithName("Featly.Admin.Flags.Unarchive").RequirePermission(Permission.FlagArchive);
+        admin.MapGet("/{key}/activity", GetFlagActivityAsync).WithName("Featly.Admin.Flags.Activity").RequirePermission(Permission.FlagRead);
 
         return group;
     }
@@ -240,6 +241,33 @@ internal static class AdminFlagsEndpoints
         return Results.Ok(updated);
     }
 
+    // GET /admin/flags/{key}/activity — last exposure + count, aggregated on
+    // read from the Event store (ARCHITECTURE.md §16's existing "aggregate on
+    // read" pattern; no new tracking). Only meaningful for a flag that has an
+    // active or past experiment: plain evaluation never reaches the server
+    // (ARCHITECTURE.md §1 — local-first, no network call on the hot path), so
+    // there is nothing to report for a flag that was never under experiment.
+    private static async Task<IResult> GetFlagActivityAsync(
+        string key,
+        StorageFacade store,
+        string? env,
+        CancellationToken ct)
+    {
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+
+        var exposures = await store.Events
+            .QueryAsync(environment.Id, type: EventType.Exposure, flagKey: key, ct: ct)
+            .ConfigureAwait(false);
+
+        DateTimeOffset? lastExposureAt = exposures.Count > 0 ? exposures.Max(e => e.At) : null;
+
+        return Results.Ok(new FlagActivityView(key, lastExposureAt, exposures.Count));
+    }
+
     private static async Task<Environment?> ResolveEnvironmentAsync(
         StorageFacade store,
         string? envKey,
@@ -303,3 +331,10 @@ public sealed record FlagWriteRequest(
         UpdatedBy = actor,
     };
 }
+
+/// <summary>
+/// Exposure-derived activity for one flag. <see cref="LastExposureAt"/> and
+/// <see cref="TotalExposureEvents"/> are <c>null</c>/<c>0</c> when the flag has
+/// never had an active experiment.
+/// </summary>
+public sealed record FlagActivityView(string FlagKey, DateTimeOffset? LastExposureAt, int TotalExposureEvents);

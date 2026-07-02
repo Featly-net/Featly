@@ -34,7 +34,7 @@ internal static class SdkEndpoints
         return group;
     }
 
-    private static async Task GetConfigAsync(HttpContext context, StorageFacade store, string? env, CancellationToken ct)
+    private static async Task GetConfigAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -44,6 +44,12 @@ internal static class SdkEndpoints
                 new { error = $"Environment '{env}' not found." }, ct).ConfigureAwait(false);
             return;
         }
+
+        // This IS the network round-trip the SDK already makes to sync its
+        // cache (poll or ETag revalidation) — recording it observes an
+        // existing call rather than adding one, so the "no network call on
+        // the hot path" evaluation guarantee is untouched.
+        activity.RecordConfigSync(environment.Id);
 
         // Compose the ETag from the most recent flag, segment, AND config update
         // so edits in any of the three buckets invalidate cached snapshots on
@@ -86,7 +92,7 @@ internal static class SdkEndpoints
 
     // ConfigSnapshot record moved to Featly.Abstractions so the SDK shares the same shape.
 
-    private static async Task StreamAsync(HttpContext context, StorageFacade store, string? env, CancellationToken ct)
+    private static async Task StreamAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
@@ -94,6 +100,10 @@ internal static class SdkEndpoints
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
+
+        // Tracks the connection for the life of the SSE stream; decremented
+        // when the client disconnects (ct canceled) via the finally block below.
+        using var lease = activity.RecordStreamConnected(environment.Id);
 
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = "text/event-stream";

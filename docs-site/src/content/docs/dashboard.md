@@ -45,8 +45,12 @@ JSON-typed values (a `Json` flag variant or config value) use a
 
 The **Settings** screen edits runtime settings with *database-overrides-config*
 precedence — webhook retry tuning, the auto-provision policy, audit retention,
-and approval defaults. Each setting shows whether its effective value comes from
-the **database** or `appsettings`.
+approval defaults, and request rate limiting. Each setting shows whether its
+effective value comes from the **database** or `appsettings`. The same screen
+lists each environment with its lock state and connected SDK clients + last
+config sync (best-effort, in-process — see
+[Deployment](/Featly/operate/deployment/#scaling-out-one-writable-replica-for-now)
+for the multi-replica caveat).
 
 ![The settings screen with database-overridable sections](../../assets/dashboard/dashboard-settings.png)
 
