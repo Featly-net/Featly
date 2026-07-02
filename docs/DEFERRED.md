@@ -56,8 +56,10 @@ Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
   accept an optional `expiresAt` (enforced by the auth pipeline), and
   `POST /api/admin/apikeys/{id}/rotate` / `featly apikey rotate` mint a
   replacement and revoke the old key.
-- **Request rate limiting.** No built-in throttling on the admin/SDK APIs;
-  operators rely on a reverse proxy for now.
+- **Request rate limiting.** ~~No built-in throttling on the admin/SDK APIs;
+  operators rely on a reverse proxy for now.~~ **Shipped post-preview.2:**
+  opt-in fixed-window throttling per surface (auth/admin/SDK) and per client,
+  bound from `Featly:RateLimiting` and DB-overridable via the settings API.
 - **Synchronizer-token CSRF layer.** Dashboard state-changing calls rely on the
   `SameSite=Strict` cookie; a per-request anti-forgery token is possible future
   hardening.

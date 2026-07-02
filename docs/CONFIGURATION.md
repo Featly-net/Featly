@@ -59,6 +59,21 @@ Bound into `WebhookOptions` — the delivery worker's tuning. DB-overridable.
 | `MaxRetryDelay` | `00:30:00` | Backoff cap. |
 | `RequestTimeout` | `00:00:10` | Per-delivery HTTP timeout. |
 
+## `Featly:RateLimiting`
+
+Bound into `FeatlyRateLimitOptions` — opt-in request throttling over the Featly
+HTTP surface (fixed one-minute windows, partitioned per client: authenticated
+identity when present, else remote IP). DB-overridable via
+`PUT /api/admin/settings/rate-limit` and the dashboard Settings screen.
+Rejections return `429` with a `Retry-After: 60` header.
+
+| Key | Default | Notes |
+|---|---|---|
+| `Enabled` | `false` | Master switch. Off by default so embedded hosts opt in. |
+| `AuthPermitsPerMinute` | `10` | Requests per minute per client against `/api/auth/*` (login brute-force guard). `0` = unlimited. |
+| `AdminPermitsPerMinute` | `300` | Requests per minute per client against `/api/admin/*`. `0` = unlimited. |
+| `SdkPermitsPerMinute` | `1000` | Requests per minute per client against `/api/sdk/*`. `0` = unlimited. |
+
 ## `Featly:Telemetry`
 
 Bound into `FeatlyTelemetryOptions` — server-side OpenTelemetry. **Off by

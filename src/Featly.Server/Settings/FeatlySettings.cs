@@ -15,6 +15,9 @@ public static class FeatlySettingsKeys
     /// <summary>Approval-defaults aggregate key (fallback policy templates).</summary>
     public const string ApprovalDefaults = "approval-defaults";
 
+    /// <summary>Rate-limiting aggregate key (per-surface request throttling).</summary>
+    public const string RateLimit = "rate-limit";
+
     /// <summary>
     /// Entity type used on the <c>IChangeNotifier</c> notification emitted when a
     /// settings singleton changes, so other instances reload.
@@ -102,6 +105,28 @@ public sealed class FeatlyApprovalDefaultsSettings
     /// <summary>Picks the template for an environment key (prod-named vs the rest).</summary>
     public FeatlyApprovalPolicyTemplate TemplateFor(string? environmentKey)
         => (environmentKey ?? string.Empty).Contains("prod", StringComparison.OrdinalIgnoreCase) ? Prod : NonProd;
+}
+
+/// <summary>
+/// DB-overridable request rate limiting (SECURITY_AUDIT.md follow-up). Off by
+/// default — an embedded host opts in. Limits are fixed windows of one minute,
+/// partitioned per client (authenticated identity when present, else remote IP)
+/// and per surface: the auth endpoints (brute-force protection), the admin API,
+/// and the SDK API. Zero disables the limit for that surface.
+/// </summary>
+public sealed class FeatlyRateLimitSettings
+{
+    /// <summary>Master switch. Off by default so embedded hosts opt in.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Requests per minute per client against <c>/api/auth/*</c> (login brute-force guard). 0 = unlimited.</summary>
+    public int AuthPermitsPerMinute { get; set; } = 10;
+
+    /// <summary>Requests per minute per client against <c>/api/admin/*</c>. 0 = unlimited.</summary>
+    public int AdminPermitsPerMinute { get; set; } = 300;
+
+    /// <summary>Requests per minute per client against <c>/api/sdk/*</c>. 0 = unlimited.</summary>
+    public int SdkPermitsPerMinute { get; set; } = 1000;
 }
 
 /// <summary>A default approval-policy shape (no approver rules — those stay per-environment).</summary>

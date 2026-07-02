@@ -86,6 +86,7 @@ the system Admin role by default; grant them to a custom role for backup tooling
 
 ## Follow-ups (tracked)
 
-Recorded in [DEFERRED.md](DEFERRED.md): API-key rotation/expiry, request rate
-limiting, a synchronizer-token CSRF layer, and a dedicated backup/import
-permission. None block v0.1.0.
+Recorded in [DEFERRED.md](DEFERRED.md): API-key rotation/expiry (**shipped**),
+request rate limiting (**shipped** — opt-in `Featly:RateLimiting`, DB-overridable),
+a synchronizer-token CSRF layer, and a dedicated backup/import permission
+(**shipped**). None block v0.1.0.

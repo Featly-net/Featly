@@ -33,6 +33,12 @@ public interface IFeatlySettingsProvider
     /// <summary>Which precedence layer supplied <see cref="ApprovalDefaults"/>.</summary>
     FeatlySettingsSource ApprovalDefaultsSource { get; }
 
+    /// <summary>The effective request rate limiting.</summary>
+    FeatlyRateLimitSettings RateLimit { get; }
+
+    /// <summary>Which precedence layer supplied <see cref="RateLimit"/>.</summary>
+    FeatlySettingsSource RateLimitSource { get; }
+
     /// <summary>Re-reads the database layer and refreshes the cached effective values.</summary>
     Task ReloadAsync(CancellationToken ct = default);
 }

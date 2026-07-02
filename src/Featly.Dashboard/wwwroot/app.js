@@ -3122,6 +3122,9 @@
             '  <h2>Approval defaults</h2>',
             '  <p class="sub">Fallback approval policy for an environment that has no explicit policy. Production-named environments use the first template; everything else uses the second. Saved to the database, overriding <code>appsettings</code>.</p>',
             '  <div id="apprdef-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
+            '  <h2>Rate limiting</h2>',
+            '  <p class="sub">Requests per minute per client (identity when authenticated, else IP) for the auth, admin, and SDK surfaces. Off by default; <code>0</code> means unlimited for that surface. Saved to the database, overriding <code>appsettings</code>.</p>',
+            '  <div id="ratelimit-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
         ].join("\n");
 
@@ -3144,6 +3147,42 @@
         loadAuthorizationSettings();
         loadAuditSettings();
         loadApprovalDefaultsSettings();
+        loadRateLimitSettings();
+
+        function loadRateLimitSettings() {
+            api("GET", "/admin/settings/rate-limit").then(function (view) {
+                var v = (view && view.value) || {};
+                var source = (view && view.source) || "";
+                var prov = source === "Database"
+                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
+                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                document.getElementById("ratelimit-settings").innerHTML = [
+                    '<div class="card-pad"><form id="ratelimit-settings-form" class="row-form">',
+                    '  <label class="check"><input type="checkbox" name="enabled"' + (v.enabled ? " checked" : "") + ' /> Enabled</label>',
+                    '  <label class="field"><span class="field__label">Auth (req/min)</span><input name="authPermitsPerMinute" type="number" min="0" value="' + esc(String(v.authPermitsPerMinute != null ? v.authPermitsPerMinute : 10)) + '" /></label>',
+                    '  <label class="field"><span class="field__label">Admin (req/min)</span><input name="adminPermitsPerMinute" type="number" min="0" value="' + esc(String(v.adminPermitsPerMinute != null ? v.adminPermitsPerMinute : 300)) + '" /></label>',
+                    '  <label class="field"><span class="field__label">SDK (req/min)</span><input name="sdkPermitsPerMinute" type="number" min="0" value="' + esc(String(v.sdkPermitsPerMinute != null ? v.sdkPermitsPerMinute : 1000)) + '" /></label>',
+                    '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="ratelimit-settings-msg"></span></div>',
+                    '</form></div>',
+                ].join("\n");
+                document.getElementById("ratelimit-settings-form").addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    var f = e.target;
+                    var msg = document.getElementById("ratelimit-settings-msg");
+                    setMessageOn(msg, "loading", "Saving…");
+                    api("PUT", "/admin/settings/rate-limit", {
+                        enabled: f.enabled.checked,
+                        authPermitsPerMinute: parseInt(f.authPermitsPerMinute.value, 10) || 0,
+                        adminPermitsPerMinute: parseInt(f.adminPermitsPerMinute.value, 10) || 0,
+                        sdkPermitsPerMinute: parseInt(f.sdkPermitsPerMinute.value, 10) || 0,
+                    }).then(function () { setMessageOn(msg, "success", "Saved."); loadRateLimitSettings(); })
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
+                });
+            }).catch(function (err) {
+                if (err.kind === "auth") { showAuthPrompt(); return; }
+                document.getElementById("ratelimit-settings").innerHTML = '<div class="empty"><p class="muted">' + esc(err.message) + '</p></div>';
+            });
+        }
 
         function approvalTemplateFields(prefix, t) {
             t = t || {};
