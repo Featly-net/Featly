@@ -137,6 +137,42 @@ public class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task Login_with_expired_api_key_is_rejected()
+    {
+        // Expiry is enforced on the Bearer path since the expiry feature; the
+        // dashboard login must refuse the same key — otherwise an expired key
+        // could still open a 7-day sliding cookie session.
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var hasher = host.Services.GetRequiredService<ApiKeyHasher>();
+
+        var plaintext = hasher.GenerateToken();
+        var project = await store.Projects.GetDefaultAsync(TestContext.Current.CancellationToken);
+        var env = await store.Environments.GetDefaultAsync(project!.Id, TestContext.Current.CancellationToken);
+
+        await store.ApiKeys.CreateAsync(new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = "expired-admin",
+            Prefix = ApiKeyHasher.ExtractPrefix(plaintext),
+            Hash = hasher.Hash(plaintext),
+            Scope = ApiKeyScope.AdminWrite,
+            EnvironmentId = env!.Id,
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-30),
+            CreatedBy = "test",
+        }, TestContext.Current.CancellationToken);
+
+        using var client = host.GetTestClient();
+        var response = await client.PostAsJsonAsync(
+            new Uri("/api/auth/login", UriKind.Relative),
+            new LoginRequest(plaintext),
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Login_with_sdk_scope_api_key_is_rejected()
     {
         // Same reasoning as the legacy SDK key case: SdkRead scope is not a
