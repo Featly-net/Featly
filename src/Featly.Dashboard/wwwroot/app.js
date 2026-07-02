@@ -866,8 +866,51 @@
                 viewEl.innerHTML = flagListMarkup(rows, false);
                 hydrateIcons(viewEl);
                 wireFlagList(rows);
+                loadStaleFlagsPanel();
             })
             .catch(handleErrOnView("Flags"));
+    }
+
+    // Cleanup candidates (no targeting rules left, a stalled experiment, or an
+    // archived flag with a still-active experiment) — a lightweight, dismissible
+    // panel above the table. Best-effort: silently does nothing on error.
+    function loadStaleFlagsPanel() {
+        var panel = document.getElementById("stale-flags-panel");
+        if (!panel) { return; }
+        api("GET", "/admin/flags/stale?env=" + encodeURIComponent(currentEnv.key))
+            .then(function (candidates) {
+                candidates = Array.isArray(candidates) ? candidates : [];
+                if (!candidates.length) { return; }
+                var reasonLabel = {
+                    NoTargetingRules: "No targeting rules",
+                    ExperimentStalledNoExposures: "Stalled experiment",
+                    ArchivedButExperimentStillActive: "Archived, experiment still active",
+                };
+                var rows = candidates.map(function (c) {
+                    return '<div class="bar-row" data-key="' + esc(c.flagKey) + '" style="cursor:pointer">'
+                        + '<div class="bar-row__label mono">' + esc(c.flagKey) + '</div>'
+                        + '<div class="bar-row__value" style="flex:1;text-align:left;white-space:normal">'
+                        + '<span class="badge warn">' + esc(reasonLabel[c.reason] || c.reason) + '</span> '
+                        + '<span class="muted" style="font-size:11px">' + esc(c.detail) + '</span></div>'
+                        + '</div>';
+                }).join("");
+                panel.innerHTML = [
+                    '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">',
+                    '  <div style="display:flex;justify-content:space-between;align-items:center">',
+                    '    <strong>' + candidates.length + ' flag(s) look stale</strong>',
+                    '    <button type="button" class="icon-btn" id="stale-flags-dismiss" aria-label="Dismiss">' + icon("x") + '</button>',
+                    '  </div>',
+                    '  <div class="bar-chart" style="margin-top:8px">' + rows + '</div>',
+                    '</div>',
+                ].join("\n");
+                hydrateIcons(panel);
+                panel.querySelectorAll("[data-key]").forEach(function (row) {
+                    row.addEventListener("click", function () { navigate("/flags/" + encodeURIComponent(row.getAttribute("data-key"))); });
+                });
+                var dismiss = document.getElementById("stale-flags-dismiss");
+                if (dismiss) { dismiss.addEventListener("click", function () { panel.innerHTML = ""; }); }
+            })
+            .catch(function () { /* best-effort */ });
     }
 
     function flagListMarkup(all, loading) {
@@ -903,7 +946,10 @@
             '    <span class="sub">Boolean and multivariate feature flags evaluated in <code>' + esc(currentEnv.key) + '</code>.</span>',
             '  </div><div class="actions"><button type="button" class="btn primary" id="flag-new">New flag</button></div></div>',
             '  <div class="tabs">' + tabsHtml + '</div>',
-            '  <div class="page-body tight">' + body + '</div>',
+            '  <div class="page-body tight">',
+            loading ? "" : '  <div id="stale-flags-panel"></div>',
+            body,
+            '  </div>',
             '</div>',
         ].join("");
     }

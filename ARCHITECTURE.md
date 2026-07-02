@@ -837,6 +837,7 @@ Selected non-CRUD endpoints:
 - `GET /api/admin/audit?from=&to=&entity=` — audit log search
 - `GET /api/admin/environments/{key}/sdk-activity` — connected SSE clients + last config sync (in-process, best-effort)
 - `GET /api/admin/flags/{key}/activity` — a flag's last exposure timestamp + count, aggregated on read from the `Event` store
+- `GET /api/admin/flags/stale?staleDays=` — flag cleanup candidates (no rules left, a stalled experiment, or archived-but-referenced), aggregated on read
 
 ### Dry-run
 

@@ -15,7 +15,11 @@ light/dark toggle, and a command palette.
 ## Flags
 
 The **Flags** screen lists every flag with status, type, variants, tags, and
-last-modified, with quick filters and a tab split by enabled / disabled.
+last-modified, with quick filters and a tab split by enabled / disabled. A
+dismissible panel above the table surfaces **stale-flag candidates** — a flag
+with no targeting rules left, a stalled experiment (no exposures for a while),
+or an archived flag whose experiment is still running — each linking straight
+to the flag.
 
 ![The Featly flags list, showing flags with status, type, and variants](../../assets/dashboard/dashboard-flags.png)
 
