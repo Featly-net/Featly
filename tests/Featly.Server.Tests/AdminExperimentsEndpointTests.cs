@@ -159,6 +159,45 @@ public class AdminExperimentsEndpointTests
         green.Metrics.Single().ConversionRate.Should().Be(0.5);
         var blue = analytics.Variants.Single(v => v.VariantKey == "blue");
         blue.Metrics.Single().ConversionRate.Should().Be(1.0);
+
+        // The flag's default variant is "off" (see SeedFlagAsync), but neither
+        // exposure used that key, so the baseline falls back to the first
+        // observed variant in ordinal order.
+        analytics.BaselineVariantKey.Should().Be("blue");
+    }
+
+    [Fact]
+    public async Task Analytics_baseline_resolves_to_the_flags_default_variant()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var sdk = SdkClient(host);
+        await SeedFlagAsync(admin); // defaultVariantKey: "off", variants: on/off
+        await CreateExperimentAsync(admin, metricKeys: ["checkout.completed"]);
+        await admin.PostAsync(new Uri("/api/admin/experiments/exp/start", UriKind.Relative), null, TestContext.Current.CancellationToken);
+
+        var ingest = await sdk.PostAsJsonAsync("/api/sdk/events", new
+        {
+            events = new object[]
+            {
+                new { type = "Exposure", subjectKey = "s1", flagKey = "checkout", variantKey = "off" },
+                new { type = "Exposure", subjectKey = "s2", flagKey = "checkout", variantKey = "on" },
+                new { type = "Custom", subjectKey = "s2", customKey = "checkout.completed" },
+            },
+        }, TestContext.Current.CancellationToken);
+        ingest.StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var analytics = await admin.GetFromJsonAsync<ExperimentAnalytics>(
+            "/api/admin/experiments/exp/analytics", TestJson.Options, TestContext.Current.CancellationToken);
+
+        analytics!.BaselineVariantKey.Should().Be("off");
+        var baselineMetric = analytics.Variants.Single(v => v.VariantKey == "off").Metrics.Single();
+        baselineMetric.PValue.Should().BeNull();
+        var onMetric = analytics.Variants.Single(v => v.VariantKey == "on").Metrics.Single();
+        // A single subject each side is nowhere near enough power to be
+        // significant — this just proves the baseline wiring, not the math
+        // (covered exhaustively by SignificanceCalculatorTests).
+        onMetric.PValue.Should().NotBeNull();
     }
 
     [Fact]

@@ -2553,18 +2553,31 @@
             '</div>',
         ];
 
-        // One conversion-rate chart per metric.
+        // One conversion-rate chart per metric, with a significance badge per
+        // variant (two-proportion z-test vs the baseline) and a winner callout.
         metricKeys.forEach(function (metric) {
+            var winner = (a.winners || []).find(function (w) { return w.metricKey === metric; });
             var rows = a.variants.map(function (v) {
                 var m = (v.metrics || []).find(function (x) { return x.metricKey === metric; });
                 var rate = m ? m.conversionRate : 0;
                 var pct = Math.round(rate * 1000) / 10; // one decimal
                 var convs = m ? m.conversions : 0;
-                return barRow(v.variantKey, Math.min(pct, 100), pct + "% (" + convs + "/" + (v.exposedSubjects || 0) + ")", "bar--conversion");
+                var isBaseline = v.variantKey === a.baselineVariantKey;
+                var label = v.variantKey;
+                if (isBaseline) {
+                    label += " (baseline)";
+                } else if (m && m.pValue != null) {
+                    label += m.isSignificant ? " (p=" + m.pValue.toFixed(3) + ", significant)" : " (p=" + m.pValue.toFixed(3) + ")";
+                }
+                return barRow(label, Math.min(pct, 100), pct + "% (" + convs + "/" + (v.exposedSubjects || 0) + ")", "bar--conversion");
             }).join("");
+            var winnerCallout = winner && winner.variantKey
+                ? '<div class="badge success" style="margin-bottom:8px"><span class="dot"></span>Winner: ' + esc(winner.variantKey) + ' (p=' + winner.pValue.toFixed(3) + ')</div>'
+                : '<div class="muted" style="margin-bottom:8px;font-size:11px">No variant is significantly better than the baseline yet.</div>';
             sections.push(
                 '<div class="card">'
                 + '<h3 class="preview-h3">Conversion rate — ' + code(metric) + '</h3>'
+                + winnerCallout
                 + '<div class="bar-chart">' + rows + '</div>'
                 + '</div>');
         });

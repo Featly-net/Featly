@@ -77,8 +77,12 @@ Designed in `ARCHITECTURE.md`, explicitly out of scope until after `v0.1.0`:
 
 - `Featly.Storage.SqlServer` and `Featly.Storage.Postgres` providers
 - `Featly.Storage.Redis` (cache + change pub/sub)
-- Statistical significance for experiments (Welch's t-test, chi-square,
-  sequential analysis)
+- ~~Statistical significance for experiments (Welch's t-test, chi-square,
+  sequential analysis)~~ **Shipped post-preview.2:** a two-proportion z-test
+  (the standard large-sample equivalent of the 2x2 chi-square test) against a
+  baseline variant, with a per-metric winner. **Sequential analysis** (safe to
+  peek at a running experiment without inflating the false-positive rate)
+  remains deferred — the shipped test is fixed-horizon.
 - Email (SMTP) notification channel
 - Multi-tenant cloud-hosted mode (same binary, tenant flag)
 - Browser-side edge SDK (JavaScript/TypeScript)

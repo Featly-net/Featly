@@ -120,6 +120,132 @@ public class ExperimentAnalyticsAggregatorTests
 
         result.TotalExposedSubjects.Should().Be(0);
         result.Variants.Should().BeEmpty();
+        result.BaselineVariantKey.Should().BeNull();
+        result.Winners.Should().ContainSingle(w => w.MetricKey == "m" && w.VariantKey == null);
+    }
+
+    [Fact]
+    public void Baseline_carries_no_pvalue_and_the_significantly_better_variant_wins()
+    {
+        var experiment = NewExperiment(metricKeys: ["checkout.completed"]);
+
+        // control: 10/100 (10%), treatment: 25/100 (25%) — a large, clearly
+        // significant lift (mirrors SignificanceCalculatorTests).
+        var exposures = new List<Event>();
+        var customs = new List<Event>();
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("c" + i, "control"));
+            if (i < 10)
+            {
+                customs.Add(Custom("c" + i, "checkout.completed"));
+            }
+        }
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("t" + i, "treatment"));
+            if (i < 25)
+            {
+                customs.Add(Custom("t" + i, "checkout.completed"));
+            }
+        }
+
+        var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
+
+        result.BaselineVariantKey.Should().Be("control");
+
+        var control = result.Variants.Single(v => v.VariantKey == "control").Metrics.Single();
+        control.PValue.Should().BeNull("the baseline is never tested against itself");
+        control.IsSignificant.Should().BeFalse();
+        control.UpliftVsBaseline.Should().BeNull();
+
+        var treatment = result.Variants.Single(v => v.VariantKey == "treatment").Metrics.Single();
+        treatment.PValue.Should().NotBeNull();
+        treatment.PValue!.Value.Should().BeLessThan(SignificanceCalculator.Alpha);
+        treatment.IsSignificant.Should().BeTrue();
+        treatment.UpliftVsBaseline.Should().BeApproximately(1.5, 0.001); // +150%
+
+        result.Winners.Should().ContainSingle(w => w.MetricKey == "checkout.completed" && w.VariantKey == "treatment");
+    }
+
+    [Fact]
+    public void No_winner_when_no_variant_beats_the_baseline_significantly()
+    {
+        var experiment = NewExperiment(metricKeys: ["m"]);
+
+        // control 10/100, treatment 11/100 — noise-level gap, not significant.
+        var exposures = new List<Event>();
+        var customs = new List<Event>();
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("c" + i, "control"));
+            if (i < 10)
+            {
+                customs.Add(Custom("c" + i, "m"));
+            }
+        }
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("t" + i, "treatment"));
+            if (i < 11)
+            {
+                customs.Add(Custom("t" + i, "m"));
+            }
+        }
+
+        var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
+
+        var treatment = result.Variants.Single(v => v.VariantKey == "treatment").Metrics.Single();
+        treatment.IsSignificant.Should().BeFalse();
+        result.Winners.Should().ContainSingle(w => w.VariantKey == null);
+    }
+
+    [Fact]
+    public void A_variant_significantly_worse_than_baseline_is_never_a_winner()
+    {
+        var experiment = NewExperiment(metricKeys: ["m"]);
+
+        // control converts far more than treatment — treatment must not win
+        // even though the difference is significant (it's a significant loss).
+        var exposures = new List<Event>();
+        var customs = new List<Event>();
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("c" + i, "control"));
+            if (i < 40)
+            {
+                customs.Add(Custom("c" + i, "m"));
+            }
+        }
+        for (var i = 0; i < 100; i++)
+        {
+            exposures.Add(Exposure("t" + i, "treatment"));
+            if (i < 5)
+            {
+                customs.Add(Custom("t" + i, "m"));
+            }
+        }
+
+        var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
+
+        var treatment = result.Variants.Single(v => v.VariantKey == "treatment").Metrics.Single();
+        treatment.IsSignificant.Should().BeTrue("the drop is large enough to be significant");
+        treatment.UpliftVsBaseline.Should().BeLessThan(0);
+        result.Winners.Should().ContainSingle(w => w.VariantKey == null, "a significant loss is not a win");
+    }
+
+    [Fact]
+    public void Falls_back_to_the_first_observed_variant_when_the_requested_baseline_has_no_exposures()
+    {
+        var experiment = NewExperiment(metricKeys: ["m"]);
+        var exposures = new[] { Exposure("s1", "blue"), Exposure("s2", "green") };
+        var customs = Array.Empty<Event>();
+
+        // "control" (e.g. an unreachable flag default) was never actually
+        // exposed — the aggregator falls back rather than reporting no baseline.
+        var result = ExperimentAnalyticsAggregator.Aggregate(experiment, exposures, customs, baselineVariantKey: "control");
+
+        result.BaselineVariantKey.Should().Be("blue"); // first in ordinal order
     }
 
     private static Experiment NewExperiment(IReadOnlyList<string> metricKeys) => new()

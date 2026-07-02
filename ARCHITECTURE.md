@@ -1198,7 +1198,7 @@ Deterministic hashing already guarantees stickiness as long as weights do not ch
 
 ### Statistical analysis
 
-Featly provides exposure and conversion counts plus conversion rates per variant. Significance testing (Welch's t-test for continuous metrics, chi-square for conversion, confidence intervals, sequential analysis) is a planned extension. For teams that want a more sophisticated statistics engine, Featly exposes the raw event data via the Admin API so external tools (GrowthBook stats engine, custom pipelines) can compute analyses.
+Featly provides exposure and conversion counts, conversion rates, and per-variant significance per variant: a two-proportion z-test (the standard large-sample equivalent of a 2x2 chi-square test) against a baseline variant (the flag's default, falling back to the first variant observed), surfaced as a p-value, an `isSignificant` flag at the conventional `p < 0.05` threshold, relative uplift, and a per-metric winner. This is a fixed-horizon test — repeated peeking at a running experiment inflates the false-positive rate. Sequential analysis (safe to check anytime) and continuous-metric tests (Welch's t-test) remain planned extensions. For teams that want a more sophisticated statistics engine, Featly exposes the raw event data via the Admin API so external tools (GrowthBook stats engine, custom pipelines) can compute analyses.
 
 ---
 
