@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Featly.Cli.Infrastructure;
 
@@ -59,6 +61,39 @@ internal sealed class AdminApiClient(HttpClient http)
     {
         var verb = readOnly ? "lock" : "unlock";
         return PostNoContentAsync($"/api/admin/environments/{Uri.EscapeDataString(environmentKey)}/{verb}", ct);
+    }
+
+    /// <summary>Lists every flag in an environment.</summary>
+    public async Task<IReadOnlyList<FlagSummary>> ListFlagsAsync(string? environmentKey, CancellationToken ct)
+    {
+        var path = "/api/admin/flags" + EnvQuery(environmentKey);
+        using var response = await http.GetAsync(new Uri(path, UriKind.Relative), ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        var flags = await response.Content.ReadFromJsonAsync<List<FlagSummary>>(JsonOptions, ct).ConfigureAwait(false);
+        return flags ?? [];
+    }
+
+    /// <summary>
+    /// Flips a flag's master switch. Reads the current definition and PUTs it
+    /// back with only <c>enabled</c> changed, so every other field (variants,
+    /// rules, tags) round-trips untouched — the CLI never needs its own model
+    /// of the full flag shape.
+    /// </summary>
+    public async Task SetFlagEnabledAsync(string key, bool enabled, string? environmentKey, CancellationToken ct)
+    {
+        var envQuery = EnvQuery(environmentKey);
+        var path = $"/api/admin/flags/{Uri.EscapeDataString(key)}{envQuery}";
+
+        using var getResponse = await http.GetAsync(new Uri(path, UriKind.Relative), ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(getResponse, ct).ConfigureAwait(false);
+        var raw = await getResponse.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var flag = JsonNode.Parse(raw) as JsonObject
+            ?? throw new InvalidOperationException("The server returned an unexpected flag shape.");
+        flag["enabled"] = enabled;
+
+        using var putContent = new StringContent(flag.ToJsonString(JsonOptions), Encoding.UTF8, "application/json");
+        using var putResponse = await http.PutAsync(new Uri(path, UriKind.Relative), putContent, ct).ConfigureAwait(false);
+        await EnsureSuccessAsync(putResponse, ct).ConfigureAwait(false);
     }
 
     /// <summary>Exports an environment's definitions as a raw JSON bundle (returned verbatim).</summary>
@@ -158,3 +193,9 @@ internal sealed record BootstrappedAdmin(string Identifier, Guid UserId, Guid Ap
 
 /// <summary>Per-kind counts returned by an import.</summary>
 internal sealed record ImportResult(string EnvironmentKey, int Flags, int Configs, int Segments);
+
+/// <summary>Listing-shape view of a flag — enough for the CLI table, not the full definition.</summary>
+internal sealed record FlagSummary(string Key, string Name, string Type, bool Enabled, IReadOnlyList<FlagVariantSummary>? Variants);
+
+/// <summary>A flag variant's key, for the CLI's variant-count column.</summary>
+internal sealed record FlagVariantSummary(string Key);
