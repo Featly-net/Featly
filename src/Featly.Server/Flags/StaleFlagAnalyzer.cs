@@ -58,7 +58,7 @@ public static class StaleFlagAnalyzer
 
         var experimentsByFlag = experiments
             .GroupBy(e => e.FlagKey, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<Experiment>)[.. g], StringComparer.Ordinal);
+            .ToDictionary(g => g.Key, IReadOnlyList<Experiment> (g) => [.. g], StringComparer.Ordinal);
 
         var candidates = new List<StaleFlagCandidate>();
         foreach (var flag in flags)
