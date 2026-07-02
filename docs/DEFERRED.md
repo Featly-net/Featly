@@ -61,9 +61,11 @@ Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
 - **Synchronizer-token CSRF layer.** Dashboard state-changing calls rely on the
   `SameSite=Strict` cookie; a per-request anti-forgery token is possible future
   hardening.
-- **Dedicated backup/import permission.** `export`/`import` are gated by
+- **Dedicated backup/import permission.** ~~`export`/`import` are gated by
   `FlagRead` / `FlagCreate`; a dedicated `BackupImport` permission would tighten
-  the gate for bundles carrying configs/segments.
+  the gate for bundles carrying configs/segments.~~ **Shipped post-preview.2:**
+  `BackupExport` / `BackupImport` permissions gate the two routes; only the
+  system Admin role holds them by default.
 
 ## Post-1.0 (from PLAN.md "Post-1.0 extensions")
 

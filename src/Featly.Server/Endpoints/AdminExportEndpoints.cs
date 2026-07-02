@@ -18,16 +18,21 @@ namespace Featly.Server.Endpoints;
 /// Operational state (users, API keys, role assignments, webhooks, audit) is
 /// intentionally out of scope — a bundle carries only the targeting definitions.
 /// Import upserts by key into the target environment (matching keys are
-/// overwritten in place); it bypasses the approval gate, so it is a deliberate
-/// admin operation gated by <see cref="Permission.FlagCreate"/>.
+/// overwritten in place); it bypasses the approval gate. Both routes carry
+/// dedicated permissions (<see cref="Permission.BackupExport"/> /
+/// <see cref="Permission.BackupImport"/>): a bundle spans flags, configs, and
+/// segments, so piggybacking on <c>FlagRead</c>/<c>FlagCreate</c> let a
+/// flag-only role move entity kinds it could not touch individually
+/// (SECURITY_AUDIT.md follow-up). By default only the system Admin role holds
+/// them; grant them to a custom role for backup tooling.
 /// </remarks>
 internal static class AdminExportEndpoints
 {
     public static RouteGroupBuilder MapAdminExport(this RouteGroupBuilder group)
     {
         var admin = group.MapGroup("/admin").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
-        admin.MapGet("/export", ExportAsync).WithName("Featly.Admin.Export").RequirePermission(Permission.FlagRead);
-        admin.MapPost("/import", ImportAsync).WithName("Featly.Admin.Import").RequirePermission(Permission.FlagCreate);
+        admin.MapGet("/export", ExportAsync).WithName("Featly.Admin.Export").RequirePermission(Permission.BackupExport);
+        admin.MapPost("/import", ImportAsync).WithName("Featly.Admin.Import").RequirePermission(Permission.BackupImport);
         return group;
     }
 

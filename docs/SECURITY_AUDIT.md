@@ -66,13 +66,14 @@ is closed. See [ADR-0020](adr/0020-bootstrap-admin-appsettings-db-override.md) /
 ## 7. Export / import — **NOTE**
 
 `export`/`import` move **definitions only** (flags, configs, segments) — never
-users, keys, role assignments, webhooks, or audit. Export is gated by `FlagRead`
-and import by `FlagCreate`; import emits a `configuration.imported` audit event.
+users, keys, role assignments, webhooks, or audit. Export is gated by the
+dedicated `BackupExport` permission and import by `BackupImport`; import emits a
+`configuration.imported` audit event.
 
-**FOLLOW-UP:** the import gate is a single coarse permission (`FlagCreate`) even
-though a bundle may carry configs/segments. An editor role holds all three create
-permissions so the common case is correct; a dedicated `BackupImport` permission
-is a possible future refinement.
+**RESOLVED (was a follow-up):** the routes originally piggybacked on
+`FlagRead`/`FlagCreate`, which let a flag-only role move entity kinds it could
+not touch individually. Both routes now carry dedicated permissions held only by
+the system Admin role by default; grant them to a custom role for backup tooling.
 
 ## Dependency posture
 
