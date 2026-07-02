@@ -263,14 +263,7 @@ internal static class AdminFlagsEndpoints
             .QueryAsync(environment.Id, type: EventType.Exposure, flagKey: key, ct: ct)
             .ConfigureAwait(false);
 
-        DateTimeOffset? lastExposureAt = null;
-        foreach (var e in exposures)
-        {
-            if (lastExposureAt is null || e.At > lastExposureAt)
-            {
-                lastExposureAt = e.At;
-            }
-        }
+        DateTimeOffset? lastExposureAt = exposures.Count > 0 ? exposures.Max(e => e.At) : null;
 
         return Results.Ok(new FlagActivityView(key, lastExposureAt, exposures.Count));
     }
