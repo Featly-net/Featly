@@ -24,6 +24,11 @@ internal static class AdminApiKeysEndpoints
         admin.MapPost("/", CreateAsync).WithName("Featly.Admin.ApiKeys.Create").RequirePermission(Permission.ApiKeyCreate);
         admin.MapPost("/{id:guid}/revoke", RevokeAsync).WithName("Featly.Admin.ApiKeys.Revoke").RequirePermission(Permission.ApiKeyRevoke);
 
+        // Rotation mints a replacement and revokes the old key, so it needs both ends of the pair.
+        admin.MapPost("/{id:guid}/rotate", RotateAsync).WithName("Featly.Admin.ApiKeys.Rotate")
+            .RequirePermission(Permission.ApiKeyCreate)
+            .RequirePermission(Permission.ApiKeyRevoke);
+
         return group;
     }
 
@@ -70,6 +75,11 @@ internal static class AdminApiKeysEndpoints
             return Results.BadRequest(new { error = "No matching environment found; create a project + environment first." });
         }
 
+        if (body.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow)
+        {
+            return Results.BadRequest(new { error = "expiresAt must be in the future." });
+        }
+
         var actor = ResolveActor(principal);
 
         // Optionally bind the key to a real user (auto-creating the user row on
@@ -91,6 +101,7 @@ internal static class AdminApiKeysEndpoints
             Scope = scope,
             EnvironmentId = environment.Id,
             UserId = userId,
+            ExpiresAt = body.ExpiresAt,
             Revoked = false,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedBy = actor,
@@ -103,7 +114,7 @@ internal static class AdminApiKeysEndpoints
             entityKey: apiKey.Id.ToString(),
             environmentId: environment.Id,
             user: principal,
-            data: new { apiKey.Id, apiKey.Name, Scope = scope.ToString(), apiKey.UserId, apiKey.Prefix },
+            data: new { apiKey.Id, apiKey.Name, Scope = scope.ToString(), apiKey.UserId, apiKey.Prefix, apiKey.ExpiresAt },
             ct).ConfigureAwait(false);
 
         // The plaintext token is shown exactly once.
@@ -135,6 +146,70 @@ internal static class AdminApiKeysEndpoints
             ct).ConfigureAwait(false);
 
         return Results.NoContent();
+    }
+
+    // POST /admin/apikeys/{id}/rotate — mints a replacement carrying the old
+    // key's name, scope, environment, and user binding, then revokes the old
+    // key. The replacement's plaintext token is returned exactly once.
+    private static async Task<IResult> RotateAsync(
+        Guid id,
+        ApiKeyRotateRequest? body,
+        StorageFacade store,
+        ApiKeyHasher hasher,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        var existing = await store.ApiKeys.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Results.NotFound(new { error = $"API key '{id}' not found." });
+        }
+        if (existing.Revoked)
+        {
+            return Results.Conflict(new { error = "A revoked API key cannot be rotated; mint a new key instead." });
+        }
+
+        if (body?.ExpiresAt is { } explicitExpiry && explicitExpiry <= DateTimeOffset.UtcNow)
+        {
+            return Results.BadRequest(new { error = "expiresAt must be in the future." });
+        }
+
+        var actor = ResolveActor(principal);
+        var plaintext = hasher.GenerateToken();
+        var replacement = new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = existing.Name,
+            Prefix = ApiKeyHasher.ExtractPrefix(plaintext),
+            Hash = hasher.Hash(plaintext),
+            Scope = existing.Scope,
+            EnvironmentId = existing.EnvironmentId,
+            UserId = existing.UserId,
+            // No explicit expiry on the request carries the old key's expiry
+            // forward (a non-expiring key stays non-expiring).
+            ExpiresAt = body?.ExpiresAt ?? existing.ExpiresAt,
+            Revoked = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = actor,
+        };
+
+        // Mint first, revoke second: a failure in between leaves both keys
+        // valid (recoverable) rather than neither (an outage).
+        await store.ApiKeys.CreateAsync(replacement, ct).ConfigureAwait(false);
+        await store.ApiKeys.RevokeAsync(existing.Id, actor, ct).ConfigureAwait(false);
+
+        await events.PublishAsync(
+            FeatlyEventTypes.ApiKeyRotated,
+            entityType: "ApiKey",
+            entityKey: existing.Id.ToString(),
+            environmentId: existing.EnvironmentId,
+            user: principal,
+            data: new { OldId = existing.Id, NewId = replacement.Id, replacement.Name, Scope = replacement.Scope.ToString(), replacement.ExpiresAt },
+            ct).ConfigureAwait(false);
+
+        var response = ApiKeyMintResponse.From(replacement, plaintext);
+        return Results.Created($"/api/admin/apikeys/{replacement.Id}", response);
     }
 
     /// <summary>
@@ -198,7 +273,14 @@ public sealed record ApiKeyMintRequest(
     string Name,
     string? Scope = null,
     string? UserIdentifier = null,
-    string? EnvironmentKey = null);
+    string? EnvironmentKey = null,
+    DateTimeOffset? ExpiresAt = null);
+
+/// <summary>
+/// Inbound shape for <c>POST /api/admin/apikeys/{id}/rotate</c>. When
+/// <see cref="ExpiresAt"/> is omitted the replacement inherits the old key's expiry.
+/// </summary>
+public sealed record ApiKeyRotateRequest(DateTimeOffset? ExpiresAt = null);
 
 /// <summary>Metadata view of an API key — never includes the hash or plaintext.</summary>
 public sealed record ApiKeyView(
@@ -210,7 +292,8 @@ public sealed record ApiKeyView(
     Guid? UserId,
     bool Revoked,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? LastUsedAt)
+    DateTimeOffset? LastUsedAt,
+    DateTimeOffset? ExpiresAt)
 {
     /// <summary>Projects an <see cref="ApiKey"/> to its metadata view.</summary>
     public static ApiKeyView From(ApiKey key)
@@ -218,7 +301,7 @@ public sealed record ApiKeyView(
         ArgumentNullException.ThrowIfNull(key);
         return new ApiKeyView(
             key.Id, key.Name, key.Prefix, key.Scope.ToString(),
-            key.EnvironmentId, key.UserId, key.Revoked, key.CreatedAt, key.LastUsedAt);
+            key.EnvironmentId, key.UserId, key.Revoked, key.CreatedAt, key.LastUsedAt, key.ExpiresAt);
     }
 }
 
@@ -230,6 +313,7 @@ public sealed record ApiKeyMintResponse(
     string Scope,
     Guid EnvironmentId,
     Guid? UserId,
+    DateTimeOffset? ExpiresAt,
     string Token)
 {
     /// <summary>Builds the one-time response carrying the plaintext token.</summary>
@@ -238,6 +322,6 @@ public sealed record ApiKeyMintResponse(
         ArgumentNullException.ThrowIfNull(key);
         return new ApiKeyMintResponse(
             key.Id, key.Name, key.Prefix, key.Scope.ToString(),
-            key.EnvironmentId, key.UserId, token);
+            key.EnvironmentId, key.UserId, key.ExpiresAt, token);
     }
 }

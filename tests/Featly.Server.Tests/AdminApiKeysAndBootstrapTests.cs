@@ -169,6 +169,127 @@ public class AdminApiKeysAndBootstrapTests
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    [Fact]
+    public async Task Mint_with_past_expiry_is_rejected()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+
+        var resp = await admin.PostAsJsonAsync(ApiKeysUri, new
+        {
+            name = "already-dead",
+            expiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+        }, ct);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Mint_with_future_expiry_returns_and_lists_it()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+
+        var expiry = DateTimeOffset.UtcNow.AddDays(30);
+        var mint = await admin.PostAsJsonAsync(ApiKeysUri, new { name = "expiring", expiresAt = expiry }, ct);
+        mint.StatusCode.Should().Be(HttpStatusCode.Created);
+        var minted = await mint.Content.ReadFromJsonAsync<ApiKeyMintResponse>(TestJson.Options, ct);
+        minted!.ExpiresAt.Should().BeCloseTo(expiry, TimeSpan.FromSeconds(1));
+
+        // The key authenticates while the expiry is in the future.
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", minted.Token);
+        (await client.GetAsync(FlagsUri, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var list = await admin.GetFromJsonAsync<List<ApiKeyView>>(ApiKeysUri, TestJson.Options, ct);
+        list!.Should().ContainSingle(k => k.Name == "expiring")
+            .Which.ExpiresAt.Should().BeCloseTo(expiry, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Expired_key_no_longer_authenticates()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed an already-expired key straight into the store — the mint
+        // endpoint (correctly) refuses to create one.
+        var store = host.Services.GetRequiredService<Featly.Storage.IFeatlyStore>();
+        var hasher = host.Services.GetRequiredService<Featly.Server.Authentication.ApiKeyHasher>();
+        var project = await store.Projects.GetDefaultAsync(ct);
+        var environment = await store.Environments.GetDefaultAsync(project!.Id, ct);
+        var plaintext = hasher.GenerateToken();
+        await store.ApiKeys.CreateAsync(new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = "expired",
+            Prefix = Featly.Server.Authentication.ApiKeyHasher.ExtractPrefix(plaintext),
+            Hash = hasher.Hash(plaintext),
+            Scope = ApiKeyScope.AdminWrite,
+            EnvironmentId = environment!.Id,
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-30),
+            CreatedBy = "test",
+        }, ct);
+
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", plaintext);
+        (await client.GetAsync(FlagsUri, ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Rotate_mints_replacement_and_revokes_old()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+
+        var minted = await (await admin.PostAsJsonAsync(ApiKeysUri, new { name = "rotate-me", userIdentifier = "bob@example.com" }, ct))
+            .Content.ReadFromJsonAsync<ApiKeyMintResponse>(TestJson.Options, ct);
+
+        var rotate = await admin.PostAsJsonAsync(new Uri($"/api/admin/apikeys/{minted!.Id}/rotate", UriKind.Relative), new { }, ct);
+        rotate.StatusCode.Should().Be(HttpStatusCode.Created);
+        var replacement = await rotate.Content.ReadFromJsonAsync<ApiKeyMintResponse>(TestJson.Options, ct);
+
+        // The replacement carries the old key's name, scope, and user binding.
+        replacement!.Id.Should().NotBe(minted.Id);
+        replacement.Name.Should().Be("rotate-me");
+        replacement.Scope.Should().Be(minted.Scope);
+        replacement.UserId.Should().Be(minted.UserId);
+        replacement.Token.Should().NotBe(minted.Token);
+
+        // Old token stops authenticating; the replacement works.
+        var oldClient = host.GetTestClient();
+        oldClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", minted.Token);
+        (await oldClient.GetAsync(FlagsUri, ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var newClient = host.GetTestClient();
+        newClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", replacement.Token);
+        (await newClient.GetAsync(FlagsUri, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // The old row is kept, revoked, for audit.
+        var list = await admin.GetFromJsonAsync<List<ApiKeyView>>(ApiKeysUri, TestJson.Options, ct);
+        list!.Should().Contain(k => k.Id == minted.Id && k.Revoked);
+        list.Should().Contain(k => k.Id == replacement.Id && !k.Revoked);
+    }
+
+    [Fact]
+    public async Task Rotate_refuses_a_revoked_key()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+
+        var minted = await (await admin.PostAsJsonAsync(ApiKeysUri, new { name = "revoked-then-rotated" }, ct))
+            .Content.ReadFromJsonAsync<ApiKeyMintResponse>(TestJson.Options, ct);
+        await admin.PostAsync(new Uri($"/api/admin/apikeys/{minted!.Id}/revoke", UriKind.Relative), null, ct);
+
+        var rotate = await admin.PostAsJsonAsync(new Uri($"/api/admin/apikeys/{minted.Id}/rotate", UriKind.Relative), new { }, ct);
+        rotate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();

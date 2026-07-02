@@ -2253,24 +2253,35 @@
             '    <label class="field"><span class="field__label">Name</span><input name="name" required placeholder="ci-pipeline" /></label>',
             '    <label class="field"><span class="field__label">Scope</span><select name="scope"><option value="AdminWrite">AdminWrite</option><option value="SdkRead">SdkRead</option></select></label>',
             '    <label class="field"><span class="field__label">Bind to user</span><input name="user" placeholder="optional identifier, e.g. alice@example.com" /></label>',
+            '    <label class="field"><span class="field__label">Expires in (days)</span><input name="expiresIn" type="number" min="1" placeholder="never" /></label>',
             '    <div class="row-form__action"><button type="submit" class="btn primary">Mint key</button><span class="save-msg" id="apikey-msg"></span></div>',
             '  </form></div>',
-            '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="8" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
+            '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="9" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
             '</div></div>',
         ].join("\n");
         hydrateIcons(viewEl);
 
         var tbody = document.getElementById("apikey-tbody");
+        function revealToken(token, heading) {
+            var reveal = document.getElementById("apikey-reveal");
+            if (!reveal) { return; }
+            reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
+                + '<strong>' + esc(heading) + '</strong>'
+                + '<pre class="cr-json" style="margin:8px 0 0">' + esc(token) + '</pre></div>';
+        }
         function paint(keys) {
             keys = Array.isArray(keys) ? keys : [];
             if (!keys.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No API keys in this environment yet. Mint one on the right.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:18px;text-align:center">No API keys in this environment yet. Mint one on the right.</td></tr>';
                 return;
             }
             tbody.innerHTML = keys.map(function (k) {
+                var expired = !k.revoked && k.expiresAt && new Date(k.expiresAt) <= new Date();
                 var status = k.revoked
                     ? '<span class="badge danger">revoked</span>'
-                    : '<span class="badge success"><span class="dot"></span>active</span>';
+                    : expired
+                        ? '<span class="badge warn">expired</span>'
+                        : '<span class="badge success"><span class="dot"></span>active</span>';
                 return '<tr>'
                     + '<td>' + esc(k.name) + '</td>'
                     + '<td>' + code(k.prefix) + '</td>'
@@ -2279,7 +2290,10 @@
                     + '<td>' + status + '</td>'
                     + '<td class="mono cell-modified">' + (formatDate(k.createdAt) || "—") + '</td>'
                     + '<td class="mono cell-modified">' + (k.lastUsedAt ? formatDate(k.lastUsedAt) : '<span class="muted">never</span>') + '</td>'
-                    + '<td class="col-actions">' + (k.revoked ? "" : '<button type="button" class="btn outline xs danger" data-revoke="' + esc(k.id) + '">Revoke</button>') + '</td>'
+                    + '<td class="mono cell-modified">' + (k.expiresAt ? formatDate(k.expiresAt) : '<span class="muted">never</span>') + '</td>'
+                    + '<td class="col-actions">' + (k.revoked ? "" :
+                        '<button type="button" class="btn outline xs" data-rotate="' + esc(k.id) + '">Rotate</button> '
+                        + '<button type="button" class="btn outline xs danger" data-revoke="' + esc(k.id) + '">Revoke</button>') + '</td>'
                     + '</tr>';
             }).join("");
             Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
@@ -2288,6 +2302,18 @@
                     if (!window.confirm("Revoke this API key? Requests using it start failing immediately.")) { return; }
                     api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/revoke")
                         .then(refresh)
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } window.alert(err.message); });
+                });
+            });
+            Array.prototype.slice.call(tbody.querySelectorAll("[data-rotate]")).forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var id = btn.getAttribute("data-rotate");
+                    if (!window.confirm("Rotate this API key? A replacement is minted and the old key is revoked immediately.")) { return; }
+                    api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/rotate", {})
+                        .then(function (res) {
+                            revealToken(res.token, "Key rotated. Copy the replacement token now — it will not be shown again.");
+                            return refresh();
+                        })
                         .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } window.alert(err.message); });
                 });
             });
@@ -2304,18 +2330,15 @@
             var f = e.target;
             var msg = document.getElementById("apikey-msg");
             setMessageOn(msg, "loading", "Minting…");
+            var expiresInDays = parseInt(f.expiresIn.value, 10);
             api("POST", "/admin/apikeys", {
                 name: f.name.value.trim(),
                 scope: f.scope.value,
                 userIdentifier: f.user.value.trim() || null,
                 environmentKey: envKey,
+                expiresAt: expiresInDays > 0 ? new Date(Date.now() + expiresInDays * 86400000).toISOString() : null,
             }).then(function (res) {
-                var reveal = document.getElementById("apikey-reveal");
-                if (reveal) {
-                    reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
-                        + '<strong>Copy this token now — it will not be shown again.</strong>'
-                        + '<pre class="cr-json" style="margin:8px 0 0">' + esc(res.token) + '</pre></div>';
-                }
+                revealToken(res.token, "Copy this token now — it will not be shown again.");
                 setMessageOn(msg, "success", "Minted.");
                 f.reset();
                 return refresh();
@@ -2878,7 +2901,7 @@
         { label: "Changes", types: ["change.proposed", "change.approved", "change.rejected", "change.applied"] },
         { label: "Roles", types: ["role.assigned", "role.unassigned"] },
         { label: "Environments", types: ["environment.locked", "environment.unlocked"] },
-        { label: "Platform", types: ["apikey.created", "apikey.revoked", "admin.bootstrapped", "configuration.imported"] },
+        { label: "Platform", types: ["apikey.created", "apikey.revoked", "apikey.rotated", "admin.bootstrapped", "configuration.imported"] },
     ];
 
     // Multi-select for event types. An empty saved set means "all events", so an

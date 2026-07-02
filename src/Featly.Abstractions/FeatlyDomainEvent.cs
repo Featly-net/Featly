@@ -122,6 +122,9 @@ public static class FeatlyEventTypes
     /// <summary>An API key was revoked.</summary>
     public const string ApiKeyRevoked = "apikey.revoked";
 
+    /// <summary>An API key was rotated: a replacement was minted and the old key revoked.</summary>
+    public const string ApiKeyRotated = "apikey.rotated";
+
     /// <summary>The first admin was provisioned via the bootstrap endpoint.</summary>
     public const string AdminBootstrapped = "admin.bootstrapped";
 

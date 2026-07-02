@@ -118,6 +118,38 @@ public class SqliteApiKeyStoreTests
         await host.Store.ApiKeys.TouchLastUsedAsync(Guid.NewGuid(), when, ct);
     }
 
+    [Fact]
+    public async Task ExpiresAt_round_trips_and_defaults_to_null()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        var expiry = new DateTimeOffset(2027, 3, 15, 12, 30, 0, TimeSpan.Zero);
+        var expiring = new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = "expiring key",
+            Prefix = "featly_EXPIR",
+            Hash = "argon2id$v=19$m=65536,t=3,p=2$" + Convert.ToBase64String(new byte[16]) + "$" + Convert.ToBase64String(new byte[32]),
+            Scope = ApiKeyScope.AdminWrite,
+            EnvironmentId = envId,
+            ExpiresAt = expiry,
+            Revoked = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "test",
+        };
+        await host.Store.ApiKeys.CreateAsync(expiring, ct);
+
+        var loaded = await host.Store.ApiKeys.GetByIdAsync(expiring.Id, ct);
+        loaded!.ExpiresAt.Should().Be(expiry);
+
+        // A key without an expiry keeps a null ExpiresAt.
+        var forever = NewKey(envId, "featly_FORVR");
+        await host.Store.ApiKeys.CreateAsync(forever, ct);
+        (await host.Store.ApiKeys.GetByIdAsync(forever.Id, ct))!.ExpiresAt.Should().BeNull();
+    }
+
     private static ApiKey NewKey(Guid environmentId, string prefix, DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.NewGuid(),
