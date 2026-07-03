@@ -50,6 +50,14 @@ internal sealed class PostgresTestHost : IAsyncDisposable
 
     public Stores.PostgresRoleUpgradeRequestStore RoleUpgradeRequestStore => new(CreateFactory());
 
+    public Stores.PostgresPendingChangeStore PendingChangeStore => new(CreateFactory());
+
+    public Stores.PostgresApprovalPolicyStore ApprovalPolicyStore => new(CreateFactory());
+
+    public Stores.PostgresApiKeyStore ApiKeyStore => new(CreateFactory());
+
+    public Stores.PostgresSystemSettingsStore SystemSettingsStore => new(CreateFactory());
+
     public static async Task<PostgresTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new NpgsqlConnectionStringBuilder
