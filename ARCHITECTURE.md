@@ -84,6 +84,7 @@ src/
   Featly.Storage.Abstractions/    # IFeatlyStore facade and sub-store contracts.
   Featly.Storage.InMemory/        # In-memory store, for tests and demos.
   Featly.Storage.Sqlite/          # SQLite store via EF Core.
+  Featly.Storage.Postgres/        # PostgreSQL store via EF Core/Npgsql (in progress, ADR-0026).
   Featly.Cli/                     # dotnet tool for migrations, locks, import/export.
 tests/
   Featly.Engine.Tests/

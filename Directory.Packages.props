@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup Label="Microsoft.Extensions.* (net8.0 and net10.0 compatible)">
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
@@ -29,6 +30,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
+    <!-- Postgres provider (ADR-0026), same EF Core line as the SQLite provider. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <!-- Pin away from the vulnerable 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf)
          that EF Core Design pulls in transitively via Microsoft.Build/MSBuild stack. -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.8" />
