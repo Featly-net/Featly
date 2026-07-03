@@ -796,7 +796,7 @@ EF Core migrations live in `Featly.Storage.Sqlite/Migrations/` and ship compiled
 - **`AutoMigrate = true` (default for embedded).** At application boot, `Featly.Storage.Sqlite` calls `DbContext.Database.MigrateAsync()`. If already at the latest schema, it is a no-op. This is the zero-friction quickstart.
 - **`AutoMigrate = false` (recommended for serious production).** Featly does not touch the schema. A DBA runs `featly db migrate --connection "..."` via the CLI before deploying.
 
-When SQL Server and PostgreSQL providers ship, each will have its own `Migrations/` folder following the standard EF Core multi-provider pattern. The `FeatlyDbContext` is shared.
+When SQL Server and PostgreSQL providers ship, each has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — not a shared one. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz` vs. SQLite's raw-JSON-text and ticks converters); a shared context would force one provider to carry the other's mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md).
 
 ### Provider roadmap
 
@@ -1358,6 +1358,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-023](docs/adr/0023-user-bound-api-keys.md) | API keys may bind to a real user; persisted keys authenticate over Bearer | Accepted |
 | [ADR-024](docs/adr/0024-modular-feature-areas.md) | Modular feature areas via DI toggles (hybrid; package split deferred) | Accepted |
 | [ADR-025](docs/adr/0025-documentation-site-astro-starlight.md) | Documentation site on Astro Starlight, hosted on GitHub Pages | Accepted |
+| [ADR-026](docs/adr/0026-postgres-storage-provider.md) | PostgreSQL storage provider — Npgsql, own DbContext per provider, LISTEN/NOTIFY | Accepted |
 | [ADR-027](docs/adr/0027-flag-prerequisites.md) | Flag prerequisites — AND-only, write-time cycle rejection, opt-in evaluation cost | Accepted |
 
 ---
