@@ -226,6 +226,79 @@ public class AdminFlagsEndpointTests
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task POST_admin_flags_persists_prerequisites_when_the_referenced_flag_exists()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/flags", NewFlagBody("infra-flag"), ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var body = NewFlagBody("feature-flag");
+        body["prerequisites"] = new[] { new { flagKey = "infra-flag", requiredVariantKeys = new[] { "on" } } };
+        var create = await client.PostAsJsonAsync("/api/admin/flags", body, ct);
+
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await create.Content.ReadFromJsonAsync<Flag>(TestJson.Options, ct);
+        created!.Prerequisites.Should().ContainSingle(p => p.FlagKey == "infra-flag");
+    }
+
+    [Fact]
+    public async Task POST_admin_flags_rejects_a_prerequisite_on_an_unknown_flag()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        var body = NewFlagBody("feature-flag");
+        body["prerequisites"] = new[] { new { flagKey = "ghost-flag", requiredVariantKeys = new[] { "on" } } };
+
+        var response = await client.PostAsJsonAsync("/api/admin/flags", body, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task PUT_admin_flags_rejects_a_prerequisite_cycle()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        await client.PostAsJsonAsync("/api/admin/flags", NewFlagBody("a"), ct);
+        var bBody = NewFlagBody("b");
+        bBody["prerequisites"] = new[] { new { flagKey = "a", requiredVariantKeys = new[] { "on" } } };
+        await client.PostAsJsonAsync("/api/admin/flags", bBody, ct);
+
+        // Now try to make "a" depend on "b" -- a -> b -> a is a cycle.
+        var aUpdate = NewFlagBody("a");
+        aUpdate["prerequisites"] = new[] { new { flagKey = "b", requiredVariantKeys = new[] { "on" } } };
+        var response = await client.PutAsJsonAsync("/api/admin/flags/a", aUpdate, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var raw = await response.Content.ReadAsStringAsync(ct);
+        raw.Should().Contain("cycle");
+    }
+
+    private static Dictionary<string, object> NewFlagBody(string key) => new()
+    {
+        ["key"] = key,
+        ["name"] = key,
+        ["type"] = "Boolean",
+        ["enabled"] = true,
+        ["defaultVariantKey"] = "off",
+        ["variants"] = new[]
+        {
+            new { key = "off", name = "Off", value = false },
+            new { key = "on", name = "On", value = true },
+        },
+    };
+
     private static async Task<IHost> BuildHostAsync()
     {
         var builder = new HostBuilder()

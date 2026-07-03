@@ -189,6 +189,34 @@ public class SqliteFlagStoreTests
     }
 
     [Fact]
+    public async Task Upsert_persists_and_updates_prerequisites()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+
+        var flag = NewBooleanFlag(envId, "gated-feature");
+        flag.Prerequisites =
+        [
+            new Prerequisite { FlagKey = "infra-flag", RequiredVariantKeys = ["on"] },
+        ];
+        await host.Store.Flags.UpsertAsync(envId, flag, actor: "test", ct);
+
+        var loaded = await host.Store.Flags.GetAsync(envId, "gated-feature", ct);
+        loaded!.Prerequisites.Should().ContainSingle();
+        loaded.Prerequisites[0].FlagKey.Should().Be("infra-flag");
+        loaded.Prerequisites[0].RequiredVariantKeys.Should().Equal("on");
+
+        // Update clears/replaces the owned collection, same as Rules/Variants.
+        var update = NewBooleanFlag(envId, "gated-feature");
+        update.Prerequisites = [];
+        await host.Store.Flags.UpsertAsync(envId, update, actor: "test", ct);
+
+        var afterClear = await host.Store.Flags.GetAsync(envId, "gated-feature", ct);
+        afterClear!.Prerequisites.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Upsert_replaces_rules_on_update()
     {
         // Regression for the dashboard edit flow: M5C surfaced that the

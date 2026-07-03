@@ -45,6 +45,17 @@ public sealed class Flag
     /// </summary>
     public List<Rule> Rules { get; set; } = [];
 
+    /// <summary>
+    /// Other flags that must currently resolve to one of their required
+    /// variants before this flag's own rules are considered (ADR-0027). Joined
+    /// with AND: every listed prerequisite must be satisfied. An unmet
+    /// prerequisite short-circuits evaluation to <see cref="DefaultVariantKey"/>
+    /// with reason <c>PrerequisiteNotMet</c>, before <see cref="Rules"/> are
+    /// walked. Empty by default — flags with no prerequisites pay no
+    /// evaluation cost for this feature.
+    /// </summary>
+    public List<Prerequisite> Prerequisites { get; set; } = [];
+
     /// <summary>Environment this flag is scoped to.</summary>
     public required Guid EnvironmentId { get; init; }
 
@@ -102,4 +113,24 @@ public sealed class Variant
 
     /// <summary>The typed value, encoded as <see cref="JsonElement"/>.</summary>
     public required JsonElement Value { get; set; }
+}
+
+/// <summary>
+/// A dependency on another flag's current result (ADR-0027). The referring
+/// flag's own targeting is only considered once the referenced flag (by
+/// <see cref="FlagKey"/>, same environment) currently resolves to one of
+/// <see cref="RequiredVariantKeys"/>.
+/// </summary>
+public sealed class Prerequisite
+{
+    /// <summary>Key of the flag this prerequisite depends on, in the same environment.</summary>
+    public required string FlagKey { get; set; }
+
+    /// <summary>
+    /// The prerequisite is satisfied when <see cref="FlagKey"/> currently
+    /// resolves to any one of these variant keys. Typically a single key
+    /// (<c>["on"]</c>), but multiple keys cover "on if the prerequisite chose
+    /// either treatment" without a separate mechanism.
+    /// </summary>
+    public List<string> RequiredVariantKeys { get; set; } = [];
 }
