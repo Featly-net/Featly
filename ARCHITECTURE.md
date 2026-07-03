@@ -618,9 +618,9 @@ Bucketing uses **MurmurHash3** (128-bit, truncated to 32 bits) over `targetingKe
 
 Config evaluation reuses the same rule-matching logic. The only difference is the outcome shape: `ConfigRule.Value` is the typed value directly instead of selecting a variant. This is what allows configs to have full targeting (Option B in the design discussion) without duplicating engine code.
 
-### Flag prerequisites (planned)
+### Flag prerequisites
 
-One flag may declare that another flag must resolve to a specific variant before its own rules are considered — see [ADR-0027](adr/0027-flag-prerequisites.md). Resolution stays local (no server round-trip) and costs nothing for the majority of flags that declare no prerequisite.
+One flag may declare that another flag must resolve to one of a set of required variants before its own rules are considered — see [ADR-0027](adr/0027-flag-prerequisites.md). Multiple prerequisites are ANDed together; the required variant keys within a single prerequisite are ORed. A cycle is rejected at write time (`PrerequisiteValidator`), so evaluation never needs runtime cycle-guard bookkeeping. Resolution stays local: the engine takes an `IFlagLookup` (sibling to `ISegmentLookup`) to resolve the referenced flags from the same snapshot — no server round-trip — and the lookup is only touched when `Flag.Prerequisites` is non-empty, so the common case (no prerequisites) costs nothing extra.
 
 ---
 

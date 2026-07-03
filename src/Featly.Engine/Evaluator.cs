@@ -32,7 +32,8 @@ public static class Evaluator
         Flag? flag,
         EvaluationContext? context,
         JsonElement fallback,
-        ISegmentLookup? segments = null)
+        ISegmentLookup? segments = null,
+        IFlagLookup? flags = null)
     {
         if (flag is null)
         {
@@ -59,6 +60,14 @@ public static class Evaluator
 
         segments ??= DictionarySegmentLookup.Empty;
 
+        // Only touch the flag lookup when the flag actually declares
+        // prerequisites — a flag with none pays nothing extra (ADR-0027).
+        if (flag.Prerequisites.Count > 0
+            && !PrerequisitesMet(flag.Prerequisites, context, segments, flags ?? DictionaryFlagLookup.Empty))
+        {
+            return ResolveDefault(flag, fallback, EvaluationReason.PrerequisiteNotMet, ruleMatched: null);
+        }
+
         // Walk rules ordered by Order asc. We don't sort here on the hot path —
         // the storage layer / API layer is responsible for keeping the in-memory
         // list ordered. A defensive sort is cheap if a future regression sneaks
@@ -80,6 +89,36 @@ public static class Evaluator
         }
 
         return ResolveDefault(flag, fallback, EvaluationReason.Default, ruleMatched: null);
+    }
+
+    /// <summary>
+    /// AND across prerequisites, OR within a single prerequisite's required
+    /// variant keys — mirrors "AND within, flatten OR across" from ADR-0005.
+    /// A missing prerequisite flag counts as unmet. Cycles are rejected at
+    /// write time (<c>PrerequisiteValidator</c>, ADR-0027), so this recursion
+    /// is assumed to terminate without runtime cycle-guard bookkeeping.
+    /// </summary>
+    private static bool PrerequisitesMet(
+        List<Prerequisite> prerequisites,
+        EvaluationContext? context,
+        ISegmentLookup segments,
+        IFlagLookup flags)
+    {
+        for (var i = 0; i < prerequisites.Count; i++)
+        {
+            var prerequisite = prerequisites[i];
+            if (!flags.TryGet(prerequisite.FlagKey, out var prerequisiteFlag) || prerequisiteFlag is null)
+            {
+                return false;
+            }
+
+            var result = EvaluateFlag(prerequisiteFlag, context, default, segments, flags);
+            if (!prerequisite.RequiredVariantKeys.Contains(result.VariantKey, StringComparer.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool AllConditionsMatch(
