@@ -62,8 +62,16 @@ jobs:
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
+      # RequiresPostgres tests need a real Postgres reachable, which this
+      # workflow doesn't provision (see ci.yml's dedicated postgres-tests job
+      # for those); excluding them here mirrors ci.yml's main build job.
       - name: Test
-        run: dotnet test Featly.sln --configuration ${{ env.CONFIGURATION }} --no-build --logger "console;verbosity=normal"
+        run: >
+          dotnet test Featly.sln
+          --configuration ${{ env.CONFIGURATION }}
+          --no-build
+          --filter "Category!=RequiresPostgres"
+          --logger "console;verbosity=normal"
 
       - name: Pack
         run: dotnet pack Featly.sln --configuration ${{ env.CONFIGURATION }} --no-build --output artifacts
