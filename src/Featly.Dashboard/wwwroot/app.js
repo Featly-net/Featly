@@ -2775,6 +2775,25 @@
             + '<div class="actions"><a class="btn outline xs" data-link="/inbox/' + encodeURIComponent(c.id) + '">Review</a></div>'
             + '</div>';
     }
+    // Approved-but-not-applied changes (ADR-0028): distinguishes "ready to
+    // apply whenever a human gets to it" from "scheduled for <time>" so a
+    // scheduled apply is visible without already knowing the change's id.
+    function inboxApprovedCard(c) {
+        var statusLine = c.scheduledApplyAt
+            ? "Scheduled for " + (formatDate(c.scheduledApplyAt) || c.scheduledApplyAt)
+            : "Ready to apply";
+        return '<div class="inbox-card' + (c.scheduledApplyAt ? "" : " urgent") + '" data-cr="' + esc(c.id) + '">'
+            + '<span class="ic' + (c.scheduledApplyAt ? " info" : " success") + '"><span class="ti-slot" data-ti="' + (c.scheduledApplyAt ? "clock" : "check") + '"></span></span>'
+            + '<div class="main">'
+            + '  <div class="row1"><span class="title">' + esc(c.action || "Change") + '<span class="key">' + esc(c.entityKey || "") + '</span></span>'
+            + (c.entityType ? '<span class="badge sq">' + esc(c.entityType) + '</span>' : '') + '</div>'
+            + '  <div class="row2"><span>' + code(truncate(c.authorUserId || "—", 8)) + '</span><span class="dot-sep"></span>'
+            + '<span>' + (formatDate(c.createdAt) || "—") + '</span></div>'
+            + '  <div class="status-line"><span class="ti-slot" data-ti="clock"></span>' + esc(statusLine) + '</div>'
+            + '</div>'
+            + '<div class="actions"><a class="btn outline xs" data-link="/inbox/' + encodeURIComponent(c.id) + '">Review</a></div>'
+            + '</div>';
+    }
     function inboxUpgradeCard(u) {
         return '<div class="inbox-card mine">'
             + '<span class="ic purple"><span class="ti-slot" data-ti="user-shield"></span></span>'
@@ -2797,12 +2816,15 @@
         var none = Promise.resolve([]);
         Promise.all([
             featureOn("approvals") ? api("GET", "/admin/changes?status=Pending").catch(function () { return []; }) : none,
+            featureOn("approvals") ? api("GET", "/admin/changes?status=Approved").catch(function () { return []; }) : none,
             featureOn("rbac") ? api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }) : none,
         ]).then(function (res) {
             var changes = Array.isArray(res[0]) ? res[0] : [];
-            var upgrades = Array.isArray(res[1]) ? res[1] : [];
+            var approved = Array.isArray(res[1]) ? res[1] : [];
+            var upgrades = Array.isArray(res[2]) ? res[2] : [];
             var body = [
                 inboxGroup("Awaiting your approval", changes.length, changes.map(inboxChangeCard).join(""), "Nothing awaiting approval."),
+                inboxGroup("Approved — awaiting apply", approved.length, approved.map(inboxApprovedCard).join(""), "Nothing approved and awaiting apply."),
                 inboxGroup("Role upgrade requests", upgrades.length, upgrades.map(inboxUpgradeCard).join(""), "No pending role-upgrade requests."),
             ].join("");
             viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
@@ -2857,6 +2879,7 @@
                     '    <dt>Action</dt><dd>' + esc(c.action) + '</dd>',
                     '    <dt>Entity</dt><dd>' + esc(c.entityType) + '</dd>',
                     '    <dt>Author</dt><dd><code>' + esc(truncate(c.authorUserId, 8)) + '</code></dd>',
+                    c.scheduledApplyAt ? '    <dt>Scheduled</dt><dd><span class="badge info">' + esc(formatDate(c.scheduledApplyAt) || "—") + '</span></dd>' : '',
                     c.authorMessage ? '    <dt>Message</dt><dd>' + esc(c.authorMessage) + '</dd>' : '',
                     '  </dl></div>',
                     approvals ? '  <div class="side-card"><h3 class="side-h">Approvals</h3><ul class="cr-approvals">' + approvals + '</ul></div>' : '',
@@ -2875,11 +2898,35 @@
         }
         if (c.status === "Approved") {
             buttons.push('<button type="button" class="btn primary xs" data-cr="apply">Apply</button>');
+            buttons.push(scheduleControls(c));
         }
         if (c.status === "Pending" || c.status === "Approved") {
             buttons.push('<button type="button" class="btn outline xs danger" data-cr="bypass">Emergency bypass</button>');
         }
         return buttons.join(" ") || '<span class="muted">No actions available (' + esc(c.status) + ').</span>';
+    }
+
+    // Scheduled apply (ADR-0028): once Approved, an operator can also pick a
+    // future UTC time for the background worker to apply it automatically,
+    // instead of clicking Apply themselves.
+    function scheduleControls(c) {
+        var prefill = c.scheduledApplyAt ? toLocalDateTimeInputValue(c.scheduledApplyAt) : "";
+        return '<div class="cr-schedule">'
+            + '<input type="datetime-local" id="cr-schedule-input" value="' + esc(prefill) + '" />'
+            + '<button type="button" class="btn outline xs" data-cr="schedule">' + (c.scheduledApplyAt ? "Reschedule" : "Schedule") + '</button>'
+            + (c.scheduledApplyAt ? '<button type="button" class="btn outline xs" data-cr="cancel-schedule">Cancel schedule</button>' : '')
+            + '</div>';
+    }
+
+    // A <input type="datetime-local"> has no timezone; the browser parses and
+    // displays it in local time. Format an incoming UTC ISO string the same
+    // way so re-opening a scheduled change shows the operator's own local
+    // time, not the raw UTC instant.
+    function toLocalDateTimeInputValue(iso) {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) { return ""; }
+        var pad = function (n) { return String(n).padStart(2, "0"); };
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
     }
 
     function wireChangeDetail(c) {
@@ -2904,6 +2951,18 @@
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "apply") {
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/apply")
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                } else if (action === "schedule") {
+                    var input = document.getElementById("cr-schedule-input");
+                    if (!input || !input.value) {
+                        if (msg) { msg.className = "save-msg save-msg--error"; msg.textContent = "Pick a date and time first."; }
+                        return;
+                    }
+                    var scheduledApplyAt = new Date(input.value).toISOString();
+                    api("PATCH", "/admin/changes/" + encodeURIComponent(c.id) + "/schedule", { scheduledApplyAt: scheduledApplyAt })
+                        .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
+                } else if (action === "cancel-schedule") {
+                    api("PATCH", "/admin/changes/" + encodeURIComponent(c.id) + "/schedule", { scheduledApplyAt: null })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "bypass") {
                     var why = window.prompt("Emergency bypass reason (required):");

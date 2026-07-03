@@ -1090,6 +1090,22 @@ p:last-child { margin-bottom: 0; }
     border-radius: var(--radius-sm);
 }
 
+/* Scheduled apply (ADR-0028): datetime-local + Schedule/Reschedule/Cancel,
+   nested inside the Decision panel's .cr-actions flex row. */
+.cr-schedule {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+.cr-schedule input[type="datetime-local"] {
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
 @media (max-width: 800px) {
     .cr-diff { grid-template-columns: 1fr; }
 }
