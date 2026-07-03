@@ -1407,8 +1407,15 @@
     function renderFlagDetail(key) {
         if (!currentEnv) { return; }
         viewEl.innerHTML = detailLoadingShell("Flag", key);
-        api("GET", "/admin/flags/" + encodeURIComponent(key) + "?env=" + encodeURIComponent(currentEnv.key))
-            .then(function (flag) { renderFlagEditor(flag); })
+        Promise.all([
+            api("GET", "/admin/flags/" + encodeURIComponent(key) + "?env=" + encodeURIComponent(currentEnv.key)),
+            api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key)).catch(function () { return []; }),
+        ])
+            .then(function (results) {
+                var flag = results[0];
+                var otherFlags = (results[1] || []).filter(function (f) { return f.key !== flag.key && !f.archived; });
+                renderFlagEditor(flag, otherFlags);
+            })
             .catch(handleErrOnView("Flag: " + key));
     }
 
@@ -1440,7 +1447,8 @@
     }
 
     // ---------- Flag editor ----------
-    function renderFlagEditor(flag) {
+    function renderFlagEditor(flag, otherFlags) {
+        otherFlags = otherFlags || [];
         var variantOpts = (flag.variants || []).map(function (v) {
             return '<option value="' + esc(v.key) + '"' + (v.key === flag.defaultVariantKey ? " selected" : "") + '>' + esc(v.key) + '</option>';
         }).join("");
@@ -1469,6 +1477,12 @@
             '<h2>Rules</h2>',
             renderRulesEditor(flag.rules || [], { kind: "flag", variants: flag.variants || [] }),
             '<button type="button" class="btn outline xs" data-action="add-rule"><span class="ti-slot" data-ti="plus"></span> Add rule</button>',
+            '<h2>Prerequisites</h2>',
+            '<p class="muted">Other flags that must resolve to one of the listed variants before this flag\'s own rules are considered.</p>',
+            '<div class="prereq-list">' + (flag.prerequisites || []).map(function (p) { return renderPrerequisiteRow(p, otherFlags); }).join("") + '</div>',
+            otherFlags.length
+                ? '<button type="button" class="btn outline xs" data-action="add-prerequisite"><span class="ti-slot" data-ti="plus"></span> Add prerequisite</button>'
+                : '<p class="muted">No other flags in this environment to depend on.</p>',
             '<div class="editor__footer">',
             '  <button type="submit" class="btn primary">Save flag</button>',
             '  <span class="save-msg" id="save-msg"></span>',
@@ -1482,6 +1496,7 @@
             '    <dt>Default</dt><dd class="mono">' + esc(flag.defaultVariantKey || "—") + '</dd>',
             '    <dt>Variants</dt><dd>' + (flag.variants || []).length + '</dd>',
             '    <dt>Rules</dt><dd>' + (flag.rules || []).length + '</dd>',
+            '    <dt>Prerequisites</dt><dd id="flag-prereq-status">' + ((flag.prerequisites || []).length ? '…' : '<span class="muted">None</span>') + '</dd>',
             '    <dt>Created</dt><dd>' + (formatDate(flag.createdAt) || "—") + '</dd>',
             '    <dt>Updated</dt><dd>' + (formatDate(flag.updatedAt) || "—") + '</dd>',
             '    <dt>Last evaluated</dt><dd id="flag-last-evaluated" class="muted">…</dd>',
@@ -1489,9 +1504,31 @@
             '</aside></div></div></div>',
         ].join("\n");
 
-        wireFlagEditor(flag);
+        wireFlagEditor(flag, otherFlags);
         wirePreviewPanel("flag", flag.key);
         hydrateIcons(viewEl);
+
+        // Whether prerequisites currently resolve is a function of live state
+        // (the referenced flags), not something baked into this flag's own
+        // row — reuse the server's own evaluator via the no-context preview
+        // dry-run rather than re-implementing prerequisite resolution in JS.
+        if ((flag.prerequisites || []).length > 0) {
+            api("POST", "/admin/preview/flags/" + encodeURIComponent(flag.key) + "?env=" + encodeURIComponent(currentEnv.key), { targetingKey: null, attributes: {} })
+                .then(function (r) {
+                    var cell = document.getElementById("flag-prereq-status");
+                    if (!cell) { return; }
+                    if (r.reason === "PrerequisiteNotMet") {
+                        cell.innerHTML = '<span class="badge warn"><span class="dot"></span>Not met</span>';
+                    } else if (r.reason === "Disabled") {
+                        // The flag's own kill switch is off -- prerequisites
+                        // are never reached, so "met/not met" doesn't apply.
+                        cell.innerHTML = '<span class="muted">Flag disabled</span>';
+                    } else {
+                        cell.innerHTML = '<span class="badge success"><span class="dot"></span>Met</span>';
+                    }
+                })
+                .catch(function () { /* best-effort */ });
+        }
 
         // Derived from exposure events (an experiment must have run this flag
         // through the server at least once) — never from evaluation itself,
@@ -1517,6 +1554,32 @@
             + jsonField('<textarea class="v-value json-area" rows="1" spellcheck="false" placeholder="value (JSON)">' + esc(jsonPretty(v.value)) + '</textarea>')
             + '<button type="button" class="icon-btn" data-action="remove-variant" aria-label="Remove">' + icon("x") + '</button>'
             + '</div>';
+    }
+
+    // A prerequisite is { flagKey, requiredVariantKeys }: another flag that
+    // must resolve to one of the listed variants (OR within, ANDed across
+    // every prerequisite row — ADR-0027). The variant checkboxes are keyed
+    // off the CHOSEN flag's own declared variants, so picking a different
+    // flagKey re-renders them (wired in wireFlagEditor).
+    function renderPrerequisiteRow(p, otherFlags) {
+        p = p || { flagKey: "", requiredVariantKeys: [] };
+        var flagOpts = (otherFlags || []).map(function (f) {
+            return '<option value="' + esc(f.key) + '"' + (f.key === p.flagKey ? " selected" : "") + '>' + esc(f.key) + '</option>';
+        }).join("");
+        return '<div class="prereq-row">'
+            + '<select class="prereq-flag-key">' + flagOpts + '</select>'
+            + '<div class="prereq-variants">' + renderPrereqVariantChecks(p, otherFlags) + '</div>'
+            + '<button type="button" class="icon-btn" data-action="remove-prerequisite" aria-label="Remove">' + icon("x") + '</button>'
+            + '</div>';
+    }
+
+    function renderPrereqVariantChecks(p, otherFlags) {
+        var target = (otherFlags || []).find(function (f) { return f.key === p.flagKey; });
+        if (!target) { return '<span class="muted">Select a flag</span>'; }
+        return (target.variants || []).map(function (v) {
+            var checked = (p.requiredVariantKeys || []).indexOf(v.key) !== -1;
+            return '<label class="check"><input type="checkbox" class="prereq-variant" value="' + esc(v.key) + '"' + (checked ? " checked" : "") + ' /> ' + esc(v.key) + '</label>';
+        }).join(" ") || '<span class="muted">No variants</span>';
     }
 
     // Pretty-print a value as JSON for a multiline editor. Scalars stay one-line.
@@ -1591,7 +1654,8 @@
         repaintJson(form);
     }
 
-    function wireFlagEditor(flag) {
+    function wireFlagEditor(flag, otherFlags) {
+        otherFlags = otherFlags || [];
         var form = document.getElementById("flag-form");
         wireJsonAreas(form);
         // Wire any pre-existing split toggles (rules loaded with splits).
@@ -1617,8 +1681,19 @@
                 var rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], outcome: { variantKey: flag.defaultVariantKey } }, { kind: "flag", variants: flag.variants || [] }));
                 repaintJson(rulesEl);
+            } else if (action === "add-prerequisite") {
+                var prereqList = form.querySelector(".prereq-list");
+                prereqList.insertAdjacentHTML("beforeend", renderPrerequisiteRow({ flagKey: otherFlags[0] ? otherFlags[0].key : "", requiredVariantKeys: [] }, otherFlags));
+            } else if (action === "remove-prerequisite") {
+                e.target.closest(".prereq-row").remove();
             } else {
                 handleRuleAction(e, form, { kind: "flag", variants: flag.variants || [] });
+            }
+        });
+        form.addEventListener("change", function (e) {
+            if (e.target.classList.contains("prereq-flag-key")) {
+                var row = e.target.closest(".prereq-row");
+                row.querySelector(".prereq-variants").innerHTML = renderPrereqVariantChecks({ flagKey: e.target.value, requiredVariantKeys: [] }, otherFlags);
             }
         });
         form.addEventListener("submit", function (e) {
@@ -1627,7 +1702,7 @@
                 var body = collectFlagBody(form, flag);
                 setMessage("loading", "Saving…");
                 api("PUT", "/admin/flags/" + encodeURIComponent(flag.key) + "?env=" + encodeURIComponent(currentEnv.key), body)
-                    .then(function (updated) { setMessage("success", "Saved."); renderFlagEditor(updated || body); })
+                    .then(function (updated) { setMessage("success", "Saved."); renderFlagEditor(updated || body, otherFlags); })
                     .catch(function (err) {
                         if (err.kind === "auth") { showAuthPrompt(); return; }
                         setMessage("error", err.message);
@@ -1657,6 +1732,13 @@
             }),
             tags: parseCsv(form.elements["tags"].value),
             rules: collectRules(form, { kind: "flag" }),
+            prerequisites: Array.prototype.slice.call(form.querySelectorAll(".prereq-row")).map(function (row, idx) {
+                var flagKey = row.querySelector(".prereq-flag-key").value;
+                var requiredVariantKeys = Array.prototype.slice.call(row.querySelectorAll(".prereq-variant:checked")).map(function (cb) { return cb.value; });
+                if (!flagKey) { throw new Error("Prerequisite #" + (idx + 1) + ": select a flag."); }
+                if (requiredVariantKeys.length === 0) { throw new Error("Prerequisite on '" + flagKey + "': select at least one required variant."); }
+                return { flagKey: flagKey, requiredVariantKeys: requiredVariantKeys };
+            }),
         };
         if (!body.name) { throw new Error("Name is required."); }
         if (!body.variants.some(function (v) { return v.key === body.defaultVariantKey; })) {
