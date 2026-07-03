@@ -1,0 +1,115 @@
+name: sonarcloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Cancel in-progress runs for the same ref when a new run starts.
+concurrency:
+  group: sonarcloud-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  CONFIGURATION: Release
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # SonarCloud's PR decoration needs the full history + all branches
+          # to compute the diff against the target branch.
+          fetch-depth: 0
+
+      - name: Setup .NET 8 SDK (needed for net8.0 multi-target)
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup .NET 10 SDK (primary)
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Setup Java (required by the SonarScanner CLI)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Cache SonarCloud analysis cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.sonar/cache
+          key: sonar-${{ runner.os }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Install SonarCloud scanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Restore
+        run: dotnet restore Featly.sln
+
+      - name: Begin SonarCloud analysis
+        # Reference the shell env var ($SONAR_TOKEN), not a direct
+        # ${{ secrets.SONAR_TOKEN }} expansion -- the latter literally inlines
+        # the secret's value into the runner's script text before it ever
+        # executes (flagged by SonarCloud's own githubactions:S7636 rule).
+        # Reading it from the process environment at runtime avoids that.
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"Featly-net_Featly"
+          /o:"featly"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+          /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
+          /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,samples/**,**/Featly.Engine.Benchmarks/**"
+
+      - name: Build
+        run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
+
+      # Same test scope as ci.yml's main build job: RequiresPostgres tests run
+      # in a dedicated job with a real service container, which this
+      # ubuntu-latest runner doesn't provision here. Coverlet's VSTest
+      # collector emits OpenCover format directly (Format=opencover) — the
+      # scanner needs OpenCover, not the Cobertura format ci.yml's own
+      # coverage collection uses for its artifact upload.
+      - name: Test with coverage
+        run: >
+          dotnet test Featly.sln
+          --configuration ${{ env.CONFIGURATION }}
+          --no-build
+          --filter "Category!=RequiresPostgres"
+          --collect:"XPlat Code Coverage;Format=opencover"
+          --results-directory ./TestResults
+
+      - name: End SonarCloud analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
