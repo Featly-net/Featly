@@ -97,6 +97,16 @@ internal static class AdminFlagsEndpoints
             return Results.Conflict(new { error = $"Flag '{body.Key}' already exists in environment '{environment.Key}'." });
         }
 
+        if (body.Prerequisites is { Count: > 0 } proposedPrerequisites)
+        {
+            var allFlags = await AllFlagsIncludingArchivedAsync(store, environment.Id, ct).ConfigureAwait(false);
+            var validation = Flags.PrerequisiteValidator.Validate(allFlags, body.Key, proposedPrerequisites);
+            if (!validation.IsValid)
+            {
+                return Results.Conflict(new { error = validation.Error });
+            }
+        }
+
         // Approval gate: when the environment requires approval, this returns a
         // 202 PendingChange (or applies via emergency bypass) instead of a
         // direct create. dryRun never mutates.
@@ -153,6 +163,16 @@ internal static class AdminFlagsEndpoints
             return Results.BadRequest(new { error = "Cannot rename a flag via PUT. Body key must match URL key." });
         }
 
+        if (body.Prerequisites is { Count: > 0 } proposedPrerequisites)
+        {
+            var allFlags = await AllFlagsIncludingArchivedAsync(store, environment.Id, ct).ConfigureAwait(false);
+            var validation = Flags.PrerequisiteValidator.Validate(allFlags, key, proposedPrerequisites);
+            if (!validation.IsValid)
+            {
+                return Results.Conflict(new { error = validation.Error });
+            }
+        }
+
         var gated = await gate.InterceptAsync("Flag", key, environment, ChangeAction.Update,
             JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
         if (gated.Outcome == GateOutcome.Handled)
@@ -170,6 +190,7 @@ internal static class AdminFlagsEndpoints
         existing.Variants = [.. body.Variants];
         existing.Tags = [.. (body.Tags ?? [])];
         existing.Rules = body.Rules is null ? [] : [.. body.Rules];
+        existing.Prerequisites = body.Prerequisites is null ? [] : [.. body.Prerequisites];
 
         await store.Flags.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
         await NotifyChangeAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
@@ -306,6 +327,14 @@ internal static class AdminFlagsEndpoints
         return Results.Ok(new FlagActivityView(key, lastExposureAt, exposures.Count));
     }
 
+    private static async Task<IReadOnlyList<Flag>> AllFlagsIncludingArchivedAsync(
+        StorageFacade store, Guid environmentId, CancellationToken ct)
+    {
+        var active = await store.Flags.ListAsync(environmentId, ct).ConfigureAwait(false);
+        var archived = await store.Flags.ListArchivedAsync(environmentId, ct).ConfigureAwait(false);
+        return [.. active, .. archived];
+    }
+
     private static async Task<Environment?> ResolveEnvironmentAsync(
         StorageFacade store,
         string? envKey,
@@ -347,7 +376,8 @@ public sealed record FlagWriteRequest(
     string DefaultVariantKey,
     IReadOnlyList<Variant> Variants,
     IReadOnlyList<string>? Tags = null,
-    IReadOnlyList<Rule>? Rules = null)
+    IReadOnlyList<Rule>? Rules = null,
+    IReadOnlyList<Prerequisite>? Prerequisites = null)
 {
     internal Flag ToEntity(Guid environmentId, string actor) => new()
     {
@@ -360,6 +390,7 @@ public sealed record FlagWriteRequest(
         DefaultVariantKey = DefaultVariantKey,
         Variants = [.. Variants],
         Rules = Rules is null ? [] : [.. Rules],
+        Prerequisites = Prerequisites is null ? [] : [.. Prerequisites],
         EnvironmentId = environmentId,
         Tags = [.. (Tags ?? [])],
         Archived = false,

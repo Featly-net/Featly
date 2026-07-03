@@ -46,6 +46,7 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
         var existing = await db.Flags
             .Include(f => f.Variants)
             .Include(f => f.Rules)
+            .Include(f => f.Prerequisites)
             .FirstOrDefaultAsync(f => f.EnvironmentId == environmentId && f.Key == flag.Key, ct)
             .ConfigureAwait(false);
 
@@ -77,6 +78,11 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
             foreach (var rule in flag.Rules)
             {
                 existing.Rules.Add(rule);
+            }
+            existing.Prerequisites.Clear();
+            foreach (var prerequisite in flag.Prerequisites)
+            {
+                existing.Prerequisites.Add(prerequisite);
             }
         }
 

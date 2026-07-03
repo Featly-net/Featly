@@ -82,6 +82,7 @@ internal sealed class ChangeApplicationService(StorageFacade store, FeatlyServer
         existing.Variants = [.. body.Variants];
         existing.Tags = [.. (body.Tags ?? [])];
         existing.Rules = body.Rules is null ? [] : [.. body.Rules];
+        existing.Prerequisites = body.Prerequisites is null ? [] : [.. body.Prerequisites];
         await store.Flags.UpsertAsync(change.EnvironmentId, existing, actor, ct).ConfigureAwait(false);
     }
 
