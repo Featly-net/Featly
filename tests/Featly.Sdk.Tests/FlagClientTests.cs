@@ -70,6 +70,74 @@ public class FlagClientTests
         result.Reason.Should().Be(EvaluationReason.Default);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_resolves_a_prerequisite_from_the_same_cached_snapshot()
+    {
+        // ADR-0027: the SDK must resolve prerequisites purely from the local
+        // snapshot cache -- no server round-trip.
+        var envId = Guid.NewGuid();
+        var infra = NewFlag(envId, "infra-flag", enabled: true, defaultVariantKey: "on");
+        var dependent = NewFlag(envId, "dependent-flag", enabled: true, defaultVariantKey: "on");
+        dependent.Prerequisites = [new Prerequisite { FlagKey = "infra-flag", RequiredVariantKeys = ["on"] }];
+
+        var cache = new FeatlySnapshotCache();
+        cache.Replace(new ConfigSnapshot(
+            EnvironmentId: envId,
+            EnvironmentKey: "development",
+            At: DateTimeOffset.UtcNow,
+            Flags: [infra, dependent],
+            Segments: [],
+            Configs: []), etag: "\"abc\"");
+        var client = new FlagClient(cache, new NoOpAccessor());
+
+        var result = await client.EvaluateAsync("dependent-flag", defaultValue: false, ct: TestContext.Current.CancellationToken);
+
+        result.Value.Should().BeTrue();
+        result.Reason.Should().Be(EvaluationReason.Default);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_returns_PrerequisiteNotMet_when_the_prerequisite_flag_is_disabled()
+    {
+        var envId = Guid.NewGuid();
+        var infra = NewFlag(envId, "infra-flag", enabled: false, defaultVariantKey: "off");
+        var dependent = NewFlag(envId, "dependent-flag", enabled: true, defaultVariantKey: "off");
+        dependent.Prerequisites = [new Prerequisite { FlagKey = "infra-flag", RequiredVariantKeys = ["on"] }];
+
+        var cache = new FeatlySnapshotCache();
+        cache.Replace(new ConfigSnapshot(
+            EnvironmentId: envId,
+            EnvironmentKey: "development",
+            At: DateTimeOffset.UtcNow,
+            Flags: [infra, dependent],
+            Segments: [],
+            Configs: []), etag: "\"abc\"");
+        var client = new FlagClient(cache, new NoOpAccessor());
+
+        var result = await client.EvaluateAsync("dependent-flag", defaultValue: true, ct: TestContext.Current.CancellationToken);
+
+        result.Value.Should().BeFalse();
+        result.Reason.Should().Be(EvaluationReason.PrerequisiteNotMet);
+    }
+
+    private static Flag NewFlag(Guid envId, string key, bool enabled, string defaultVariantKey) => new()
+    {
+        Id = Guid.NewGuid(),
+        Key = key,
+        Name = key,
+        Type = FlagType.Boolean,
+        Enabled = enabled,
+        DefaultVariantKey = defaultVariantKey,
+        EnvironmentId = envId,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow,
+        Variants =
+        [
+            new Variant { Key = "on", Name = "On", Value = JsonSerializer.SerializeToElement(true) },
+            new Variant { Key = "off", Name = "Off", Value = JsonSerializer.SerializeToElement(false) },
+        ],
+    };
+
     private static ConfigSnapshot BuildSnapshot(bool enabled, string defaultVariantKey)
     {
         var envId = Guid.NewGuid();

@@ -25,6 +25,7 @@ public class AdminPreviewEndpointTests
 {
     private const string AdminKey = "admin-key-test";
     private const string SdkKey = "sdk-key-test";
+    private static readonly string[] OnVariantKeys = ["on"];
 
     [Fact]
     public async Task POST_preview_flag_rejects_unauthenticated_requests()
@@ -153,6 +154,50 @@ public class AdminPreviewEndpointTests
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
         result.GetProperty("reason").GetString().Should().Be("TargetingMatch");
         result.GetProperty("variantKey").GetString().Should().Be("on");
+    }
+
+    [Fact]
+    public async Task POST_preview_flag_honors_an_unmet_prerequisite()
+    {
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        await client.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "infra-flag",
+            name = "Infra",
+            type = "Boolean",
+            enabled = false,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        await client.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "dependent-flag",
+            name = "Dependent",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = true },
+                new { key = "off", name = "Off", value = false },
+            },
+            prerequisites = new[] { new { flagKey = "infra-flag", requiredVariantKeys = OnVariantKeys } },
+        }, TestContext.Current.CancellationToken);
+
+        var response = await client.PostAsJsonAsync("/api/admin/preview/flags/dependent-flag", new { }, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(TestJson.Options, cancellationToken: TestContext.Current.CancellationToken);
+        result.GetProperty("reason").GetString().Should().Be("PrerequisiteNotMet");
+        result.GetProperty("variantKey").GetString().Should().Be("off");
     }
 
     [Fact]
