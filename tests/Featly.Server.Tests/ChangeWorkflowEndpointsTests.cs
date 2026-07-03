@@ -103,6 +103,48 @@ public class ChangeWorkflowEndpointsTests
     }
 
     [Fact]
+    public async Task Schedule_sets_ScheduledApplyAt_on_an_approved_change()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+        await store.ApprovalPolicies.UpsertAsync(new ApprovalPolicy { Id = Guid.NewGuid(), EnvironmentId = env.Id, Required = true, MinApprovals = 1 }, ct);
+
+        using var alice = await CookieClientAsync(host, store, "alice-sched@example.com", ct);
+        using var bob = await CookieClientAsync(host, store, "bob-sched@example.com", ct, SystemRoles.ApproverKey);
+
+        var change = await ProposeFlagAsync(alice, "sched-flag", ct);
+        await bob.PostAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/approvals", UriKind.Relative), new { decision = "Approve" }, ct);
+
+        var scheduledAt = DateTimeOffset.UtcNow.AddDays(1);
+        var schedule = await bob.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new { scheduledApplyAt = scheduledAt }, ct);
+        schedule.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var reloaded = await store.PendingChanges.GetByIdAsync(change.Id, ct);
+        reloaded!.ScheduledApplyAt.Should().BeCloseTo(scheduledAt, TimeSpan.FromSeconds(1));
+
+        var cancel = await bob.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new ScheduleChangeRequest(null), ct);
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await store.PendingChanges.GetByIdAsync(change.Id, ct))!.ScheduledApplyAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Schedule_rejects_a_change_that_is_not_yet_approved()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        await DefaultProjectEnvAsync(store, ct);
+
+        using var alice = await CookieClientAsync(host, store, "alice-sched2@example.com", ct, SystemRoles.ApproverKey);
+        var change = await ProposeFlagAsync(alice, "sched-flag-2", ct);
+
+        var schedule = await alice.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new { scheduledApplyAt = DateTimeOffset.UtcNow.AddDays(1) }, ct);
+        schedule.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task Applying_a_gated_change_preserves_prerequisites()
     {
         // Regression coverage: ChangeApplicationService.ApplyFlagAsync must
