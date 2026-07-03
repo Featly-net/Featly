@@ -31,6 +31,7 @@ internal static class AdminChangesEndpoints
         admin.MapPost("/{id:guid}/approvals", DecideAsync).WithName("Featly.Admin.Changes.Decide").RequirePermission(Permission.ChangeApprove);
         admin.MapPost("/{id:guid}/apply", ApplyAsync).WithName("Featly.Admin.Changes.Apply").RequirePermission(Permission.ChangeApply);
         admin.MapPost("/{id:guid}/bypass", BypassAsync).WithName("Featly.Admin.Changes.Bypass").RequirePermission(Permission.ChangeBypass);
+        admin.MapPatch("/{id:guid}/schedule", ScheduleAsync).WithName("Featly.Admin.Changes.Schedule").RequirePermission(Permission.ChangeApply);
 
         return group;
     }
@@ -259,6 +260,43 @@ internal static class AdminChangesEndpoints
         return Results.Ok(change);
     }
 
+    /// <summary>
+    /// Schedules, reschedules, or cancels (<c>scheduledApplyAt: null</c>) an
+    /// automatic apply for an approved change (ADR-0028). Gated by the same
+    /// <see cref="Permission.ChangeApply"/> permission as manual Apply —
+    /// scheduling is "apply, but later," not a distinct capability. Actually
+    /// applying the change is <see cref="Approval.ScheduledApplyWorker"/>'s
+    /// job once <see cref="PendingChange.ScheduledApplyAt"/> is due.
+    /// </summary>
+    private static async Task<IResult> ScheduleAsync(
+        Guid id,
+        ScheduleChangeRequest body,
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        ClaimsPrincipal principal,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (change is null)
+        {
+            return Results.NotFound(new { error = $"Change '{id}' not found." });
+        }
+        if (change.Status != ChangeStatus.Approved)
+        {
+            return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be scheduled." });
+        }
+
+        change.ScheduledApplyAt = body.ScheduledApplyAt;
+        change.UpdatedAt = DateTimeOffset.UtcNow;
+        await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+
+        await events.PublishAsync(FeatlyEventTypes.ChangeScheduled, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            new { change.Id, change.EntityType, change.EntityKey, change.Action, scheduledApplyAt = body.ScheduledApplyAt }, ct).ConfigureAwait(false);
+
+        return Results.Ok(change);
+    }
+
     private static async Task<IResult> BypassAsync(
         Guid id,
         BypassRequest body,
@@ -349,3 +387,6 @@ public sealed record DecisionWriteRequest(ApprovalDecision Decision, string? Com
 
 /// <summary>Inbound shape for an emergency bypass.</summary>
 public sealed record BypassRequest(string Reason);
+
+/// <summary>Inbound shape for scheduling (or cancelling, when <c>null</c>) an automatic apply.</summary>
+public sealed record ScheduleChangeRequest(DateTimeOffset? ScheduledApplyAt);
