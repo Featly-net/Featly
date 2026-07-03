@@ -27,4 +27,11 @@ public enum EvaluationReason
 
     /// <summary>The requested key was not found in the snapshot.</summary>
     NotFound,
+
+    /// <summary>
+    /// One of the flag's <see cref="Prerequisite"/>s did not resolve to a
+    /// required variant. The default variant was returned instead of
+    /// evaluating the flag's own rules (ADR-0027).
+    /// </summary>
+    PrerequisiteNotMet,
 }

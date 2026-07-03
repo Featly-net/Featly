@@ -28,9 +28,11 @@ public class EvaluatorBenchmarks
     private Flag _fiveRulesThreeConditions = null!;
     private Flag _splitFlag = null!;
     private Flag _segmentFlag = null!;
+    private Flag _prerequisiteFlag = null!;
 
     private EvaluationContext _ctx = null!;
     private DictionarySegmentLookup _segmentLookup = null!;
+    private DictionaryFlagLookup _flagLookup = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -126,6 +128,12 @@ public class EvaluatorBenchmarks
                 Outcome = new RuleOutcome { VariantKey = "on" },
             },
         ]);
+
+        var infraFlag = BuildBoolFlag([], key: "infra", defaultVariantKey: "on");
+        _flagLookup = new DictionaryFlagLookup(new Dictionary<string, Flag> { ["infra"] = infraFlag });
+
+        _prerequisiteFlag = BuildBoolFlag([]);
+        _prerequisiteFlag.Prerequisites = [new Prerequisite { FlagKey = "infra", RequiredVariantKeys = ["on"] }];
     }
 
     [Benchmark(Description = "Boolean flag, no rules (degenerate fast path)", Baseline = true)]
@@ -148,16 +156,20 @@ public class EvaluatorBenchmarks
     public EvaluationResult<JsonElement> SegmentLookup()
         => Evaluator.EvaluateFlag(_segmentFlag, _ctx, Fallback, _segmentLookup);
 
+    [Benchmark(Description = "1 prerequisite, met (no rules of its own)")]
+    public EvaluationResult<JsonElement> PrerequisiteMet()
+        => Evaluator.EvaluateFlag(_prerequisiteFlag, _ctx, Fallback, flags: _flagLookup);
+
     // ---- helpers ----
 
-    private static Flag BuildBoolFlag(Rule[] rules) => new()
+    private static Flag BuildBoolFlag(Rule[] rules, string key = "demo", string defaultVariantKey = "off") => new()
     {
         Id = Guid.NewGuid(),
-        Key = "demo",
+        Key = key,
         Name = "Demo",
         Type = FlagType.Boolean,
         Enabled = true,
-        DefaultVariantKey = "off",
+        DefaultVariantKey = defaultVariantKey,
         EnvironmentId = EnvId,
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow,
