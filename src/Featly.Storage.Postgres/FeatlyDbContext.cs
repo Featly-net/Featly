@@ -13,13 +13,15 @@ namespace Featly.Storage.Postgres;
 /// ADR-0026.
 /// </summary>
 /// <remarks>
-/// This is PR 1 of the Postgres provider (issue #157): only the entities
-/// needed to prove the shape (<see cref="Project"/>, <see cref="Environment"/>,
-/// <see cref="Flag"/>) are mapped so far. The remaining entities land in
-/// follow-up PRs; only once every <c>IFeatlyStore</c> sub-store has a Postgres
-/// implementation does a <c>PostgresFeatlyStore</c> facade and
-/// <c>AddFeatlyPostgresStore()</c> DI extension get added — the facade can't
-/// compile as a partial implementation of <c>IFeatlyStore</c>.
+/// This is PR 2 of the Postgres provider (issue #157): <see cref="Project"/>,
+/// <see cref="Environment"/>, and <see cref="Flag"/> shipped in PR 1;
+/// <see cref="Segment"/> and <see cref="Config"/> land here, following the
+/// same shape (owned jsonb collections, native <c>timestamptz</c>). The
+/// remaining entities land in follow-up PRs; only once every
+/// <c>IFeatlyStore</c> sub-store has a Postgres implementation does a
+/// <c>PostgresFeatlyStore</c> facade and <c>AddFeatlyPostgresStore()</c> DI
+/// extension get added — the facade can't compile as a partial
+/// implementation of <c>IFeatlyStore</c>.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -30,6 +32,10 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Flag> Flags => Set<Flag>();
 
+    public DbSet<Segment> Segments => Set<Segment>();
+
+    public DbSet<Config> Configs => Set<Config>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -38,5 +44,7 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
         modelBuilder.ApplyConfiguration(new EnvironmentConfiguration());
         modelBuilder.ApplyConfiguration(new FlagConfiguration());
+        modelBuilder.ApplyConfiguration(new SegmentConfiguration());
+        modelBuilder.ApplyConfiguration(new ConfigConfiguration());
     }
 }
