@@ -103,6 +103,76 @@ public class ChangeWorkflowEndpointsTests
     }
 
     [Fact]
+    public async Task Applying_a_gated_change_preserves_prerequisites()
+    {
+        // Regression coverage: ChangeApplicationService.ApplyFlagAsync must
+        // copy Prerequisites onto the existing entity like every other
+        // field -- an earlier version silently dropped them on apply even
+        // though the direct (non-gated) PUT path persisted them correctly.
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+
+        using var admin = AdminClient(host);
+        // The infra flag exists before the environment goes ReadOnly-by-policy.
+        (await admin.PostAsJsonAsync(new Uri("/api/admin/flags", UriKind.Relative), MinimalFlag("infra-flag"), ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await admin.PostAsJsonAsync(new Uri("/api/admin/flags", UriKind.Relative), MinimalFlag("gated-flag"), ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        await store.ApprovalPolicies.UpsertAsync(new ApprovalPolicy
+        {
+            Id = Guid.NewGuid(),
+            EnvironmentId = env.Id,
+            Required = true,
+            MinApprovals = 1,
+            AuthorCanApproveOwnChange = false,
+        }, ct);
+
+        using var alice = await CookieClientAsync(host, store, "alice2@example.com", ct, SystemRoles.ApproverKey);
+        using var bob = await CookieClientAsync(host, store, "bob2@example.com", ct, SystemRoles.ApproverKey);
+
+        var updateBody = new
+        {
+            key = "gated-flag",
+            name = "gated-flag",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[]
+            {
+                new { key = "on", name = "On", value = (object)true },
+                new { key = "off", name = "Off", value = (object)false },
+            },
+            prerequisites = new[] { new { flagKey = "infra-flag", requiredVariantKeys = new[] { "on" } } },
+        };
+        var propose = await alice.PostAsJsonAsync(new Uri("/api/admin/changes", UriKind.Relative), new
+        {
+            entityType = "Flag",
+            entityKey = "gated-flag",
+            action = "Update",
+            proposedState = updateBody,
+        }, ct);
+        propose.StatusCode.Should().Be(HttpStatusCode.Created);
+        var change = (await propose.Content.ReadFromJsonAsync<PendingChange>(TestJson.Options, ct))!;
+
+        await bob.PostAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/approvals", UriKind.Relative), new { decision = "Approve" }, ct);
+        (await bob.PostAsync(new Uri($"/api/admin/changes/{change.Id}/apply", UriKind.Relative), content: null, ct))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var applied = await store.Flags.GetAsync(env.Id, "gated-flag", ct);
+        applied!.Prerequisites.Should().ContainSingle(p => p.FlagKey == "infra-flag");
+    }
+
+    private static HttpClient AdminClient(IHost host)
+    {
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        return client;
+    }
+
+    [Fact]
     public async Task Reject_marks_change_rejected_and_blocks_apply()
     {
         using var host = await BuildHostAsync();
