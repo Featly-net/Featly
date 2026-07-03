@@ -84,6 +84,7 @@ internal sealed class SqlitePendingChangeStore(IDbContextFactory<FeatlyDbContext
         existing.RejectionReason = change.RejectionReason;
         existing.WasEmergencyBypass = change.WasEmergencyBypass;
         existing.EmergencyReason = change.EmergencyReason;
+        existing.ScheduledApplyAt = change.ScheduledApplyAt;
         existing.UpdatedAt = change.UpdatedAt;
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
