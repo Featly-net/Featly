@@ -103,6 +103,38 @@ public class SqliteApprovalStoreTests
     }
 
     [Fact]
+    public async Task Update_persists_and_clears_ScheduledApplyAt()
+    {
+        // Regression: UpdateAsync re-fetches the tracked entity and copies
+        // fields one by one -- ScheduledApplyAt (ADR-0028) was missing from
+        // that list, so a PATCH .../schedule appeared to succeed (the response
+        // echoed the in-memory object) but silently never persisted. Caught
+        // via manual dashboard verification against a real SQLite-backed
+        // sample, not by the in-memory-store-backed endpoint tests, since the
+        // in-memory store just swaps the whole object instead of copying
+        // fields.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        var change = NewPending();
+        change.Status = ChangeStatus.Approved;
+        await host.Store.PendingChanges.CreateAsync(change, ct);
+
+        var scheduledAt = DateTimeOffset.UtcNow.AddHours(1);
+        change.ScheduledApplyAt = scheduledAt;
+        await host.Store.PendingChanges.UpdateAsync(change, ct);
+
+        var loaded = await host.Store.PendingChanges.GetByIdAsync(change.Id, ct);
+        loaded!.ScheduledApplyAt.Should().BeCloseTo(scheduledAt, TimeSpan.FromSeconds(1));
+
+        change.ScheduledApplyAt = null;
+        await host.Store.PendingChanges.UpdateAsync(change, ct);
+
+        var reloaded = await host.Store.PendingChanges.GetByIdAsync(change.Id, ct);
+        reloaded!.ScheduledApplyAt.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ListByStatus_and_ListOpenForEntity_filter_correctly()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
