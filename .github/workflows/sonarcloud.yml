@@ -73,13 +73,18 @@ jobs:
         run: dotnet restore Featly.sln
 
       - name: Begin SonarCloud analysis
+        # Reference the shell env var ($SONAR_TOKEN), not a direct
+        # ${{ secrets.SONAR_TOKEN }} expansion -- the latter literally inlines
+        # the secret's value into the runner's script text before it ever
+        # executes (flagged by SonarCloud's own githubactions:S7636 rule).
+        # Reading it from the process environment at runtime avoids that.
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
           dotnet-sonarscanner begin
           /k:"Featly-net_Featly"
           /o:"featly"
-          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
@@ -107,4 +112,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
