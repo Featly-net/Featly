@@ -83,15 +83,9 @@ public static class PrerequisiteValidator
             }
 
             visiting.Add(node);
-            if (edges.TryGetValue(node, out var dependsOn))
+            if (edges.TryGetValue(node, out var dependsOn) && dependsOn.Any(HasCycle))
             {
-                foreach (var dependency in dependsOn)
-                {
-                    if (HasCycle(dependency))
-                    {
-                        return true;
-                    }
-                }
+                return true;
             }
             visiting.Remove(node);
             return false;
