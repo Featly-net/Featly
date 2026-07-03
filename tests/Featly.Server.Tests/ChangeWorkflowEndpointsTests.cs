@@ -124,7 +124,7 @@ public class ChangeWorkflowEndpointsTests
         var reloaded = await store.PendingChanges.GetByIdAsync(change.Id, ct);
         reloaded!.ScheduledApplyAt.Should().BeCloseTo(scheduledAt, TimeSpan.FromSeconds(1));
 
-        var cancel = await bob.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new { scheduledApplyAt = (DateTimeOffset?)null }, ct);
+        var cancel = await bob.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new ScheduleChangeRequest(null), ct);
         cancel.StatusCode.Should().Be(HttpStatusCode.OK);
         (await store.PendingChanges.GetByIdAsync(change.Id, ct))!.ScheduledApplyAt.Should().BeNull();
     }
