@@ -101,6 +101,15 @@ internal sealed class FlagConfiguration : IEntityTypeConfiguration<Flag>
             });
         });
 
+        // Prerequisites persisted as a single jsonb document alongside Rules —
+        // small, always loaded with the parent flag (ADR-0027).
+        builder.OwnsMany(f => f.Prerequisites, prerequisites =>
+        {
+            prerequisites.ToJson();
+            prerequisites.Property(p => p.FlagKey).IsRequired().HasMaxLength(128);
+            prerequisites.PrimitiveCollection(p => p.RequiredVariantKeys);
+        });
+
         builder.HasIndex(f => new { f.EnvironmentId, f.Key })
             .IsUnique();
 
