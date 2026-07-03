@@ -13,17 +13,21 @@ namespace Featly.Storage.Postgres;
 /// ADR-0026.
 /// </summary>
 /// <remarks>
-/// This is PR 4 of the Postgres provider (issue #157): <see cref="Project"/>,
-/// <see cref="Environment"/>, and <see cref="Flag"/> shipped in PR 1;
-/// <see cref="Segment"/> and <see cref="Config"/> in PR 2; the RBAC entities
-/// in PR 3. The approval-workflow entities (<see cref="PendingChange"/>,
-/// <see cref="ApprovalPolicy"/>) and the two remaining singletons
-/// (<see cref="ApiKey"/>, <see cref="SystemSetting"/>) land here. The
-/// remaining entities land in follow-up PRs; only once every
-/// <c>IFeatlyStore</c> sub-store has a Postgres implementation does a
-/// <c>PostgresFeatlyStore</c> facade and <c>AddFeatlyPostgresStore()</c> DI
-/// extension get added — the facade can't compile as a partial
-/// implementation of <c>IFeatlyStore</c>.
+/// This is PR 5 of the Postgres provider (issue #157) — the last entity
+/// batch. <see cref="Project"/>, <see cref="Environment"/>, and
+/// <see cref="Flag"/> shipped in PR 1; <see cref="Segment"/> and
+/// <see cref="Config"/> in PR 2; the RBAC entities in PR 3; the
+/// approval-workflow entities plus <see cref="ApiKey"/>/<see cref="SystemSetting"/>
+/// in PR 4. <see cref="Experiment"/>, <see cref="Event"/>,
+/// <see cref="Assignment"/>, <see cref="WebhookEndpoint"/>,
+/// <see cref="WebhookDelivery"/>, and <see cref="AuditEntry"/> land here —
+/// every entity <c>IFeatlyStore</c> needs. The <c>PostgresFeatlyStore</c>
+/// facade and <c>AddFeatlyPostgresStore()</c> DI extension, plus a real
+/// Postgres <c>LISTEN</c>/<c>NOTIFY</c>-backed <c>IChangeNotifier</c> (ADR-0026;
+/// the in-process notifier the other 18 sub-stores don't need doesn't carry
+/// over from SQLite), are a separate follow-up PR — a persistent background
+/// listener connection is a materially different piece of infrastructure
+/// than an EF Core store and deserves its own review.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -56,6 +60,18 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
+    public DbSet<Experiment> Experiments => Set<Experiment>();
+
+    public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+
+    public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
+
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -75,5 +91,11 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
         modelBuilder.ApplyConfiguration(new SystemSettingConfiguration());
+        modelBuilder.ApplyConfiguration(new ExperimentConfiguration());
+        modelBuilder.ApplyConfiguration(new EventConfiguration());
+        modelBuilder.ApplyConfiguration(new AssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookEndpointConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookDeliveryConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
     }
 }
