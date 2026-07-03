@@ -79,6 +79,17 @@ public sealed class PendingChange
     /// <summary>Reason supplied with an emergency bypass.</summary>
     public string? EmergencyReason { get; set; }
 
+    /// <summary>
+    /// When set (UTC), a background worker applies this change automatically
+    /// once it is due, instead of waiting for a human to click Apply
+    /// (ADR-0028). Only meaningful while <see cref="Status"/> is
+    /// <see cref="ChangeStatus.Approved"/> — the worker drives the same
+    /// apply + staleness path manual Apply uses; a change that goes stale
+    /// before its scheduled time is skipped, not forced. <c>null</c> means no
+    /// schedule (manual apply only).
+    /// </summary>
+    public DateTimeOffset? ScheduledApplyAt { get; set; }
+
     /// <summary>Audit: when the change was proposed.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 
