@@ -4017,12 +4017,12 @@
     function parseCsv(s) {
         return String(s || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
     }
-    var cryptoIdFallbackCounter = 0;
+    let cryptoIdFallbackCounter = 0;
     function cryptoId() {
         // Fallback path is only ever used for a synthetic client-side DOM/list
         // key, never a security-sensitive value -- a monotonic counter is
         // simpler than Math.random() and avoids it entirely.
-        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : "id-" + Date.now().toString(36) + "-" + (cryptoIdFallbackCounter++).toString(36);
+        return crypto?.randomUUID?.() ?? "id-" + Date.now().toString(36) + "-" + (cryptoIdFallbackCounter++).toString(36);
     }
 
     // ============================================================
