@@ -72,11 +72,18 @@ jobs:
 
       - name: Install smoke dependencies
         working-directory: tests/dashboard-smoke
-        run: npm ci
+        # --ignore-scripts: our one dependency (playwright) needs no install-time
+        # lifecycle script to fetch itself -- the browser binary comes from the
+        # explicit "Install Chromium" step below.
+        run: npm ci --ignore-scripts
 
       - name: Install Chromium
         working-directory: tests/dashboard-smoke
-        run: npx playwright install --with-deps chromium
+        # Invoke the locally-installed, package.json-pinned playwright binary
+        # directly rather than "npx playwright ...", which can fetch and run an
+        # arbitrary on-demand version's lifecycle scripts if the local one were
+        # ever missing.
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run dashboard smoke
         working-directory: tests/dashboard-smoke

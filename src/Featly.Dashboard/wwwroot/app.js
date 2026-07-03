@@ -3906,7 +3906,7 @@
     // ============================================================
     function renderPreviewPanel(kind, entityKey) {
         var panelId = "preview-panel";
-        var title = kind === "flag" ? "Test this context" : "Test this context";
+        var title = "Test this context";
         return '<section class="preview-panel" id="' + panelId + '">'
             + '<h2>' + esc(title) + '</h2>'
             + '<p class="muted">Server-side dry-run against the current saved ' + esc(kind) + ' &mdash; nothing is persisted.</p>'
@@ -4017,8 +4017,12 @@
     function parseCsv(s) {
         return String(s || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
     }
+    let cryptoIdFallbackCounter = 0;
     function cryptoId() {
-        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : "id-" + Math.random().toString(36).slice(2);
+        // Fallback path is only ever used for a synthetic client-side DOM/list
+        // key, never a security-sensitive value -- a monotonic counter is
+        // simpler than Math.random() and avoids it entirely.
+        return crypto?.randomUUID?.() ?? "id-" + Date.now().toString(36) + "-" + (cryptoIdFallbackCounter++).toString(36);
     }
 
     // ============================================================

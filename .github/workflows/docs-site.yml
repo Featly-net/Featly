@@ -18,11 +18,9 @@ on:
       - '.github/workflows/docs-site.yml'
   workflow_dispatch: {}
 
-# Allow the deploy job to publish to Pages.
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Least-privilege: each job below declares only the permission it actually
+# needs, rather than one workflow-wide grant every job inherits.
+permissions: {}
 
 # One deploy at a time; never cancel an in-progress production deploy.
 concurrency:
@@ -33,12 +31,14 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Build site
-        uses: withastro/action@v6
+        uses: withastro/action@b7d53628f8b666036b0238aadb0b984a2a489f26 # v6
         with:
           path: docs-site
 
@@ -48,6 +48,9 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
