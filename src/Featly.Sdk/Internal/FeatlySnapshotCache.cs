@@ -18,6 +18,7 @@ internal sealed class FeatlySnapshotCache
         FlagsByKey: ImmutableDictionary<string, Flag>.Empty,
         ConfigsByKey: ImmutableDictionary<string, Config>.Empty,
         SegmentLookup: DictionarySegmentLookup.Empty,
+        FlagLookup: DictionaryFlagLookup.Empty,
         ExperimentsByFlagKey: ImmutableDictionary<string, Experiment>.Empty);
 
     public CacheEntry Current => Volatile.Read(ref _current);
@@ -31,6 +32,7 @@ internal sealed class FeatlySnapshotCache
         {
             flagsBuilder[flag.Key] = flag;
         }
+        var flagsByKey = flagsBuilder.ToImmutable();
 
         var configsBuilder = ImmutableDictionary.CreateBuilder<string, Config>(StringComparer.Ordinal);
         foreach (var config in snapshot.Configs)
@@ -44,6 +46,7 @@ internal sealed class FeatlySnapshotCache
             segmentsBuilder[segment.Key] = segment;
         }
         var segmentLookup = new DictionarySegmentLookup(segmentsBuilder.ToImmutable());
+        var flagLookup = new DictionaryFlagLookup(flagsByKey);
 
         // The server only ships active experiments in the snapshot. Index them
         // by the flag they cover so the flag client can check coverage in O(1)
@@ -58,9 +61,10 @@ internal sealed class FeatlySnapshotCache
         Volatile.Write(ref _current, new CacheEntry(
             Snapshot: snapshot,
             Etag: etag,
-            FlagsByKey: flagsBuilder.ToImmutable(),
+            FlagsByKey: flagsByKey,
             ConfigsByKey: configsBuilder.ToImmutable(),
             SegmentLookup: segmentLookup,
+            FlagLookup: flagLookup,
             ExperimentsByFlagKey: experimentsBuilder.ToImmutable()));
     }
 
@@ -72,6 +76,9 @@ internal sealed class FeatlySnapshotCache
 
     /// <summary>The lookup the engine consults to resolve <c>InSegment</c> conditions.</summary>
     public ISegmentLookup Segments => Current.SegmentLookup;
+
+    /// <summary>The lookup the engine consults to resolve a flag's <see cref="Prerequisite"/>s (ADR-0027).</summary>
+    public IFlagLookup Flags => Current.FlagLookup;
 
     /// <summary>
     /// Returns the active experiment covering <paramref name="flagKey"/>, or
@@ -86,5 +93,6 @@ internal sealed class FeatlySnapshotCache
         ImmutableDictionary<string, Flag> FlagsByKey,
         ImmutableDictionary<string, Config> ConfigsByKey,
         ISegmentLookup SegmentLookup,
+        IFlagLookup FlagLookup,
         ImmutableDictionary<string, Experiment> ExperimentsByFlagKey);
 }

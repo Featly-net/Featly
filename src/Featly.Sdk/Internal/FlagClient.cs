@@ -34,7 +34,7 @@ internal sealed class FlagClient(
         var resolved = ResolveContext(context);
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(false);
-        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments);
+        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments, cache.Flags);
         raw = ApplyExperiment(key, resolved, raw);
         return ValueTask.FromResult(raw.As(false));
     }
@@ -47,7 +47,7 @@ internal sealed class FlagClient(
         var resolved = ResolveContext(context);
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(defaultValue);
-        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments);
+        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments, cache.Flags);
         raw = ApplyExperiment(key, resolved, raw);
         return ValueTask.FromResult(raw.As(defaultValue));
     }
@@ -60,7 +60,7 @@ internal sealed class FlagClient(
         var resolved = ResolveContext(context);
         var flag = cache.TryGetFlag(key);
         var fallback = JsonSerializer.SerializeToElement(defaultValue);
-        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments);
+        var raw = Evaluator.EvaluateFlag(flag, resolved, fallback, cache.Segments, cache.Flags);
         raw = ApplyExperiment(key, resolved, raw);
 
         var typed = new EvaluationResult<T>(

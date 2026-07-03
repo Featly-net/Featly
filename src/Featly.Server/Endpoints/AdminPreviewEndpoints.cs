@@ -68,7 +68,17 @@ internal static class AdminPreviewEndpoints
         var context = body.ToEvaluationContext();
         var fallback = JsonSerializer.SerializeToElement<object?>(null);
 
-        var result = Evaluator.EvaluateFlag(flag, context, fallback, lookup);
+        // Only load every flag in the environment when this one actually
+        // declares prerequisites (ADR-0027) — the common preview stays a
+        // single-flag read.
+        IFlagLookup? flagLookup = null;
+        if (flag.Prerequisites.Count > 0)
+        {
+            var allFlags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
+            flagLookup = BuildFlagLookup(allFlags);
+        }
+
+        var result = Evaluator.EvaluateFlag(flag, context, fallback, lookup, flagLookup);
         metrics.RecordEvaluation("flag", result.Reason.ToString());
         return Results.Ok(result);
     }
@@ -113,6 +123,16 @@ internal static class AdminPreviewEndpoints
             map[segment.Key] = segment;
         }
         return new DictionarySegmentLookup(map);
+    }
+
+    private static DictionaryFlagLookup BuildFlagLookup(IReadOnlyList<Flag> flags)
+    {
+        var map = new Dictionary<string, Flag>(StringComparer.Ordinal);
+        foreach (var flag in flags)
+        {
+            map[flag.Key] = flag;
+        }
+        return new DictionaryFlagLookup(map);
     }
 
     private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
