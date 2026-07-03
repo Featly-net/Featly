@@ -3,6 +3,7 @@ using System;
 using Featly.Storage.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Featly.Storage.Sqlite.Migrations
 {
     [DbContext(typeof(FeatlyDbContext))]
-    partial class FeatlyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260703154142_AddScheduledApplyAt")]
+    partial class AddScheduledApplyAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -1053,32 +1056,6 @@ namespace Featly.Storage.Sqlite.Migrations
 
             modelBuilder.Entity("Featly.Flag", b =>
                 {
-                    b.OwnsMany("Featly.Prerequisite", "Prerequisites", b1 =>
-                        {
-                            b1.Property<Guid>("FlagId");
-
-                            b1.Property<int>("__synthesizedOrdinal")
-                                .ValueGeneratedOnAddOrUpdate();
-
-                            b1.Property<string>("FlagKey")
-                                .IsRequired()
-                                .HasMaxLength(128);
-
-                            b1.PrimitiveCollection<string>("RequiredVariantKeys")
-                                .IsRequired();
-
-                            b1.HasKey("FlagId", "__synthesizedOrdinal");
-
-                            b1.ToTable("Flags");
-
-                            b1
-                                .ToJson("Prerequisites")
-                                .HasColumnType("TEXT");
-
-                            b1.WithOwner()
-                                .HasForeignKey("FlagId");
-                        });
-
                     b.OwnsMany("Featly.Rule", "Rules", b1 =>
                         {
                             b1.Property<Guid>("FlagId");
@@ -1216,8 +1193,6 @@ namespace Featly.Storage.Sqlite.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("FlagId");
                         });
-
-                    b.Navigation("Prerequisites");
 
                     b.Navigation("Rules");
 

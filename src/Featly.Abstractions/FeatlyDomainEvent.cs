@@ -104,6 +104,16 @@ public static class FeatlyEventTypes
     /// <summary>A change was applied to the underlying entity.</summary>
     public const string ChangeApplied = "change.applied";
 
+    /// <summary>A change's automatic apply time was set, changed, or cleared (ADR-0028).</summary>
+    public const string ChangeScheduled = "change.scheduled";
+
+    /// <summary>
+    /// A scheduled apply was skipped because the change had gone stale by the
+    /// time it became due (ADR-0028) — the underlying entity changed after
+    /// approval, so the worker refused to force it through.
+    /// </summary>
+    public const string ChangeScheduleSkippedStale = "change.schedule_skipped_stale";
+
     /// <summary>A role was assigned to a user or group.</summary>
     public const string RoleAssigned = "role.assigned";
 

@@ -48,6 +48,10 @@ internal sealed class PendingChangeConfiguration : IEntityTypeConfiguration<Pend
             .HasConversion(
                 static v => v.HasValue ? v.Value.UtcTicks : (long?)null,
                 static t => t.HasValue ? new DateTimeOffset(t.Value, TimeSpan.Zero) : (DateTimeOffset?)null);
+        builder.Property(c => c.ScheduledApplyAt)
+            .HasConversion(
+                static v => v.HasValue ? v.Value.UtcTicks : (long?)null,
+                static t => t.HasValue ? new DateTimeOffset(t.Value, TimeSpan.Zero) : (DateTimeOffset?)null);
 
         // Approvals + comments persisted as owned JSON, same nested-JSON pattern
         // as Flag.Rules / Config.Rules.
@@ -73,5 +77,8 @@ internal sealed class PendingChangeConfiguration : IEntityTypeConfiguration<Pend
 
         builder.HasIndex(c => c.Status);
         builder.HasIndex(c => c.EnvironmentId);
+        // The scheduled-apply worker polls "Approved rows due to apply" —
+        // mirrors WebhookDelivery's (Status, NextAttemptAt) index shape.
+        builder.HasIndex(c => new { c.Status, c.ScheduledApplyAt });
     }
 }
