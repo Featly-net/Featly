@@ -78,11 +78,16 @@ jobs:
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
+      # RequiresPostgres tests need a real Postgres reachable, which the
+      # GitHub-hosted Windows runner can't provide (Actions service containers
+      # are Linux-only) — they run in the dedicated postgres-tests job below
+      # instead, against a real service container on ubuntu-latest.
       - name: Test
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
           --no-build
+          --filter "Category!=RequiresPostgres"
           --logger "trx;LogFileName=test-results.trx"
           --logger "console;verbosity=normal"
           --collect:"XPlat Code Coverage"
@@ -93,6 +98,69 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}
+          path: TestResults/**/*
+          if-no-files-found: warn
+          retention-days: 14
+
+  postgres-tests:
+    name: postgres provider tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: featly
+          POSTGRES_PASSWORD: featly
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore tests/Featly.Storage.Postgres.Tests/Featly.Storage.Postgres.Tests.csproj
+
+      - name: Test
+        env:
+          FEATLY_POSTGRES_TEST_HOST: localhost
+          FEATLY_POSTGRES_TEST_PORT: "5432"
+          FEATLY_POSTGRES_TEST_USER: featly
+          FEATLY_POSTGRES_TEST_PASSWORD: featly
+        run: >
+          dotnet test tests/Featly.Storage.Postgres.Tests/Featly.Storage.Postgres.Tests.csproj
+          --configuration ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-postgres
           path: TestResults/**/*
           if-no-files-found: warn
           retention-days: 14
