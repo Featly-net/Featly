@@ -1057,9 +1057,9 @@ The Inbox screen merges three streams for the current user:
 
 This becomes the single "what do I need to look at" screen.
 
-### Scheduled apply (planned)
+### Scheduled apply
 
-An approved change may carry a future `ScheduledApplyAt` instead of waiting for a human to click Apply — see [ADR-0028](adr/0028-scheduled-releases.md). A background worker drives the same `ChangeApplicationService` + staleness check manual Apply uses; a change that went stale before its scheduled time is skipped, not forced, and the author is notified.
+An approved change may carry a future `ScheduledApplyAt` instead of waiting for a human to click Apply — see [ADR-0028](adr/0028-scheduled-releases.md). `ScheduledApplyWorker` (shaped like the webhook delivery worker) polls for `Approved` changes past their schedule and drives them through the same `ChangeApplicationService` + `ChangeStaleness` check manual Apply uses; a change that went stale before its scheduled time is skipped (moved to `Stale`, `change.schedule_skipped_stale` fires), not forced. There is no HTTP request behind a scheduled apply, so the worker records itself as the actor (no `AppliedByUserId`) rather than resolving a `ClaimsPrincipal`. **No `PATCH .../schedule` endpoint yet** — that and the dashboard picker land in the remaining PRs of this slice.
 
 ---
 
