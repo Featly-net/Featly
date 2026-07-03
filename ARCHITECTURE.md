@@ -617,6 +617,10 @@ Bucketing uses **MurmurHash3** (128-bit, truncated to 32 bits) over `targetingKe
 
 Config evaluation reuses the same rule-matching logic. The only difference is the outcome shape: `ConfigRule.Value` is the typed value directly instead of selecting a variant. This is what allows configs to have full targeting (Option B in the design discussion) without duplicating engine code.
 
+### Flag prerequisites (planned)
+
+One flag may declare that another flag must resolve to a specific variant before its own rules are considered — see [ADR-0027](adr/0027-flag-prerequisites.md). Resolution stays local (no server round-trip) and costs nothing for the majority of flags that declare no prerequisite.
+
 ---
 
 ## 6. SDK
@@ -1355,6 +1359,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-024](docs/adr/0024-modular-feature-areas.md) | Modular feature areas via DI toggles (hybrid; package split deferred) | Accepted |
 | [ADR-025](docs/adr/0025-documentation-site-astro-starlight.md) | Documentation site on Astro Starlight, hosted on GitHub Pages | Accepted |
 | [ADR-026](docs/adr/0026-postgres-storage-provider.md) | PostgreSQL storage provider — Npgsql, own DbContext per provider, LISTEN/NOTIFY | Accepted |
+| [ADR-027](docs/adr/0027-flag-prerequisites.md) | Flag prerequisites — AND-only, write-time cycle rejection, opt-in evaluation cost | Accepted |
 
 ---
 
