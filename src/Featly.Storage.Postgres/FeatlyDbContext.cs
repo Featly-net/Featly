@@ -13,10 +13,11 @@ namespace Featly.Storage.Postgres;
 /// ADR-0026.
 /// </summary>
 /// <remarks>
-/// This is PR 2 of the Postgres provider (issue #157): <see cref="Project"/>,
+/// This is PR 3 of the Postgres provider (issue #157): <see cref="Project"/>,
 /// <see cref="Environment"/>, and <see cref="Flag"/> shipped in PR 1;
-/// <see cref="Segment"/> and <see cref="Config"/> land here, following the
-/// same shape (owned jsonb collections, native <c>timestamptz</c>). The
+/// <see cref="Segment"/> and <see cref="Config"/> in PR 2; the RBAC entities
+/// (<see cref="User"/>, <see cref="Role"/>, <see cref="RoleAssignment"/>,
+/// <see cref="UserGroup"/>, <see cref="RoleUpgradeRequest"/>) land here. The
 /// remaining entities land in follow-up PRs; only once every
 /// <c>IFeatlyStore</c> sub-store has a Postgres implementation does a
 /// <c>PostgresFeatlyStore</c> facade and <c>AddFeatlyPostgresStore()</c> DI
@@ -36,6 +37,16 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Config> Configs => Set<Config>();
 
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
+    public DbSet<UserGroup> UserGroups => Set<UserGroup>();
+
+    public DbSet<RoleUpgradeRequest> RoleUpgradeRequests => Set<RoleUpgradeRequest>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -46,5 +57,10 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new FlagConfiguration());
         modelBuilder.ApplyConfiguration(new SegmentConfiguration());
         modelBuilder.ApplyConfiguration(new ConfigConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new UserGroupConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleUpgradeRequestConfiguration());
     }
 }
