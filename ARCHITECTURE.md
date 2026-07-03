@@ -1057,6 +1057,10 @@ The Inbox screen merges three streams for the current user:
 
 This becomes the single "what do I need to look at" screen.
 
+### Scheduled apply (planned)
+
+An approved change may carry a future `ScheduledApplyAt` instead of waiting for a human to click Apply — see [ADR-0028](adr/0028-scheduled-releases.md). A background worker drives the same `ChangeApplicationService` + staleness check manual Apply uses; a change that went stale before its scheduled time is skipped, not forced, and the author is notified.
+
 ---
 
 ## 13. Safety mechanisms
@@ -1361,6 +1365,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-025](docs/adr/0025-documentation-site-astro-starlight.md) | Documentation site on Astro Starlight, hosted on GitHub Pages | Accepted |
 | [ADR-026](docs/adr/0026-postgres-storage-provider.md) | PostgreSQL storage provider — Npgsql, own DbContext per provider, LISTEN/NOTIFY | Accepted |
 | [ADR-027](docs/adr/0027-flag-prerequisites.md) | Flag prerequisites — AND-only, write-time cycle rejection, opt-in evaluation cost | Accepted |
+| [ADR-028](docs/adr/0028-scheduled-releases.md) | Scheduled releases — a field on `PendingChange`, drained by a staleness-aware worker | Accepted |
 
 ---
 
