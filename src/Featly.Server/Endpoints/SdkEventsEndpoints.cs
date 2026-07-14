@@ -27,6 +27,7 @@ internal static class SdkEventsEndpoints
 
     private static async Task<IResult> IngestAsync(
         EventBatchRequest body,
+        HttpContext http,
         StorageFacade store,
         FeatlyServerMetrics metrics,
         string? env,
@@ -34,10 +35,17 @@ internal static class SdkEventsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var bound = SdkEnvironmentScope.BoundEnvironmentId(http.User);
+        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+        if (!SdkEnvironmentScope.Allows(bound, environment.Id))
+        {
+            return Results.Problem(
+                detail: "This API key is scoped to a different environment.",
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         if (body.Events is null || body.Events.Count == 0)
@@ -92,8 +100,15 @@ internal static class SdkEventsEndpoints
         return Results.Accepted(value: new { ingested = events.Count });
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, Guid? boundEnvironmentId, CancellationToken ct)
     {
+        // Env-bound credential with no explicit env resolves to the key's own
+        // environment (see SdkEndpoints for the same rationale).
+        if (string.IsNullOrWhiteSpace(envKey) && boundEnvironmentId is Guid boundId)
+        {
+            return await store.Environments.GetByIdAsync(boundId, ct).ConfigureAwait(false);
+        }
+
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {

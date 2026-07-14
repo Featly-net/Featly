@@ -36,12 +36,20 @@ internal static class SdkEndpoints
 
     private static async Task GetConfigAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var bound = Authentication.SdkEnvironmentScope.BoundEnvironmentId(context.User);
+        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             await context.Response.WriteAsJsonAsync(
                 new { error = $"Environment '{env}' not found." }, ct).ConfigureAwait(false);
+            return;
+        }
+        if (!Authentication.SdkEnvironmentScope.Allows(bound, environment.Id))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(
+                new { error = "This API key is scoped to a different environment." }, ct).ConfigureAwait(false);
             return;
         }
 
@@ -94,10 +102,16 @@ internal static class SdkEndpoints
 
     private static async Task StreamAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var bound = Authentication.SdkEnvironmentScope.BoundEnvironmentId(context.User);
+        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        if (!Authentication.SdkEnvironmentScope.Allows(bound, environment.Id))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 
@@ -170,8 +184,16 @@ internal static class SdkEndpoints
         await response.Body.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, Guid? boundEnvironmentId, CancellationToken ct)
     {
+        // When the credential is env-bound and the caller didn't name an
+        // environment, resolve to the key's own environment rather than the
+        // project default — ergonomic and can't leak across environments.
+        if (string.IsNullOrWhiteSpace(envKey) && boundEnvironmentId is Guid boundId)
+        {
+            return await store.Environments.GetByIdAsync(boundId, ct).ConfigureAwait(false);
+        }
+
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {

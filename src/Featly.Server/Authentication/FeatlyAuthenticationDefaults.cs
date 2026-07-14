@@ -25,6 +25,14 @@ public static class FeatlyAuthenticationDefaults
     public const string ScopeClaim = "featly:scope";
 
     /// <summary>
+    /// Claim type carrying the environment id a persisted <see cref="ApiKey"/> is
+    /// bound to. Present only for persisted keys; the static bootstrap key carries
+    /// no binding and is treated as wildcard. SDK endpoints reject a request whose
+    /// resolved environment differs from this claim (ADR-0009 scope enforcement).
+    /// </summary>
+    public const string EnvironmentClaim = "featly:env";
+
+    /// <summary>
     /// Claim type carrying the per-session anti-forgery token inside the
     /// dashboard cookie. Mutating requests authenticated by the cookie must
     /// echo it in the <see cref="CsrfHeader"/> header (synchronizer token).

@@ -53,7 +53,7 @@ header credential is not ambiently attached by browsers.
 ## 5. Authentication & authorization boundaries — **OK**
 
 - Two Bearer schemes (`AdminWrite`, `SdkRead`) + a cookie scheme; the admin policy accepts admin-Bearer or cookie, the SDK policy accepts SDK-Bearer only. Per-route `RequirePermission(...)` enforces RBAC ([ADR-0014](adr/0014-cumulative-permissions-no-deny.md)).
-- API keys are environment-scoped ([ADR-0009](adr/0009-api-keys-per-environment-scoped.md)); a leaked SDK key reads one environment and cannot mutate.
+- API keys are environment-scoped ([ADR-0009](adr/0009-api-keys-per-environment-scoped.md)); a leaked SDK key reads one environment and cannot mutate. The binding is **enforced at request time**: a persisted key carries its `EnvironmentId` as a principal claim, and the SDK endpoints (`/config`, `/stream`, `/events`) return `403` when the resolved environment differs from it — so a key scoped to `staging` cannot read `production` by changing `?env=` (regression test `SdkEnvironmentScopeTests`). The static appsettings bootstrap key is intentionally unbound (wildcard) for the single-environment quickstart.
 - **M12:** a user-bound key resolves to the bound user's identity, so its effective permissions are that user's role assignments — **never a blanket admin** (a dedicated test proves a bound key with no admin role is forbidden from admin writes). The Bearer DB lookup runs only when a token is present and the static key didn't match, so the common paths pay no extra cost.
 
 ## 6. The bootstrap endpoint — **OK**
