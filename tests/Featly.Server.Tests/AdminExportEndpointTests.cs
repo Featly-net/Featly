@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
+using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Tests;
 
@@ -129,6 +130,46 @@ public class AdminExportEndpointTests
 
         var flags = await admin.GetFromJsonAsync<List<Flag>>("/api/admin/flags", TestJson.Options, ct);
         flags!.Should().Contain(f => f.Key == "imported-flag");
+    }
+
+    [Fact]
+    public async Task Import_is_rejected_when_the_environment_is_readonly()
+    {
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var admin = AdminClient(host);
+
+        var project = await store.Projects.GetDefaultAsync(ct);
+        var env = await store.Environments.GetDefaultAsync(project!.Id, ct);
+        await store.Environments.SetReadOnlyAsync(env!.Id, readOnly: true, ct);
+
+        var bundle = new
+        {
+            environmentKey = env.Key,
+            exportedAt = "2026-05-29T00:00:00Z",
+            flags = new[]
+            {
+                new
+                {
+                    key = "frozen-import",
+                    name = "Frozen",
+                    environmentId = "00000000-0000-0000-0000-000000000000",
+                    type = "Boolean",
+                    enabled = true,
+                    defaultVariantKey = "off",
+                    variants = new[] { new { key = "off", name = "Off", value = false } },
+                    rules = Array.Empty<object>(),
+                    tags = Array.Empty<string>(),
+                },
+            },
+            configs = Array.Empty<object>(),
+            segments = Array.Empty<object>(),
+        };
+
+        var resp = await admin.PostAsJsonAsync(ImportUri, bundle, ct);
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await store.Flags.GetAsync(env.Id, "frozen-import", ct)).Should().BeNull();
     }
 
     [Fact]

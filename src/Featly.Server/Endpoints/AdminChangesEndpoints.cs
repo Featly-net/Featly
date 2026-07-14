@@ -222,10 +222,10 @@ internal static class AdminChangesEndpoints
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
-        var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
+        var (change, loadError) = await LoadWritableChangeAsync(id, store, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return Results.NotFound(new { error = $"Change '{id}' not found." });
+            return loadError!;
         }
         if (change.Status != ChangeStatus.Approved)
         {
@@ -277,10 +277,10 @@ internal static class AdminChangesEndpoints
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
+        var (change, loadError) = await LoadWritableChangeAsync(id, store, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return Results.NotFound(new { error = $"Change '{id}' not found." });
+            return loadError!;
         }
         if (change.Status != ChangeStatus.Approved)
         {
@@ -308,10 +308,10 @@ internal static class AdminChangesEndpoints
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
+        var (change, loadError) = await LoadWritableChangeAsync(id, store, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return Results.NotFound(new { error = $"Change '{id}' not found." });
+            return loadError!;
         }
         if (change.Status is not (ChangeStatus.Pending or ChangeStatus.Approved))
         {
@@ -367,6 +367,26 @@ internal static class AdminChangesEndpoints
         return string.IsNullOrWhiteSpace(envKey)
             ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
             : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
+    }
+
+    // Loads a change for a write path (apply/bypass/schedule) and enforces the
+    // shared preconditions: it must exist, and its environment must not be frozen
+    // — applying, bypassing, or scheduling all mutate the environment, so a
+    // ReadOnly freeze rejects them too, not just Propose (issue #203). Returns the
+    // change, or a non-null error result to return as-is.
+    private static async Task<(PendingChange? Change, IResult? Error)> LoadWritableChangeAsync(Guid id, StorageFacade store, CancellationToken ct)
+    {
+        var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (change is null)
+        {
+            return (null, Results.NotFound(new { error = $"Change '{id}' not found." }));
+        }
+        var environment = await store.Environments.GetByIdAsync(change.EnvironmentId, ct).ConfigureAwait(false);
+        if (environment is { ReadOnly: true })
+        {
+            return (null, Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden));
+        }
+        return (change, null);
     }
 }
 
