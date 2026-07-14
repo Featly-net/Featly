@@ -27,12 +27,13 @@ internal sealed class FeatlyRateLimitFilter : IEndpointFilter
     {
         var http = context.HttpContext;
         var settings = http.RequestServices.GetRequiredService<IFeatlySettingsProvider>().RateLimit;
-        if (!settings.Enabled)
+
+        var surface = SurfaceOf(http.Request.Path);
+        if (!settings.Enabled && !IsAlwaysThrottled(surface, http.Request.Method))
         {
             return await next(context).ConfigureAwait(false);
         }
 
-        var surface = SurfaceOf(http.Request.Path);
         var limit = surface switch
         {
             FeatlyRateSurface.Auth => settings.AuthPermitsPerMinute,
@@ -50,6 +51,14 @@ internal sealed class FeatlyRateLimitFilter : IEndpointFilter
 
         return await next(context).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Credential-submitting auth POSTs (login) are always throttled as a
+    /// brute-force / Argon2-DoS guard, even when the master switch is off. Read
+    /// probes and the admin/SDK surfaces stay opt-in (issue #190).
+    /// </summary>
+    private static bool IsAlwaysThrottled(FeatlyRateSurface surface, string method)
+        => surface == FeatlyRateSurface.Auth && HttpMethods.IsPost(method);
 
     private static FeatlyRateSurface SurfaceOf(PathString path)
     {
