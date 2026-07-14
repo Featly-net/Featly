@@ -25,8 +25,8 @@ internal static class AdminSegmentsEndpoints
 
         admin.MapGet("/", ListAsync).WithName("Featly.Admin.Segments.List").RequirePermission(Permission.SegmentRead);
         admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Segments.Get").RequirePermission(Permission.SegmentRead);
-        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Segments.Create").RequirePermission(Permission.SegmentCreate);
-        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Segments.Update").RequirePermission(Permission.SegmentUpdate);
+        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Segments.Create").RequirePermission(Permission.SegmentCreate).RequirePayloadLimits();
+        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Segments.Update").RequirePermission(Permission.SegmentUpdate).RequirePayloadLimits();
         admin.MapPost("/{key}/archive", ArchiveAsync).WithName("Featly.Admin.Segments.Archive").RequirePermission(Permission.SegmentArchive);
         admin.MapPost("/{key}/unarchive", UnarchiveAsync).WithName("Featly.Admin.Segments.Unarchive").RequirePermission(Permission.SegmentArchive);
         admin.MapDelete("/{key}", DeleteAsync).WithName("Featly.Admin.Segments.Delete").RequirePermission(Permission.SegmentArchive);

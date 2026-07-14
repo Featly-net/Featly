@@ -23,8 +23,8 @@ internal static class AdminFlagsEndpoints
         admin.MapGet("/", ListFlagsAsync).WithName("Featly.Admin.Flags.List").RequirePermission(Permission.FlagRead);
         admin.MapGet("/stale", GetStaleFlagsAsync).WithName("Featly.Admin.Flags.Stale").RequirePermission(Permission.FlagRead);
         admin.MapGet("/{key}", GetFlagAsync).WithName("Featly.Admin.Flags.Get").RequirePermission(Permission.FlagRead);
-        admin.MapPost("/", CreateFlagAsync).WithName("Featly.Admin.Flags.Create").RequirePermission(Permission.FlagCreate);
-        admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update").RequirePermission(Permission.FlagUpdate);
+        admin.MapPost("/", CreateFlagAsync).WithName("Featly.Admin.Flags.Create").RequirePermission(Permission.FlagCreate).RequirePayloadLimits();
+        admin.MapPut("/{key}", UpdateFlagAsync).WithName("Featly.Admin.Flags.Update").RequirePermission(Permission.FlagUpdate).RequirePayloadLimits();
         admin.MapPost("/{key}/archive", ArchiveFlagAsync).WithName("Featly.Admin.Flags.Archive").RequirePermission(Permission.FlagArchive);
         admin.MapPost("/{key}/unarchive", UnarchiveFlagAsync).WithName("Featly.Admin.Flags.Unarchive").RequirePermission(Permission.FlagArchive);
         admin.MapGet("/{key}/activity", GetFlagActivityAsync).WithName("Featly.Admin.Flags.Activity").RequirePermission(Permission.FlagRead);

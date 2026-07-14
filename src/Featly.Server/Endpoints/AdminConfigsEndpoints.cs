@@ -25,8 +25,8 @@ internal static class AdminConfigsEndpoints
 
         admin.MapGet("/", ListAsync).WithName("Featly.Admin.Configs.List").RequirePermission(Permission.ConfigRead);
         admin.MapGet("/{key}", GetAsync).WithName("Featly.Admin.Configs.Get").RequirePermission(Permission.ConfigRead);
-        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Configs.Create").RequirePermission(Permission.ConfigCreate);
-        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Configs.Update").RequirePermission(Permission.ConfigUpdate);
+        admin.MapPost("/", CreateAsync).WithName("Featly.Admin.Configs.Create").RequirePermission(Permission.ConfigCreate).RequirePayloadLimits();
+        admin.MapPut("/{key}", UpdateAsync).WithName("Featly.Admin.Configs.Update").RequirePermission(Permission.ConfigUpdate).RequirePayloadLimits();
         admin.MapPost("/{key}/archive", ArchiveAsync).WithName("Featly.Admin.Configs.Archive").RequirePermission(Permission.ConfigArchive);
         admin.MapPost("/{key}/unarchive", UnarchiveAsync).WithName("Featly.Admin.Configs.Unarchive").RequirePermission(Permission.ConfigArchive);
 
