@@ -65,4 +65,23 @@ public class HostBootTests : IClassFixture<WebApplicationFactory<Program>>
         js.StatusCode.Should().Be(HttpStatusCode.OK);
         js.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript");
     }
+
+    [Theory]
+    [InlineData("/featly")]
+    [InlineData("/featly/flags")]
+    [InlineData("/featly/app.js")]
+    public async Task Dashboard_responses_carry_security_headers(string path)
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync(new Uri(path, UriKind.Relative), TestContext.Current.CancellationToken);
+
+        response.Headers.TryGetValues("Content-Security-Policy", out var csp).Should().BeTrue();
+        csp!.Single().Should().Contain("frame-ancestors 'none'").And.Contain("script-src 'self'");
+        response.Headers.TryGetValues("X-Content-Type-Options", out var nosniff).Should().BeTrue();
+        nosniff!.Single().Should().Be("nosniff");
+        response.Headers.TryGetValues("X-Frame-Options", out var frame).Should().BeTrue();
+        frame!.Single().Should().Be("DENY");
+        response.Headers.TryGetValues("Referrer-Policy", out var referrer).Should().BeTrue();
+        referrer!.Single().Should().Be("no-referrer");
+    }
 }
