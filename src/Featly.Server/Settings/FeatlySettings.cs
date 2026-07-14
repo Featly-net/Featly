@@ -116,10 +116,19 @@ public sealed class FeatlyApprovalDefaultsSettings
 /// </summary>
 public sealed class FeatlyRateLimitSettings
 {
-    /// <summary>Master switch. Off by default so embedded hosts opt in.</summary>
+    /// <summary>
+    /// Master switch for the admin and SDK surfaces. Off by default so embedded
+    /// hosts opt in. The auth surface's login POST is throttled regardless (see
+    /// <see cref="AuthPermitsPerMinute"/>).
+    /// </summary>
     public bool Enabled { get; set; }
 
-    /// <summary>Requests per minute per client against <c>/api/auth/*</c> (login brute-force guard). 0 = unlimited.</summary>
+    /// <summary>
+    /// Requests per minute per client against <c>/api/auth/*</c> (login
+    /// brute-force / Argon2-DoS guard). Applies to credential-submitting POSTs
+    /// even when <see cref="Enabled"/> is off; read probes (GET <c>/me</c>) are
+    /// throttled only when the master switch is on. 0 = unlimited.
+    /// </summary>
     public int AuthPermitsPerMinute { get; set; } = 10;
 
     /// <summary>Requests per minute per client against <c>/api/admin/*</c>. 0 = unlimited.</summary>

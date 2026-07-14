@@ -68,6 +68,46 @@ public class RateLimitingTests
     }
 
     [Fact]
+    public async Task Login_is_throttled_even_when_rate_limiting_is_disabled()
+    {
+        // Default config: master switch off, AuthPermitsPerMinute default (10).
+        // Login POST is an unauthenticated brute-force / Argon2-DoS vector, so it
+        // is always throttled regardless of the opt-in switch (issue #190).
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var anon = host.GetTestClient();
+
+        HttpStatusCode last = HttpStatusCode.OK;
+        for (var i = 0; i < 12; i++)
+        {
+            last = (await anon.PostAsJsonAsync(LoginUri, new { apiKey = "wrong" }, ct)).StatusCode;
+            if (last == HttpStatusCode.TooManyRequests)
+            {
+                break;
+            }
+        }
+
+        last.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Me_probe_is_not_throttled_when_rate_limiting_is_disabled()
+    {
+        // GET /api/auth/me is a read probe the dashboard hits on boot; the
+        // always-on auth guard only covers credential-submitting POSTs, so /me
+        // stays unthrottled while the master switch is off.
+        using var host = await BuildHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var anon = host.GetTestClient();
+
+        var meUri = new Uri("/api/auth/me", UriKind.Relative);
+        for (var i = 0; i < 30; i++)
+        {
+            (await anon.GetAsync(meUri, ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+    }
+
+    [Fact]
     public async Task Admin_surface_throttles_per_identity_with_its_own_limit()
     {
         using var host = await BuildHostAsync(new()

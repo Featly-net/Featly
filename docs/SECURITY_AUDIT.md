@@ -90,6 +90,8 @@ the system Admin role by default; grant them to a custom role for backup tooling
 ## Follow-ups (tracked)
 
 Recorded in [DEFERRED.md](DEFERRED.md): API-key rotation/expiry (**shipped**),
-request rate limiting (**shipped** — opt-in `Featly:RateLimiting`, DB-overridable),
-a synchronizer-token CSRF layer (**shipped** — `X-Featly-Csrf`), and a dedicated
-backup/import permission (**shipped**). All four v0.1.0-audit follow-ups are closed.
+request rate limiting (**shipped** — opt-in `Featly:RateLimiting`, DB-overridable;
+the auth-surface login POST is throttled **even when the master switch is off**
+as a brute-force / Argon2-DoS guard, issue #190), a synchronizer-token CSRF layer
+(**shipped** — `X-Featly-Csrf`), and a dedicated backup/import permission
+(**shipped**). All four v0.1.0-audit follow-ups are closed.
