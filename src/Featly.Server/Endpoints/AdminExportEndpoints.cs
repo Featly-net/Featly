@@ -67,6 +67,13 @@ internal static class AdminExportEndpoints
         {
             return Results.BadRequest(new { error = "No matching environment found; create a project + environment first." });
         }
+        // Import writes definitions directly; a ReadOnly freeze must reject it too
+        // (issue #203). It still bypasses the approval gate by design (a backup
+        // restore is an admin-only, all-or-nothing operation).
+        if (environment.ReadOnly)
+        {
+            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
 
         var actor = ResolveActor(user);
         var envId = environment.Id;

@@ -227,6 +227,10 @@ internal static class AdminChangesEndpoints
         {
             return Results.NotFound(new { error = $"Change '{id}' not found." });
         }
+        if (await IsReadOnlyAsync(store, change.EnvironmentId, ct).ConfigureAwait(false))
+        {
+            return ReadOnlyResult();
+        }
         if (change.Status != ChangeStatus.Approved)
         {
             return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be applied." });
@@ -282,6 +286,10 @@ internal static class AdminChangesEndpoints
         {
             return Results.NotFound(new { error = $"Change '{id}' not found." });
         }
+        if (await IsReadOnlyAsync(store, change.EnvironmentId, ct).ConfigureAwait(false))
+        {
+            return ReadOnlyResult();
+        }
         if (change.Status != ChangeStatus.Approved)
         {
             return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be scheduled." });
@@ -312,6 +320,10 @@ internal static class AdminChangesEndpoints
         if (change is null)
         {
             return Results.NotFound(new { error = $"Change '{id}' not found." });
+        }
+        if (await IsReadOnlyAsync(store, change.EnvironmentId, ct).ConfigureAwait(false))
+        {
+            return ReadOnlyResult();
         }
         if (change.Status is not (ChangeStatus.Pending or ChangeStatus.Approved))
         {
@@ -368,6 +380,18 @@ internal static class AdminChangesEndpoints
             ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
             : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
     }
+
+    // Applying, bypassing, or scheduling a change all mutate the target
+    // environment, so a ReadOnly freeze must reject them too — not just the
+    // Propose path (issue #203).
+    private static async Task<bool> IsReadOnlyAsync(StorageFacade store, Guid environmentId, CancellationToken ct)
+    {
+        var environment = await store.Environments.GetByIdAsync(environmentId, ct).ConfigureAwait(false);
+        return environment is { ReadOnly: true };
+    }
+
+    private static IResult ReadOnlyResult()
+        => Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 /// <summary>Inbound shape for proposing a change.</summary>

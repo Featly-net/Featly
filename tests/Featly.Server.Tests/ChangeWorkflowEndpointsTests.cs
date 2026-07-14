@@ -282,6 +282,34 @@ public class ChangeWorkflowEndpointsTests
     }
 
     [Fact]
+    public async Task ReadOnly_environment_rejects_apply_bypass_and_schedule()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+
+        using var alice = await CookieClientAsync(host, store, "alice@example.com", ct);
+        var change = await ProposeFlagAsync(alice, "frozen-flag", ct);
+
+        // Freeze the environment after the change exists.
+        await store.Environments.SetReadOnlyAsync(env.Id, readOnly: true, ct);
+
+        using var admin = host.GetTestClient();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+
+        (await admin.PostAsync(new Uri($"/api/admin/changes/{change.Id}/apply", UriKind.Relative), content: null, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.PostAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/bypass", UriKind.Relative), new { reason = "incident" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.PatchAsJsonAsync(new Uri($"/api/admin/changes/{change.Id}/schedule", UriKind.Relative), new { scheduledApplyAt = DateTimeOffset.UtcNow.AddHours(1) }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // The freeze held: nothing was applied.
+        (await store.Flags.GetAsync(env.Id, "frozen-flag", ct)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task Comment_is_appended_to_the_change()
     {
         using var host = await BuildHostAsync();
