@@ -30,10 +30,10 @@ internal sealed class FeatlyRateLimitFilter : IEndpointFilter
 
         var surface = SurfaceOf(http.Request.Path);
 
-        // The auth surface is throttled even when the master switch is off: a
-        // credential-submitting POST to /api/auth/* (login) is an unauthenticated
-        // brute-force / Argon2-DoS vector, so it always carries a per-client
-        // limit. Read probes (GET /me) and the opt-in admin/SDK surfaces still
+        // The auth surface stays throttled even when the master switch is off.
+        // A credential-submitting login POST is an unauthenticated brute-force
+        // and Argon2-DoS vector, so it always carries a per-client limit. Read
+        // probes on the auth surface and the opt-in admin and SDK surfaces still
         // honor the master switch (issue #190).
         var alwaysOnAuth = surface == FeatlyRateSurface.Auth && HttpMethods.IsPost(http.Request.Method);
         if (!settings.Enabled && !alwaysOnAuth)
