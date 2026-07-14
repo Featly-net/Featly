@@ -16,11 +16,14 @@ namespace Featly.Server.Authentication;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Scope: M6 PR 6C wires the filter onto every admin endpoint group. The
-/// project / environment ids passed to the checker are <c>Guid.Empty</c> /
-/// <c>null</c> until M7 introduces project-scoped role assignments. That's
-/// fine — the v0.0.x default checker ignores those parameters and resolves
-/// against a single per-user role.
+/// Scope: M6 PR 6C wires the filter onto every admin endpoint group. The filter
+/// resolves the request's target environment (from the <c>?env=</c> query the
+/// entity endpoints use, else the default environment) and passes it — with the
+/// default project — to the checker, so environment-scoped role assignments are
+/// honored (issue #193). A wildcard assignment (<c>EnvironmentId == null</c>)
+/// still matches any environment, so this only tightens scoping; it never
+/// broadens it. Multi-project request scoping (a per-request project selector)
+/// remains future work.
 /// </para>
 /// </remarks>
 internal sealed class PermissionFilter(Permission required) : IEndpointFilter
@@ -47,7 +50,14 @@ internal sealed class PermissionFilter(Permission required) : IEndpointFilter
         // so audit downstream has something to point at. Cheap and idempotent.
         await AutoProvisionAsync(http, resolved).ConfigureAwait(false);
 
-        var ok = await checker.HasAsync(resolved, projectId: Guid.Empty, environmentId: null, required, http.RequestAborted).ConfigureAwait(false);
+        // Resolve the request's (project, environment) so environment-scoped role
+        // assignments are actually honored (issue #193). The environment comes
+        // from the ?env= query the entity endpoints already use; absent that, the
+        // default environment. A wildcard assignment (EnvironmentId == null) still
+        // matches any concrete environment, so this only tightens scoping.
+        var (projectId, environmentId) = await ResolveScopeAsync(http).ConfigureAwait(false);
+
+        var ok = await checker.HasAsync(resolved, projectId, environmentId, required, http.RequestAborted).ConfigureAwait(false);
         if (!ok)
         {
             return Results.Problem(
@@ -56,6 +66,35 @@ internal sealed class PermissionFilter(Permission required) : IEndpointFilter
         }
 
         return await next(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolves the (project, environment) a request targets for the permission
+    /// check. Reads the <c>env</c> query the entity endpoints use; falls back to
+    /// the default environment. Returns <c>(Guid.Empty, null)</c> when the store
+    /// or default project is unavailable, preserving the pre-#193 behavior.
+    /// </summary>
+    private static async Task<(Guid ProjectId, Guid? EnvironmentId)> ResolveScopeAsync(HttpContext http)
+    {
+        var store = http.RequestServices.GetService<StorageFacade>();
+        if (store is null)
+        {
+            return (Guid.Empty, null);
+        }
+
+        var ct = http.RequestAborted;
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return (Guid.Empty, null);
+        }
+
+        var envKey = http.Request.Query["env"].ToString();
+        var environment = string.IsNullOrWhiteSpace(envKey)
+            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
+            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
+
+        return (project.Id, environment?.Id);
     }
 
     private static async Task AutoProvisionAsync(HttpContext http, ResolvedUser resolved)
