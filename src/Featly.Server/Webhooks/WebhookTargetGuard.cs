@@ -104,17 +104,23 @@ internal static class WebhookTargetGuard
         {
             var b = address.GetAddressBytes();
             // 10.0.0.0/8
-            if (b[0] == 10) { return true; }
+            if (b[0] == 10)
+            { return true; }
             // 172.16.0.0/12
-            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) { return true; }
+            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+            { return true; }
             // 192.168.0.0/16
-            if (b[0] == 192 && b[1] == 168) { return true; }
+            if (b[0] == 192 && b[1] == 168)
+            { return true; }
             // 169.254.0.0/16 (link-local, incl. 169.254.169.254 metadata)
-            if (b[0] == 169 && b[1] == 254) { return true; }
+            if (b[0] == 169 && b[1] == 254)
+            { return true; }
             // 100.64.0.0/10 (carrier-grade NAT)
-            if (b[0] == 100 && b[1] >= 64 && b[1] <= 127) { return true; }
+            if (b[0] == 100 && b[1] >= 64 && b[1] <= 127)
+            { return true; }
             // 0.0.0.0/8 and 255.255.255.255
-            if (b[0] == 0 || address.Equals(IPAddress.Broadcast)) { return true; }
+            if (b[0] == 0 || address.Equals(IPAddress.Broadcast))
+            { return true; }
             return false;
         }
 
