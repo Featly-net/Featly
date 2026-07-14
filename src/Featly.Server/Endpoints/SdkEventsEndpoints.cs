@@ -36,7 +36,7 @@ internal static class SdkEventsEndpoints
         ArgumentNullException.ThrowIfNull(body);
 
         var bound = SdkEnvironmentScope.BoundEnvironmentId(http.User);
-        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
+        var environment = await SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -100,25 +100,6 @@ internal static class SdkEventsEndpoints
         return Results.Accepted(value: new { ingested = events.Count });
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, Guid? boundEnvironmentId, CancellationToken ct)
-    {
-        // Env-bound credential with no explicit env resolves to the key's own
-        // environment (see SdkEndpoints for the same rationale).
-        if (string.IsNullOrWhiteSpace(envKey) && boundEnvironmentId is Guid boundId)
-        {
-            return await store.Environments.GetByIdAsync(boundId, ct).ConfigureAwait(false);
-        }
-
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 }
 
 /// <summary>A batch of telemetry events posted by the SDK.</summary>

@@ -1,11 +1,14 @@
 using System.Security.Claims;
+using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Authentication;
 
 /// <summary>
-/// Helper for enforcing an SDK credential's environment binding (ADR-0009). A
-/// persisted <see cref="ApiKey"/> carries a <see cref="FeatlyAuthenticationDefaults.EnvironmentClaim"/>;
-/// the static bootstrap key does not and is treated as wildcard.
+/// Helper for resolving and enforcing an SDK credential's environment binding
+/// (ADR-0009, issue #188). A persisted <see cref="ApiKey"/> carries a
+/// <see cref="FeatlyAuthenticationDefaults.EnvironmentClaim"/>; the static
+/// bootstrap key does not and is treated as wildcard. Shared by the SDK config,
+/// stream, and events endpoints so the resolution/enforcement logic lives once.
 /// </summary>
 internal static class SdkEnvironmentScope
 {
@@ -27,4 +30,29 @@ internal static class SdkEnvironmentScope
     /// </summary>
     public static bool Allows(Guid? boundEnvironmentId, Guid targetEnvironmentId)
         => boundEnvironmentId is not Guid bound || bound == targetEnvironmentId;
+
+    /// <summary>
+    /// Resolves the environment an SDK request targets. When the credential is
+    /// env-bound and the caller didn't name an environment, resolution goes to
+    /// the key's own environment (ergonomic and leak-free) rather than the
+    /// project default. Returns <c>null</c> when nothing resolves.
+    /// </summary>
+    public static async Task<Environment?> ResolveAsync(
+        StorageFacade store, string? envKey, Guid? boundEnvironmentId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(envKey) && boundEnvironmentId is Guid boundId)
+        {
+            return await store.Environments.GetByIdAsync(boundId, ct).ConfigureAwait(false);
+        }
+
+        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(envKey)
+            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
+            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
+    }
 }

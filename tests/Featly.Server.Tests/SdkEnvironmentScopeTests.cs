@@ -61,6 +61,57 @@ public class SdkEnvironmentScopeTests
         implicitEnv.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task Persisted_sdk_key_stream_is_denied_a_different_environment()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, _) = await MintSdkKeyForDefaultEnvironmentAsync(host, ct);
+        var otherEnv = await CreateEnvironmentAsync(store, "staging", ct);
+
+        var sdk = host.GetTestClient();
+        sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await sdk.GetAsync(
+            new Uri($"/api/sdk/stream?env={otherEnv.Key}", UriKind.Relative), ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Persisted_sdk_key_events_are_scoped_to_its_environment()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, envKey) = await MintSdkKeyForDefaultEnvironmentAsync(host, ct);
+        var otherEnv = await CreateEnvironmentAsync(store, "staging", ct);
+
+        var sdk = host.GetTestClient();
+        sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var batch = new
+        {
+            events = new[]
+            {
+                new { type = "Custom", subjectKey = "u1", customKey = "checkout.completed" },
+            },
+        };
+
+        // Cross-environment ingest is rejected.
+        var denied = await sdk.PostAsJsonAsync(
+            new Uri($"/api/sdk/events?env={otherEnv.Key}", UriKind.Relative), batch, ct);
+        denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Ingest into the key's own environment is accepted.
+        var allowed = await sdk.PostAsJsonAsync(
+            new Uri($"/api/sdk/events?env={envKey}", UriKind.Relative), batch, ct);
+        allowed.StatusCode.Should().Be(HttpStatusCode.Accepted);
+    }
+
     private static async Task<(string Token, string EnvKey)> MintSdkKeyForDefaultEnvironmentAsync(IHost host, CancellationToken ct)
     {
         var store = host.Services.GetRequiredService<StorageFacade>();

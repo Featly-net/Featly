@@ -37,7 +37,7 @@ internal static class SdkEndpoints
     private static async Task GetConfigAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
         var bound = Authentication.SdkEnvironmentScope.BoundEnvironmentId(context.User);
-        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
+        var environment = await Authentication.SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -103,7 +103,7 @@ internal static class SdkEndpoints
     private static async Task StreamAsync(HttpContext context, StorageFacade store, Telemetry.SdkActivityTracker activity, string? env, CancellationToken ct)
     {
         var bound = Authentication.SdkEnvironmentScope.BoundEnvironmentId(context.User);
-        var environment = await ResolveEnvironmentAsync(store, env, bound, ct).ConfigureAwait(false);
+        var environment = await Authentication.SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -182,27 +182,6 @@ internal static class SdkEndpoints
             .ToString();
         await response.WriteAsync(frame, Encoding.UTF8, ct).ConfigureAwait(false);
         await response.Body.FlushAsync(ct).ConfigureAwait(false);
-    }
-
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, Guid? boundEnvironmentId, CancellationToken ct)
-    {
-        // When the credential is env-bound and the caller didn't name an
-        // environment, resolve to the key's own environment rather than the
-        // project default — ergonomic and can't leak across environments.
-        if (string.IsNullOrWhiteSpace(envKey) && boundEnvironmentId is Guid boundId)
-        {
-            return await store.Environments.GetByIdAsync(boundId, ct).ConfigureAwait(false);
-        }
-
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
     }
 
     private static string ComputeEtag(Guid environmentId, DateTimeOffset? mostRecent)
