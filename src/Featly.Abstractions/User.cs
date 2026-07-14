@@ -8,14 +8,10 @@ namespace Featly;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The identifier is whatever the configured <c>IFeatlyUserResolver</c>
-/// extracts from the request — typically an email, an OIDC <c>sub</c>,
-/// or a username from basic-auth. It is the join key used by every
+/// The identifier is whatever the server resolves from the authenticated
+/// principal — typically an email or OIDC <c>sub</c> from the cookie session,
+/// or the name/bound-user of a Bearer API key. It is the join key used by every
 /// downstream lookup (role assignments, audit, change comments).
-/// </para>
-/// <para>
-/// M6 PR 6A defines the entity shape and storage. The auth pipeline
-/// that consumes it ships in M6 PR 6B / 6C.
 /// </para>
 /// </remarks>
 public sealed class User

@@ -907,29 +907,20 @@ The dashboard hides Project and Environment selectors when only one of each exis
 
 ## 10. Authentication and authorization pipeline
 
-Three pluggable interfaces. Authentication is up to you (any ASP.NET Core scheme works). Featly handles authorization — given an authenticated user, what can they do?
+Featly ships a concrete authentication surface (it is not "bring your own gate"): two Bearer API-key schemes and a dashboard cookie session. Authorization is then a permission check over the authenticated identity — given a resolved user, what can they do?
 
-### `IFeatlyDashboardAuthorizationFilter`
+### Authentication surface
 
-The gate. Mirrors Hangfire's `IDashboardAuthorizationFilter`. Receives the `HttpContext`, returns `bool`. Default implementation allows only loopback requests, exactly like Hangfire. Plug your own implementation to accept Cookie / JWT / OIDC / mTLS / API key in header / IP allowlist / any combination.
+- **Bearer API keys.** Two schemes, `AdminWrite` and `SdkRead` (`FeatlyApiKeyAuthenticationHandler`). A presented token is matched against the static `appsettings` bootstrap key (constant-time) and then against persisted `ApiKey` rows (prefix lookup + Argon2id verify). A user-bound key resolves to that user's identity; an unbound key is a service principal named after the key. SDK keys additionally carry their environment binding as a claim, enforced per request (ADR-0009).
+- **Dashboard cookie session.** `POST /api/auth/login` accepts an admin-scoped API key and mints an `HttpOnly; SameSite=Strict` cookie (`FeatlyCookie` scheme). The dashboard uses the cookie; SDK clients and scripts use Bearer. Cookie-authenticated mutations carry a synchronizer-token (`X-Featly-Csrf`) minted at login; Bearer requests are exempt (a header credential is not ambiently attached by browsers).
 
-```csharp
-public interface IFeatlyDashboardAuthorizationFilter
-{
-    Task<bool> AuthorizeAsync(HttpContext context);
-}
-```
+The admin authorization policy accepts either an `AdminWrite` Bearer token or the cookie; the SDK policy accepts an `SdkRead` Bearer token only. Auth failures return `401`/`403` as JSON, never a redirect.
 
-### `IFeatlyUserResolver`
+### `ResolvedUser`
 
-Extracts a stable `Identifier` (email or `sub` claim) and a `DisplayName` from `HttpContext.User`. The default implementation reads the standard claims. Override for unusual identity setups.
+The server resolves a stable `Identifier` (email, OIDC `sub`, or a key's bound-user / name) and `DisplayName` from the authenticated principal and passes it to the permission checker.
 
 ```csharp
-public interface IFeatlyUserResolver
-{
-    Task<ResolvedUser?> ResolveAsync(HttpContext context, CancellationToken ct);
-}
-
 public sealed record ResolvedUser(string Identifier, string DisplayName);
 ```
 
@@ -951,7 +942,7 @@ public interface IFeatlyPermissionChecker
 Configurable in `AuthorizationSettings` (which itself respects the DB-overrides-config precedence described in Section 11):
 
 - **`AutoProvisionMode = Open`** — A successfully authenticated identifier with no matching `User` row is auto-created as `Viewer` in the default Project. Good for development and the embedded quickstart.
-- **`AutoProvisionMode = Closed`** — Unknown identifiers receive `403`, even after passing the auth filter. The Admin must pre-create the `User` row. Recommended for production.
+- **`AutoProvisionMode = Closed`** — Unknown identifiers receive `403`, even after authenticating. The Admin must pre-create the `User` row. Recommended for production.
 
 Default contextual: `Open` in `IHostEnvironment.IsDevelopment()`, `Closed` otherwise. The user can override either way explicitly.
 
@@ -959,9 +950,9 @@ Default contextual: `Open` in `IHostEnvironment.IsDevelopment()`, `Closed` other
 
 To break the chicken-and-egg of "I need an Admin to create the first Admin", Featly reads `AuthorizationSettings.BootstrapAdminIdentifier` (DB first, then `appsettings.json:Featly:Authorization:BootstrapAdminIdentifier`). On boot, if no User row matches, Featly auto-creates the bootstrap admin with full permissions. After the first admin exists, normal rules apply.
 
-### Built-in basic auth filter
+### Quickstart credential
 
-For environments where wiring an identity provider is overkill (local dev, demos), Featly ships an optional `FeatlyBasicAuthFilter` that reads username/password from `appsettings.json`. Opt-in via DI registration; production deployments should plug in a real auth scheme.
+For environments where wiring an identity provider is overkill (local dev, demos), the static `appsettings` admin key (`Featly:Server:AdminApiKey`) is a zero-setup bootstrap credential: present it as a Bearer token or exchange it for a dashboard cookie at `POST /api/auth/login`. Production deployments should instead mint user-bound API keys (revocable, attributable) and set a real `BootstrapAdminIdentifier`.
 
 ---
 
