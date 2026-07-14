@@ -97,6 +97,52 @@ public class WritePayloadLimitsTests
         (await store.Flags.GetAsync(env!.Id, "too-many", ct)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task Create_config_with_too_many_rules_is_rejected()
+    {
+        using var host = await BuildHostAsync();
+        var admin = host.GetTestClient();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        var rules = Enumerable.Range(0, WritePayloadLimits.MaxRules + 1)
+            .Select(_ => new { order = 0, value = 1, conditions = Array.Empty<object>() })
+            .ToArray();
+
+        var resp = await admin.PostAsJsonAsync("/api/admin/configs", new
+        {
+            key = "too-many-rules",
+            name = "Too many",
+            type = "Int",
+            defaultValue = 0,
+            rules,
+        }, ct);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_segment_with_too_many_conditions_is_rejected()
+    {
+        using var host = await BuildHostAsync();
+        var admin = host.GetTestClient();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        var conditions = Enumerable.Range(0, WritePayloadLimits.MaxConditionsPerRule + 1)
+            .Select(_ => new { attribute = "user.plan", @operator = "Equals", value = "pro" })
+            .ToArray();
+
+        var resp = await admin.PostAsJsonAsync("/api/admin/segments", new
+        {
+            key = "too-many-conditions",
+            name = "Too many",
+            conditions,
+        }, ct);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static async Task<IHost> BuildHostAsync()
     {
         var builder = new HostBuilder()
