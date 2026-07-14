@@ -145,6 +145,47 @@ public class SdkActivityTests
         activity.TotalExposureEvents.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Stream_opens_and_emits_the_hello_frame()
+    {
+        using var host = await BuildHostAsync();
+        var sdk = SdkClient(host);
+
+        // The SSE stream is long-lived, so cap the read: we only need to confirm
+        // it opens (channel created) and emits the initial hello frame.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+        using var response = await sdk.GetAsync(
+            new Uri("/api/sdk/stream", UriKind.Relative), HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("text/event-stream");
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+        using var reader = new StreamReader(stream);
+        var buffer = new char[128];
+        var read = await reader.ReadAsync(buffer.AsMemory(), cts.Token);
+        new string(buffer, 0, read).Should().Contain("hello");
+    }
+
+    [Fact]
+    public async Task Events_ingest_rejects_a_batch_over_the_cap()
+    {
+        using var host = await BuildHostAsync();
+        var sdk = SdkClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Default MaxEventBatchSize is 1000; a 1001-event batch is refused before
+        // any storage work (issue #204).
+        var events = Enumerable.Range(0, 1001)
+            .Select(i => new { type = "Custom", subjectKey = "s" + i, customKey = "evt" })
+            .ToArray();
+
+        var ingest = await sdk.PostAsJsonAsync("/api/sdk/events", new { events }, ct);
+
+        ingest.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
