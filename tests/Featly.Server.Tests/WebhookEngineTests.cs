@@ -304,6 +304,19 @@ public class WebhookEngineTests
         result.Should().Be(allowed);
     }
 
+    [Theory]
+    [InlineData("http://10.0.0.1/hook", false, false)]   // blocked when guard on
+    [InlineData("https://8.8.8.8/hook", false, true)]    // public allowed
+    [InlineData("not-a-url", false, false)]              // unparseable -> blocked
+    [InlineData("http://10.0.0.1/hook", true, true)]     // opted in -> allowed
+    public async Task Worker_target_check_respects_the_guard_and_opt_in(string url, bool allowPrivate, bool allowed)
+    {
+        var opts = new WebhookOptions { AllowPrivateNetworkTargets = allowPrivate };
+        var result = await WebhookDeliveryWorker.IsTargetAllowedAsync(
+            url, opts, TestContext.Current.CancellationToken);
+        result.Should().Be(allowed);
+    }
+
     [Fact]
     public async Task Create_rejects_an_internal_target_by_default()
     {

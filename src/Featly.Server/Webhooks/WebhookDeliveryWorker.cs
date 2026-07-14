@@ -187,7 +187,7 @@ internal sealed partial class WebhookDeliveryWorker(
     /// Skipped when the operator has opted into private targets; otherwise the
     /// URL must parse and resolve outside the blocked ranges (issue #189).
     /// </summary>
-    private static async Task<bool> IsTargetAllowedAsync(string url, WebhookOptions opts, CancellationToken ct)
+    internal static async Task<bool> IsTargetAllowedAsync(string url, WebhookOptions opts, CancellationToken ct)
     {
         if (opts.AllowPrivateNetworkTargets)
         {
