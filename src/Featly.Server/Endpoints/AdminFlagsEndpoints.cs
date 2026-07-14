@@ -91,6 +91,11 @@ internal static class AdminFlagsEndpoints
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
         }
 
+        if (WritePayloadLimits.ValidateFlag(body.Variants, body.Rules) is { } flagLimitError)
+        {
+            return Results.BadRequest(new { error = flagLimitError });
+        }
+
         var existing = await store.Flags.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
@@ -150,6 +155,11 @@ internal static class AdminFlagsEndpoints
         if (environment.ReadOnly)
         {
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (WritePayloadLimits.ValidateFlag(body.Variants, body.Rules) is { } flagLimitError)
+        {
+            return Results.BadRequest(new { error = flagLimitError });
         }
 
         var existing = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);

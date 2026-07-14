@@ -88,6 +88,11 @@ internal static class AdminConfigsEndpoints
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
         }
 
+        if (WritePayloadLimits.ValidateConfig(body.Rules) is { } configLimitError)
+        {
+            return Results.BadRequest(new { error = configLimitError });
+        }
+
         var existing = await store.Configs.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
@@ -134,6 +139,11 @@ internal static class AdminConfigsEndpoints
         if (environment.ReadOnly)
         {
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (WritePayloadLimits.ValidateConfig(body.Rules) is { } configLimitError)
+        {
+            return Results.BadRequest(new { error = configLimitError });
         }
 
         var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);

@@ -89,6 +89,11 @@ internal static class AdminSegmentsEndpoints
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
         }
 
+        if (WritePayloadLimits.ValidateConditions(body.Conditions) is { } segmentLimitError)
+        {
+            return Results.BadRequest(new { error = segmentLimitError });
+        }
+
         var existing = await store.Segments.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
@@ -135,6 +140,11 @@ internal static class AdminSegmentsEndpoints
         if (environment.ReadOnly)
         {
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (WritePayloadLimits.ValidateConditions(body.Conditions) is { } segmentLimitError)
+        {
+            return Results.BadRequest(new { error = segmentLimitError });
         }
 
         var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
