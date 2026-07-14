@@ -70,19 +70,7 @@ internal static class WebhookTargetGuard
             return true;
         }
 
-        if (addresses.Length == 0)
-        {
-            return true;
-        }
-
-        foreach (var address in addresses)
-        {
-            if (IsBlocked(address))
-            {
-                return false;
-            }
-        }
-        return true;
+        return addresses.Length == 0 || !addresses.Any(IsBlocked);
     }
 
     /// <summary>True when the address is loopback, private, link-local, unique-local, or otherwise not a valid public unicast target.</summary>
@@ -100,45 +88,32 @@ internal static class WebhookTargetGuard
             return true;
         }
 
-        if (address.AddressFamily == AddressFamily.InterNetwork)
+        return address.AddressFamily switch
         {
-            var b = address.GetAddressBytes();
-            // 10.0.0.0/8
-            if (b[0] == 10)
-            { return true; }
-            // 172.16.0.0/12
-            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-            { return true; }
-            // 192.168.0.0/16
-            if (b[0] == 192 && b[1] == 168)
-            { return true; }
-            // 169.254.0.0/16 (link-local, incl. 169.254.169.254 metadata)
-            if (b[0] == 169 && b[1] == 254)
-            { return true; }
-            // 100.64.0.0/10 (carrier-grade NAT)
-            if (b[0] == 100 && b[1] >= 64 && b[1] <= 127)
-            { return true; }
-            // 0.0.0.0/8 and 255.255.255.255
-            if (b[0] == 0 || address.Equals(IPAddress.Broadcast))
-            { return true; }
-            return false;
-        }
-
-        if (address.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            if (address.IsIPv6LinkLocal || address.IsIPv6UniqueLocal || address.IsIPv6Multicast)
-            {
-                return true;
-            }
-            // Unspecified ::
-            if (address.Equals(IPAddress.IPv6Any))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        // Unknown address family — refuse.
-        return true;
+            AddressFamily.InterNetwork => IsBlockedIPv4(address),
+            AddressFamily.InterNetworkV6 => IsBlockedIPv6(address),
+            _ => true, // unknown address family — refuse
+        };
     }
+
+    private static bool IsBlockedIPv4(IPAddress address)
+    {
+        var b = address.GetAddressBytes();
+        return b[0] switch
+        {
+            10 => true,                              // 10.0.0.0/8
+            172 when b[1] is >= 16 and <= 31 => true, // 172.16.0.0/12
+            192 when b[1] == 168 => true,            // 192.168.0.0/16
+            169 when b[1] == 254 => true,            // 169.254.0.0/16 link-local (incl. 169.254.169.254 metadata)
+            100 when b[1] is >= 64 and <= 127 => true, // 100.64.0.0/10 CGNAT
+            0 => true,                               // 0.0.0.0/8
+            _ => address.Equals(IPAddress.Broadcast), // 255.255.255.255
+        };
+    }
+
+    private static bool IsBlockedIPv6(IPAddress address)
+        => address.IsIPv6LinkLocal
+        || address.IsIPv6UniqueLocal
+        || address.IsIPv6Multicast
+        || address.Equals(IPAddress.IPv6Any); // unspecified ::
 }

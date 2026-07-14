@@ -84,9 +84,7 @@ internal sealed partial class WebhookDeliveryWorker(
         // SSRF guard at delivery time (issue #189): re-resolve the target and
         // refuse internal ranges. This also defeats DNS rebinding, where a host
         // that looked public at create time now resolves to a private address.
-        if (!opts.AllowPrivateNetworkTargets &&
-            (!Uri.TryCreate(endpoint.Url, UriKind.Absolute, out var target) ||
-             !await WebhookTargetGuard.IsAllowedAtDeliveryAsync(target, ct).ConfigureAwait(false)))
+        if (!await IsTargetAllowedAsync(endpoint.Url, opts, ct).ConfigureAwait(false))
         {
             delivery.Status = WebhookDeliveryStatus.Dead;
             delivery.LastError = "Target resolves to a blocked (internal) address range.";
@@ -182,6 +180,21 @@ internal sealed partial class WebhookDeliveryWorker(
         }
 
         await store.WebhookDeliveries.UpdateAsync(delivery, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Delivery-time SSRF check: <c>true</c> when the target may be POSTed to.
+    /// Skipped when the operator has opted into private targets; otherwise the
+    /// URL must parse and resolve outside the blocked ranges (issue #189).
+    /// </summary>
+    private static async Task<bool> IsTargetAllowedAsync(string url, WebhookOptions opts, CancellationToken ct)
+    {
+        if (opts.AllowPrivateNetworkTargets)
+        {
+            return true;
+        }
+        return Uri.TryCreate(url, UriKind.Absolute, out var target)
+            && await WebhookTargetGuard.IsAllowedAtDeliveryAsync(target, ct).ConfigureAwait(false);
     }
 
     /// <summary>Exponential backoff: base * 2^(attempt-1), capped at the configured maximum.</summary>

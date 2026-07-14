@@ -289,6 +289,21 @@ public class WebhookEngineTests
         WebhookTargetGuard.IsAllowedAtWrite(new Uri(url)).Should().Be(allowed);
     }
 
+    [Theory]
+    [InlineData("http://10.0.0.1/hook", false)]      // private literal
+    [InlineData("http://127.0.0.1/hook", false)]     // loopback literal
+    [InlineData("http://169.254.169.254/", false)]   // metadata literal
+    [InlineData("http://[::1]/hook", false)]         // IPv6 loopback literal
+    [InlineData("ftp://8.8.8.8/hook", false)]        // non-http scheme
+    [InlineData("https://8.8.8.8/hook", true)]       // public literal
+    [InlineData("http://localhost/hook", false)]     // hostname -> DNS resolves to loopback
+    public async Task Delivery_guard_classifies_literal_targets(string url, bool allowed)
+    {
+        var result = await WebhookTargetGuard.IsAllowedAtDeliveryAsync(
+            new Uri(url), TestContext.Current.CancellationToken);
+        result.Should().Be(allowed);
+    }
+
     [Fact]
     public async Task Create_rejects_an_internal_target_by_default()
     {
