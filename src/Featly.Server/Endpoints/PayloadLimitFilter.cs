@@ -14,19 +14,19 @@ internal sealed class PayloadLimitFilter : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        foreach (var argument in context.Arguments)
-        {
-            var error = argument switch
+        var error = context.Arguments
+            .Select(static argument => argument switch
             {
                 FlagWriteRequest flag => WritePayloadLimits.ValidateFlag(flag.Variants, flag.Rules),
                 ConfigWriteRequest config => WritePayloadLimits.ValidateConfig(config.Rules),
                 SegmentWriteRequest segment => WritePayloadLimits.ValidateConditions(segment.Conditions),
                 _ => null,
-            };
-            if (error is not null)
-            {
-                return Results.BadRequest(new { error });
-            }
+            })
+            .FirstOrDefault(static message => message is not null);
+
+        if (error is not null)
+        {
+            return Results.BadRequest(new { error });
         }
 
         return await next(context).ConfigureAwait(false);

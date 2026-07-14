@@ -32,15 +32,7 @@ internal static class WritePayloadLimits
         {
             return $"A flag may have at most {MaxRules} rules.";
         }
-        foreach (var rule in rules)
-        {
-            var error = ValidateConditions(rule.Conditions);
-            if (error is not null)
-            {
-                return error;
-            }
-        }
-        return null;
+        return rules.Select(rule => ValidateConditions(rule.Conditions)).FirstOrDefault(error => error is not null);
     }
 
     /// <summary>Validates a config write payload; returns an error message or <c>null</c> when acceptable.</summary>
@@ -54,15 +46,7 @@ internal static class WritePayloadLimits
         {
             return $"A config may have at most {MaxRules} rules.";
         }
-        foreach (var rule in rules)
-        {
-            var error = ValidateConditions(rule.Conditions);
-            if (error is not null)
-            {
-                return error;
-            }
-        }
-        return null;
+        return rules.Select(rule => ValidateConditions(rule.Conditions)).FirstOrDefault(error => error is not null);
     }
 
     /// <summary>Validates a condition set (rule or segment); returns an error message or <c>null</c> when acceptable.</summary>
@@ -76,15 +60,12 @@ internal static class WritePayloadLimits
         {
             return $"A rule or segment may have at most {MaxConditionsPerRule} conditions.";
         }
-        foreach (var condition in conditions)
-        {
-            if (condition.Operator == ConditionOperator.Matches
-                && condition.Value.ValueKind == JsonValueKind.String
-                && (condition.Value.GetString()?.Length ?? 0) > MaxPatternLength)
-            {
-                return $"A regex ('Matches') condition pattern may be at most {MaxPatternLength} characters.";
-            }
-        }
-        return null;
+        var hasOverlongPattern = conditions.Any(condition =>
+            condition.Operator == ConditionOperator.Matches
+            && condition.Value.ValueKind == JsonValueKind.String
+            && (condition.Value.GetString()?.Length ?? 0) > MaxPatternLength);
+        return hasOverlongPattern
+            ? $"A regex ('Matches') condition pattern may be at most {MaxPatternLength} characters."
+            : null;
     }
 }
