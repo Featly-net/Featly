@@ -349,6 +349,55 @@ public class WebhookEngineTests
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
+    [Fact]
+    public async Task Worker_dead_letters_a_delivery_whose_target_became_internal()
+    {
+        // A short poll interval so the hosted worker drains promptly.
+        using var host = await BuildHostAsync(pollInterval: "00:00:00.200");
+        var store = host.Services.GetRequiredService<Featly.Storage.IFeatlyStore>();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Insert an endpoint pointing at an internal address directly (bypassing
+        // the create-time guard) to simulate a target that resolves internally by
+        // delivery time, then enqueue a delivery for it.
+        var now = DateTimeOffset.UtcNow;
+        var endpoint = new WebhookEndpoint
+        {
+            Id = Guid.NewGuid(),
+            Name = "internal",
+            Url = "http://10.0.0.1/hook",
+            Secret = "whsec_test",
+            Enabled = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.Webhooks.UpsertAsync(endpoint, ct);
+
+        var delivery = new WebhookDelivery
+        {
+            Id = Guid.NewGuid(),
+            WebhookEndpointId = endpoint.Id,
+            EventType = "flag.updated",
+            Payload = "{}",
+            Status = WebhookDeliveryStatus.Pending,
+            NextAttemptAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.WebhookDeliveries.EnqueueAsync([delivery], ct);
+
+        WebhookDelivery? processed = null;
+        for (var i = 0; i < 50 && (processed is null || processed.Status == WebhookDeliveryStatus.Pending); i++)
+        {
+            await Task.Delay(100, ct);
+            processed = await store.WebhookDeliveries.GetByIdAsync(delivery.Id, ct);
+        }
+
+        processed.Should().NotBeNull();
+        processed!.Status.Should().Be(WebhookDeliveryStatus.Dead);
+        processed.LastError.Should().Contain("blocked");
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
@@ -356,7 +405,7 @@ public class WebhookEngineTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false)
+    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00")
     {
         var builder = new HostBuilder()
             .ConfigureWebHost(web =>
@@ -366,8 +415,9 @@ public class WebhookEngineTests
                 {
                     ["Featly:Server:AdminApiKey"] = AdminKey,
                     ["Featly:Server:SdkApiKey"] = SdkKey,
-                    // Slow the delivery worker right down so it never races the assertions.
-                    ["Featly:Webhooks:PollInterval"] = "00:10:00",
+                    // Slow the delivery worker right down so it never races the
+                    // assertions (tests that exercise the worker pass a short one).
+                    ["Featly:Webhooks:PollInterval"] = pollInterval,
                     ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
                 }));
                 web.ConfigureServices(services =>
