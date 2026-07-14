@@ -86,6 +86,17 @@ public class ConditionOperatorTests
     }
 
     [Theory]
+    // Lookahead is unsupported by the NonBacktracking engine, so this exercises
+    // the backtracking fallback path (still bounded by the regex timeout).
+    [InlineData("Passw0rd", "^(?=.*\\d).+$", true)]
+    [InlineData("password", "^(?=.*\\d).+$", false)]
+    public void Matches_falls_back_for_constructs_nonbacktracking_rejects(string actual, string pattern, bool shouldMatch)
+    {
+        var result = Eval(ConditionOperator.Matches, actual, JsonSerializer.SerializeToElement(pattern));
+        result.VariantKey.Should().Be(shouldMatch ? "on" : "off");
+    }
+
+    [Theory]
     [InlineData(ConditionOperator.SemverGt, "1.2.3", "1.2.2", true)]
     [InlineData(ConditionOperator.SemverGt, "1.2.3", "1.2.3", false)]
     [InlineData(ConditionOperator.SemverGt, "2.0.0", "1.99.99", true)]

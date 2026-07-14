@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -18,6 +19,11 @@ namespace Featly.Engine.Internal;
 internal static class ConditionEvaluator
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(50);
+
+    // Compiled-regex cache keyed by the raw pattern. Patterns come from saved
+    // rule conditions (a bounded, admin-authored set), so the cache stays small;
+    // a null entry marks a pattern that failed to compile at all.
+    private static readonly ConcurrentDictionary<string, Regex?> s_regexCache = new(StringComparer.Ordinal);
 
     public static bool Matches(
         Condition condition,
@@ -161,28 +167,60 @@ internal static class ConditionEvaluator
             return false;
         }
 
+        var pattern = expected.GetString();
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return false;
+        }
+
+        var regex = GetOrCompile(pattern);
+        if (regex is null)
+        {
+            return false;
+        }
+
         try
         {
-            var pattern = expected.GetString();
-            if (string.IsNullOrEmpty(pattern))
-            {
-                return false;
-            }
-
-            // RegexOptions.NonBacktracking would be safer, but it doesn't support all features.
-            // Stick with a short timeout — same approach LaunchDarkly's .NET SDK uses.
-            return Regex.IsMatch(a, pattern, RegexOptions.CultureInvariant, RegexTimeout);
+            return regex.IsMatch(a);
         }
         catch (RegexMatchTimeoutException)
         {
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            // Invalid regex.
+            // Only the backtracking fallback carries a timeout; the linear-time
+            // NonBacktracking engine cannot hit this.
             return false;
         }
     }
+
+    /// <summary>
+    /// Compiles and caches a rule pattern. Prefers the linear-time
+    /// <see cref="RegexOptions.NonBacktracking"/> engine (immune to catastrophic
+    /// backtracking, so no timeout is needed); when the pattern uses a construct
+    /// that engine does not support (backreferences, lookarounds, atomic groups),
+    /// falls back to the backtracking engine bounded by <see cref="RegexTimeout"/>.
+    /// Returns <c>null</c> for a genuinely invalid pattern.
+    /// </summary>
+    private static Regex? GetOrCompile(string pattern) => s_regexCache.GetOrAdd(pattern, static p =>
+    {
+        try
+        {
+            return new Regex(p, RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            // NonBacktracking rejects a construct it doesn't support
+            // (NotSupportedException: backreferences, lookarounds, atomic groups),
+            // or the pattern is invalid (ArgumentException). Retry on the
+            // backtracking engine bounded by a short timeout.
+            try
+            {
+                return new Regex(p, RegexOptions.CultureInvariant, RegexTimeout);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+    });
 
     private static int? CompareSemver(object actual, JsonElement expected)
     {
