@@ -104,6 +104,33 @@ public class WebhookEngineTests
     }
 
     [Fact]
+    public async Task Read_paths_never_echo_the_signing_secret()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var created = await (await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "Relay",
+            url = "https://example.com/hook",
+            secret = "whsec_super-secret-value",
+        }, ct)).Content.ReadFromJsonAsync<WebhookEndpoint>(TestJson.Options, cancellationToken: ct);
+
+        // Creation returns the secret exactly once (operator configures the receiver).
+        created!.Secret.Should().Be("whsec_super-secret-value");
+
+        // List and get must expose metadata only — the raw secret never appears.
+        var listJson = await admin.GetStringAsync(new Uri("/api/admin/webhooks", UriKind.Relative), ct);
+        listJson.Should().NotContain("whsec_super-secret-value");
+        listJson.Should().Contain("hasSecret");
+
+        var getJson = await admin.GetStringAsync(new Uri($"/api/admin/webhooks/{created.Id}", UriKind.Relative), ct);
+        getJson.Should().NotContain("whsec_super-secret-value");
+        getJson.Should().Contain("\"hasSecret\":true");
+    }
+
+    [Fact]
     public async Task Test_endpoint_enqueues_a_delivery()
     {
         using var host = await BuildHostAsync();

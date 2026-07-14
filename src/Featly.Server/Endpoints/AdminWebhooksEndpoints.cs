@@ -35,12 +35,15 @@ internal static class AdminWebhooksEndpoints
     }
 
     private static async Task<IResult> ListAsync(StorageFacade store, CancellationToken ct)
-        => Results.Ok(await store.Webhooks.ListAsync(ct).ConfigureAwait(false));
+    {
+        var endpoints = await store.Webhooks.ListAsync(ct).ConfigureAwait(false);
+        return Results.Ok(endpoints.Select(ToResponse).ToList());
+    }
 
     private static async Task<IResult> GetAsync(Guid id, StorageFacade store, CancellationToken ct)
     {
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
-        return endpoint is null ? Results.NotFound(new { error = $"Webhook '{id}' not found." }) : Results.Ok(endpoint);
+        return endpoint is null ? Results.NotFound(new { error = $"Webhook '{id}' not found." }) : Results.Ok(ToResponse(endpoint));
     }
 
     private static async Task<IResult> DeliveriesAsync(Guid id, StorageFacade store, CancellationToken ct)
@@ -88,7 +91,9 @@ internal static class AdminWebhooksEndpoints
             UpdatedAt = now,
         };
         await store.Webhooks.UpsertAsync(endpoint, ct).ConfigureAwait(false);
-        return Results.Created($"/api/admin/webhooks/{endpoint.Id}", endpoint);
+        // The signing secret is returned exactly once, at creation — like a
+        // minted API key. Read paths (list/get/update) never echo it again.
+        return Results.Created($"/api/admin/webhooks/{endpoint.Id}", ToCreatedResponse(endpoint));
     }
 
     private static async Task<IResult> UpdateAsync(Guid id, WebhookWriteRequest body, StorageFacade store, CancellationToken ct)
@@ -133,7 +138,7 @@ internal static class AdminWebhooksEndpoints
         endpoint.EnvironmentId = body.EnvironmentKey is null ? endpoint.EnvironmentId : environmentId;
 
         await store.Webhooks.UpsertAsync(endpoint, ct).ConfigureAwait(false);
-        return Results.Ok(endpoint);
+        return Results.Ok(ToResponse(endpoint));
     }
 
     private static async Task<IResult> DeleteAsync(Guid id, StorageFacade store, CancellationToken ct)
@@ -225,7 +230,64 @@ internal static class AdminWebhooksEndpoints
     private static string GenerateSecret()
         => "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(24))
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+    /// <summary>Metadata-only projection: the signing secret is never echoed on read paths.</summary>
+    private static WebhookResponse ToResponse(WebhookEndpoint e) => new(
+        Id: e.Id,
+        Name: e.Name,
+        Url: e.Url,
+        Enabled: e.Enabled,
+        EventTypes: e.EventTypes,
+        EnvironmentId: e.EnvironmentId,
+        HasSecret: !string.IsNullOrEmpty(e.Secret),
+        CreatedAt: e.CreatedAt,
+        UpdatedAt: e.UpdatedAt);
+
+    /// <summary>Creation projection: carries the signing secret once so the operator can configure the receiver.</summary>
+    private static WebhookCreatedResponse ToCreatedResponse(WebhookEndpoint e) => new(
+        Id: e.Id,
+        Name: e.Name,
+        Url: e.Url,
+        Enabled: e.Enabled,
+        EventTypes: e.EventTypes,
+        EnvironmentId: e.EnvironmentId,
+        HasSecret: !string.IsNullOrEmpty(e.Secret),
+        CreatedAt: e.CreatedAt,
+        UpdatedAt: e.UpdatedAt,
+        Secret: e.Secret);
 }
+
+/// <summary>
+/// Metadata view of a <see cref="WebhookEndpoint"/> returned by read paths. The
+/// HMAC signing secret is intentionally omitted; <see cref="HasSecret"/> reports
+/// only whether one is configured.
+/// </summary>
+public sealed record WebhookResponse(
+    Guid Id,
+    string Name,
+    string Url,
+    bool Enabled,
+    IReadOnlyList<string> EventTypes,
+    Guid? EnvironmentId,
+    bool HasSecret,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+/// <summary>
+/// Creation response: same metadata as <see cref="WebhookResponse"/> plus the
+/// signing <see cref="Secret"/>, returned exactly once at creation.
+/// </summary>
+public sealed record WebhookCreatedResponse(
+    Guid Id,
+    string Name,
+    string Url,
+    bool Enabled,
+    IReadOnlyList<string> EventTypes,
+    Guid? EnvironmentId,
+    bool HasSecret,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string Secret);
 
 /// <summary>
 /// Inbound shape for creating/updating a webhook endpoint. On update, null

@@ -3188,6 +3188,7 @@
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Webhooks</h1>',
                     '  <span class="sub">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
+                    '<div id="wh-reveal"></div>',
                     hooks.length
                         ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>URL</th><th>Enabled</th><th>Events</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
                         : '<div class="empty"><p>No webhooks yet. Create one on the right.</p></div>',
@@ -3212,7 +3213,20 @@
                         url: f.url.value.trim(),
                         secret: f.secret.value.trim() || null,
                         eventTypes: parseCsv(f.eventTypes.value),
-                    }).then(function (created) { navigate("/webhooks/" + encodeURIComponent(created.id)); })
+                    }).then(function (created) {
+                        // The signing secret is returned exactly once. Reveal it so
+                        // the operator can copy it into the receiver, then link to detail.
+                        var reveal = document.getElementById("wh-reveal");
+                        if (reveal && created && created.secret) {
+                            reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
+                                + '<strong>Webhook created. Copy the signing secret now — it will not be shown again.</strong>'
+                                + '<pre class="cr-json" style="margin:8px 0 0">' + esc(created.secret) + '</pre>'
+                                + '<a class="btn outline xs" data-link="/webhooks/' + encodeURIComponent(created.id) + '">Open webhook</a></div>';
+                            setMessageOn(msg, "success", "Created.");
+                        } else {
+                            navigate("/webhooks/" + encodeURIComponent(created.id));
+                        }
+                    })
                       .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                 });
             })
@@ -3253,7 +3267,7 @@
                 field("URL", '<input name="url" required value="' + esc(w.url) + '" />'),
                 field("Enabled", '<label class="check"><input type="checkbox" name="enabled"' + (w.enabled ? " checked" : "") + ' /> Deliver events</label>'),
                 field("Event types", webhookEventPicker(w.eventTypes || [])),
-                field("Secret", '<input name="secret" value="' + esc(w.secret || "") + '" />'),
+                field("Secret", '<input name="secret" placeholder="' + (w.hasSecret ? "(hidden — leave blank to keep, enter a value to rotate)" : "(none set — enter a value)") + '" />'),
                 '  <div class="editor__footer"><button type="submit" class="btn primary">Save</button></div>',
                 '  </form>',
                 '  <div class="card-pad"><h2>Recent deliveries</h2>',
@@ -3263,6 +3277,7 @@
                 '  </div>',
                 '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
                 '  <dt>Status</dt><dd>' + (w.enabled ? "enabled" : "disabled") + '</dd>',
+                '  <dt>Secret</dt><dd>' + (w.hasSecret ? "configured" : "not set") + '</dd>',
                 '  <dt>Events</dt><dd>' + ((w.eventTypes || []).length ? esc((w.eventTypes).join(", ")) : "all events") + '</dd>',
                 '  <dt>Deliveries</dt><dd>' + deliveries.length + '</dd>',
                 '  <dt>Created</dt><dd>' + (formatDate(w.createdAt) || "—") + '</dd>',
