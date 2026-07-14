@@ -119,7 +119,10 @@ public sealed class FeatlyApiKeyAuthenticationHandler(
 
                 // Best-effort last-used touch; never block auth on it.
                 _ = store.ApiKeys.TouchLastUsedAsync(candidate.Id, DateTimeOffset.UtcNow, CancellationToken.None);
-                return Success(name);
+                // Bind the principal to the key's environment so SDK endpoints can
+                // reject cross-environment reads (ADR-0009). The static bootstrap
+                // key below stays unbound (wildcard).
+                return Success(name, candidate.EnvironmentId);
             }
         }
 
@@ -127,11 +130,15 @@ public sealed class FeatlyApiKeyAuthenticationHandler(
         return AuthenticateResult.Fail("Invalid API key.");
     }
 
-    private AuthenticateResult Success(string name)
+    private AuthenticateResult Success(string name, Guid? environmentId = null)
     {
         var identity = new ClaimsIdentity(Scheme.Name);
         identity.AddClaim(new Claim(ClaimTypes.Name, name));
         identity.AddClaim(new Claim(FeatlyAuthenticationDefaults.ScopeClaim, Options.Scope));
+        if (environmentId is Guid envId)
+        {
+            identity.AddClaim(new Claim(FeatlyAuthenticationDefaults.EnvironmentClaim, envId.ToString()));
+        }
         var principal = new ClaimsPrincipal(identity);
         return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
     }

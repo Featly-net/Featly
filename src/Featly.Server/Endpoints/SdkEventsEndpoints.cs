@@ -27,6 +27,7 @@ internal static class SdkEventsEndpoints
 
     private static async Task<IResult> IngestAsync(
         EventBatchRequest body,
+        HttpContext http,
         StorageFacade store,
         FeatlyServerMetrics metrics,
         string? env,
@@ -34,10 +35,17 @@ internal static class SdkEventsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var bound = SdkEnvironmentScope.BoundEnvironmentId(http.User);
+        var environment = await SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
+        }
+        if (!SdkEnvironmentScope.Allows(bound, environment.Id))
+        {
+            return Results.Problem(
+                detail: "This API key is scoped to a different environment.",
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         if (body.Events is null || body.Events.Count == 0)
@@ -92,18 +100,6 @@ internal static class SdkEventsEndpoints
         return Results.Accepted(value: new { ingested = events.Count });
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 }
 
 /// <summary>A batch of telemetry events posted by the SDK.</summary>
