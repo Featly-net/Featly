@@ -93,6 +93,7 @@ public static class FeatlyDashboardEndpointRouteBuilderExtensions
 
         await using (stream)
         {
+            ApplySecurityHeaders(context.Response);
             context.Response.ContentType = contentType;
             context.Response.Headers.CacheControl = "no-cache";
             await stream.CopyToAsync(context.Response.Body, context.RequestAborted).ConfigureAwait(false);
@@ -104,9 +105,37 @@ public static class FeatlyDashboardEndpointRouteBuilderExtensions
         var html = await ReadResourceAsTextAsync(IndexResourceName).ConfigureAwait(false);
         html = html.Replace(MountPlaceholder, mountPath, StringComparison.Ordinal);
 
+        ApplySecurityHeaders(context.Response);
         context.Response.ContentType = MediaTypeNames.Text.Html;
         context.Response.Headers.CacheControl = "no-store";
         await context.Response.WriteAsync(html, Encoding.UTF8, context.RequestAborted).ConfigureAwait(false);
+    }
+
+    // The dashboard bundle is fully self-contained and same-origin (its CSS, JS,
+    // and fonts are served from this mount), so a strict CSP is safe. Scripts are
+    // external files only (no inline <script>), so script-src stays 'self'; the
+    // bundle does set inline style="" attributes via rendered markup, so
+    // style-src allows 'unsafe-inline' (styles cannot execute script). This is
+    // defense in depth on top of the HttpOnly + SameSite=Strict session cookie.
+    private const string ContentSecurityPolicy =
+        "default-src 'self'; " +
+        "base-uri 'self'; " +
+        "object-src 'none'; " +
+        "frame-ancestors 'none'; " +
+        "img-src 'self' data:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "script-src 'self'; " +
+        "font-src 'self'; " +
+        "connect-src 'self'; " +
+        "form-action 'self'";
+
+    private static void ApplySecurityHeaders(HttpResponse response)
+    {
+        var headers = response.Headers;
+        headers["Content-Security-Policy"] = ContentSecurityPolicy;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
     }
 
     private static async Task<string> ReadResourceAsTextAsync(string resourceName)
