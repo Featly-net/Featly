@@ -32,6 +32,14 @@ the HMAC (`sig_ok=True`).
 **NOTE:** receivers are responsible for constant-time comparison and idempotency
 (documented in [ADR-0018](adr/0018-webhooks-single-notification-channel.md)).
 
+**SSRF guard (issue #189):** webhook targets are validated against an SSRF
+blocklist — non-HTTP schemes, loopback, RFC1918 private ranges, link-local
+(including the `169.254.169.254` cloud-metadata address), CGNAT, and IPv6
+unique-local/link-local are rejected. The check runs at create/update (literal
+hosts) and again at delivery time with DNS resolution (which also defeats DNS
+rebinding). Operators that intentionally target an internal receiver opt out
+with `Featly:Webhooks:AllowPrivateNetworkTargets`.
+
 ## 3. CSRF / session defenses — **OK**
 
 - The dashboard session cookie is **`HttpOnly`** (an XSS in the host can't read the token), **`SameSite=Strict`** (a cross-site request can't ride along — the primary CSRF defense), `IsEssential`, and **`Secure` under TLS** (`SecurePolicy=SameAsRequest` keeps local-dev HTTP working).

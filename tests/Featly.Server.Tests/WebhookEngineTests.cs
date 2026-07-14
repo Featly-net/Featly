@@ -258,6 +258,150 @@ public class WebhookEngineTests
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
+    // ---- SSRF guard (issue #189) -------------------------------------------
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]      // loopback
+    [InlineData("10.1.2.3", true)]       // 10/8
+    [InlineData("172.16.5.4", true)]     // 172.16/12
+    [InlineData("192.168.0.10", true)]   // 192.168/16
+    [InlineData("169.254.169.254", true)] // link-local / cloud metadata
+    [InlineData("100.64.1.1", true)]     // CGNAT
+    [InlineData("::1", true)]            // IPv6 loopback
+    [InlineData("fd00::1", true)]        // IPv6 unique-local
+    [InlineData("fe80::1", true)]        // IPv6 link-local
+    [InlineData("8.8.8.8", false)]       // public
+    [InlineData("93.184.216.34", false)] // public (example.com)
+    public void Guard_classifies_internal_addresses_as_blocked(string ip, bool blocked)
+    {
+        WebhookTargetGuard.IsBlocked(System.Net.IPAddress.Parse(ip)).Should().Be(blocked);
+    }
+
+    [Theory]
+    [InlineData("https://example.com/hook", true)]
+    [InlineData("http://example.com/hook", true)]
+    [InlineData("ftp://example.com/hook", false)]   // non-http scheme
+    [InlineData("http://localhost/hook", false)]    // localhost hostname
+    [InlineData("http://127.0.0.1/hook", false)]    // loopback literal
+    [InlineData("http://169.254.169.254/latest/meta-data", false)] // metadata literal
+    public void Guard_write_check_allows_public_http_targets_only(string url, bool allowed)
+    {
+        WebhookTargetGuard.IsAllowedAtWrite(new Uri(url)).Should().Be(allowed);
+    }
+
+    [Theory]
+    [InlineData("http://10.0.0.1/hook", false)]      // private literal
+    [InlineData("http://127.0.0.1/hook", false)]     // loopback literal
+    [InlineData("http://169.254.169.254/", false)]   // metadata literal
+    [InlineData("http://[::1]/hook", false)]         // IPv6 loopback literal
+    [InlineData("ftp://8.8.8.8/hook", false)]        // non-http scheme
+    [InlineData("https://8.8.8.8/hook", true)]       // public literal
+    [InlineData("http://localhost/hook", false)]     // hostname -> DNS resolves to loopback
+    public async Task Delivery_guard_classifies_literal_targets(string url, bool allowed)
+    {
+        var result = await WebhookTargetGuard.IsAllowedAtDeliveryAsync(
+            new Uri(url), TestContext.Current.CancellationToken);
+        result.Should().Be(allowed);
+    }
+
+    [Theory]
+    [InlineData("http://10.0.0.1/hook", false, false)]   // blocked when guard on
+    [InlineData("https://8.8.8.8/hook", false, true)]    // public allowed
+    [InlineData("not-a-url", false, false)]              // unparseable -> blocked
+    [InlineData("http://10.0.0.1/hook", true, true)]     // opted in -> allowed
+    public async Task Worker_target_check_respects_the_guard_and_opt_in(string url, bool allowPrivate, bool allowed)
+    {
+        var opts = new WebhookOptions { AllowPrivateNetworkTargets = allowPrivate };
+        var result = await WebhookDeliveryWorker.IsTargetAllowedAsync(
+            url, opts, TestContext.Current.CancellationToken);
+        result.Should().Be(allowed);
+    }
+
+    [Fact]
+    public async Task Create_rejects_an_internal_target_by_default()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "metadata",
+            url = "http://169.254.169.254/latest/meta-data/iam/",
+        }, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_allows_an_internal_target_when_opted_in()
+    {
+        using var host = await BuildHostAsync(allowPrivateTargets: true);
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "internal",
+            url = "http://10.0.0.5/hook",
+        }, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Worker_dead_letters_a_delivery_whose_target_became_internal()
+    {
+        // A short poll interval so the hosted worker drains promptly.
+        using var host = await BuildHostAsync(pollInterval: "00:00:00.200");
+        var store = host.Services.GetRequiredService<Featly.Storage.IFeatlyStore>();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Insert an endpoint pointing at an internal address directly (bypassing
+        // the create-time guard) to simulate a target that resolves internally by
+        // delivery time, then enqueue a delivery for it.
+        var now = DateTimeOffset.UtcNow;
+        var endpoint = new WebhookEndpoint
+        {
+            Id = Guid.NewGuid(),
+            Name = "internal",
+            Url = "http://10.0.0.1/hook",
+            Secret = "whsec_test",
+            Enabled = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.Webhooks.UpsertAsync(endpoint, ct);
+
+        var delivery = new WebhookDelivery
+        {
+            Id = Guid.NewGuid(),
+            WebhookEndpointId = endpoint.Id,
+            EventType = "flag.updated",
+            Payload = "{}",
+            Status = WebhookDeliveryStatus.Pending,
+            NextAttemptAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.WebhookDeliveries.EnqueueAsync([delivery], ct);
+
+        WebhookDelivery? processed = null;
+        for (var i = 0; i < 50; i++)
+        {
+            processed = await store.WebhookDeliveries.GetByIdAsync(delivery.Id, ct);
+            if (processed is not null && processed.Status != WebhookDeliveryStatus.Pending)
+            {
+                break;
+            }
+            await Task.Delay(100, ct);
+        }
+
+        Assert.NotNull(processed); // narrows nullability for the accesses below
+        processed.Status.Should().Be(WebhookDeliveryStatus.Dead);
+        processed.LastError.Should().Contain("blocked");
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
@@ -265,7 +409,7 @@ public class WebhookEngineTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
+    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00")
     {
         var builder = new HostBuilder()
             .ConfigureWebHost(web =>
@@ -275,8 +419,10 @@ public class WebhookEngineTests
                 {
                     ["Featly:Server:AdminApiKey"] = AdminKey,
                     ["Featly:Server:SdkApiKey"] = SdkKey,
-                    // Slow the delivery worker right down so it never races the assertions.
-                    ["Featly:Webhooks:PollInterval"] = "00:10:00",
+                    // Slow the delivery worker right down so it never races the
+                    // assertions (tests that exercise the worker pass a short one).
+                    ["Featly:Webhooks:PollInterval"] = pollInterval,
+                    ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
                 }));
                 web.ConfigureServices(services =>
                 {
