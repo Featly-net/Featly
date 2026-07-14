@@ -128,10 +128,15 @@ internal static class SdkEndpoints
         var bufferingFeature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>();
         bufferingFeature?.DisableBuffering();
 
-        var channel = Channel.CreateUnbounded<ChangeNotification>(new UnboundedChannelOptions
+        // Bounded so a slow SSE consumer can't grow the queue without limit
+        // (issue #205). A change notification is a "something changed, re-sync"
+        // signal, so dropping the oldest pending one under backpressure is safe —
+        // the client revalidates via ETag on the next event and catches up.
+        var channel = Channel.CreateBounded<ChangeNotification>(new BoundedChannelOptions(capacity: 256)
         {
             SingleReader = true,
             SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropOldest,
         });
 
         using var subscription = store.Changes.Subscribe(async (notification, innerCt) =>

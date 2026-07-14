@@ -50,4 +50,12 @@ public sealed class FeatlyServerOptions
     /// its dashboard UI (for example a flags-only or configs-only deployment).
     /// </summary>
     public FeatlyFeatureOptions Features { get; set; } = new();
+
+    /// <summary>
+    /// Maximum number of events accepted in a single <c>POST /api/sdk/events</c>
+    /// batch (issue #204). The SDK batches at 200; this server-side cap stops a
+    /// compromised SDK key from flooding the store with an oversized batch.
+    /// A non-positive value disables the cap.
+    /// </summary>
+    public int MaxEventBatchSize { get; set; } = 1000;
 }

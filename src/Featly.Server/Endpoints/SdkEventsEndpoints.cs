@@ -4,6 +4,7 @@ using Featly.Server.Telemetry;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Endpoints;
@@ -30,10 +31,21 @@ internal static class SdkEventsEndpoints
         HttpContext http,
         StorageFacade store,
         FeatlyServerMetrics metrics,
+        IOptions<FeatlyServerOptions> serverOptions,
         string? env,
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
+
+        // Reject an oversized batch before doing any work — a compromised SDK key
+        // must not be able to flood the store (issue #204).
+        var maxBatch = serverOptions.Value.MaxEventBatchSize;
+        if (maxBatch > 0 && body.Events is { Count: var count } && count > maxBatch)
+        {
+            return Results.Problem(
+                detail: $"Event batch of {count} exceeds the maximum of {maxBatch}.",
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+        }
 
         var bound = SdkEnvironmentScope.BoundEnvironmentId(http.User);
         var environment = await SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
