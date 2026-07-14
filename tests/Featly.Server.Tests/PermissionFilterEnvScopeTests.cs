@@ -76,6 +76,50 @@ public class PermissionFilterEnvScopeTests
         var outOfScope = await client.PostAsJsonAsync(
             new Uri($"/api/admin/flags?env={staging.Key}", UriKind.Relative), FlagBody, ct);
         outOfScope.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // An unknown environment resolves to no environment; the env-scoped grant
+        // still doesn't apply, so the Viewer floor denies the write as well.
+        var unknownEnv = await client.PostAsJsonAsync(
+            new Uri("/api/admin/flags?env=does-not-exist", UriKind.Relative), FlagBody, ct);
+        unknownEnv.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Wildcard_editor_can_write_in_any_environment()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var project = await store.Projects.GetDefaultAsync(ct);
+        var staging = await CreateEnvironmentAsync(store, project!.Id, "staging", ct);
+
+        // Frank is Editor project-wide (wildcard environment).
+        var frank = await CreateUserAsync(store, "frank@example.com", ct);
+        var editor = await store.Roles.GetByKeyAsync(SystemRoles.EditorKey, ct);
+        await store.RoleAssignments.CreateAsync(new RoleAssignment
+        {
+            Id = Guid.NewGuid(),
+            AssigneeType = AssigneeType.User,
+            AssigneeId = frank.Id,
+            ProjectId = project.Id,
+            EnvironmentId = null, // wildcard: every environment in the project
+            RoleId = editor!.Id,
+            AssignedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        var defaultEnv = await store.Environments.GetDefaultAsync(project.Id, ct);
+        var token = await MintAdminKeyBoundToAsync(host, frank.Id, defaultEnv!.Id, ct);
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Wildcard grant still matches a concrete environment (this only tightens,
+        // never broadens): both the default and staging environments are writable.
+        (await client.PostAsJsonAsync("/api/admin/flags", FlagBody, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PostAsJsonAsync(
+            new Uri($"/api/admin/flags?env={staging.Key}", UriKind.Relative), FlagBody, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     private static async Task<Featly.Environment> CreateEnvironmentAsync(StorageFacade store, Guid projectId, string key, CancellationToken ct)

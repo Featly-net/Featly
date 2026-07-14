@@ -76,12 +76,7 @@ internal sealed class PermissionFilter(Permission required) : IEndpointFilter
     /// </summary>
     private static async Task<(Guid ProjectId, Guid? EnvironmentId)> ResolveScopeAsync(HttpContext http)
     {
-        var store = http.RequestServices.GetService<StorageFacade>();
-        if (store is null)
-        {
-            return (Guid.Empty, null);
-        }
-
+        var store = http.RequestServices.GetRequiredService<StorageFacade>();
         var ct = http.RequestAborted;
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
