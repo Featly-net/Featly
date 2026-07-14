@@ -387,14 +387,18 @@ public class WebhookEngineTests
         await store.WebhookDeliveries.EnqueueAsync([delivery], ct);
 
         WebhookDelivery? processed = null;
-        for (var i = 0; i < 50 && (processed is null || processed.Status == WebhookDeliveryStatus.Pending); i++)
+        for (var i = 0; i < 50; i++)
         {
-            await Task.Delay(100, ct);
             processed = await store.WebhookDeliveries.GetByIdAsync(delivery.Id, ct);
+            if (processed is not null && processed.Status != WebhookDeliveryStatus.Pending)
+            {
+                break;
+            }
+            await Task.Delay(100, ct);
         }
 
-        processed.Should().NotBeNull();
-        processed!.Status.Should().Be(WebhookDeliveryStatus.Dead);
+        Assert.NotNull(processed); // narrows nullability for the accesses below
+        processed.Status.Should().Be(WebhookDeliveryStatus.Dead);
         processed.LastError.Should().Contain("blocked");
     }
 
