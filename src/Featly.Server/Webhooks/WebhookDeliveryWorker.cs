@@ -81,6 +81,21 @@ internal sealed partial class WebhookDeliveryWorker(
             return;
         }
 
+        // SSRF guard at delivery time (issue #189): re-resolve the target and
+        // refuse internal ranges. This also defeats DNS rebinding, where a host
+        // that looked public at create time now resolves to a private address.
+        if (!opts.AllowPrivateNetworkTargets &&
+            (!Uri.TryCreate(endpoint.Url, UriKind.Absolute, out var target) ||
+             !await WebhookTargetGuard.IsAllowedAtDeliveryAsync(target, ct).ConfigureAwait(false)))
+        {
+            delivery.Status = WebhookDeliveryStatus.Dead;
+            delivery.LastError = "Target resolves to a blocked (internal) address range.";
+            delivery.UpdatedAt = DateTimeOffset.UtcNow;
+            await store.WebhookDeliveries.UpdateAsync(delivery, ct).ConfigureAwait(false);
+            LogBlockedTarget(logger, delivery.Id, endpoint.Url);
+            return;
+        }
+
         delivery.AttemptCount++;
         int? statusCode = null;
         string? error = null;
@@ -189,4 +204,7 @@ internal sealed partial class WebhookDeliveryWorker(
 
     [LoggerMessage(EventId = 4104, Level = LogLevel.Error, Message = "Webhook delivery scan failed.")]
     private static partial void LogScanFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 4105, Level = LogLevel.Warning, Message = "Webhook delivery {DeliveryId} to {Url} blocked: target resolves to an internal address range.")]
+    private static partial void LogBlockedTarget(ILogger logger, Guid deliveryId, string url);
 }

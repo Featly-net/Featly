@@ -26,4 +26,13 @@ public sealed class WebhookOptions
 
     /// <summary>Per-request timeout for an individual delivery POST.</summary>
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// When <c>true</c>, disables the SSRF guard that blocks webhook targets on
+    /// loopback / private / link-local ranges (issue #189). Off by default;
+    /// enable only when you intentionally deliver to an internal receiver and
+    /// understand the SSRF exposure. This is a network-policy switch, so it is
+    /// bootstrap config (<c>Featly:Webhooks</c>), not a DB-overridable setting.
+    /// </summary>
+    public bool AllowPrivateNetworkTargets { get; set; }
 }

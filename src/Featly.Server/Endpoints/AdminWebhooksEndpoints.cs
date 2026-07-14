@@ -5,6 +5,7 @@ using Featly.Server.Webhooks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Endpoints;
@@ -58,16 +59,20 @@ internal static class AdminWebhooksEndpoints
         return Results.Ok(deliveries);
     }
 
-    private static async Task<IResult> CreateAsync(WebhookWriteRequest body, StorageFacade store, CancellationToken ct)
+    private static async Task<IResult> CreateAsync(WebhookWriteRequest body, StorageFacade store, IOptions<WebhookOptions> options, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.Url))
         {
             return Results.BadRequest(new { error = "name and url are required." });
         }
-        if (!Uri.TryCreate(body.Url, UriKind.Absolute, out _))
+        if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var createUri))
         {
             return Results.BadRequest(new { error = "url must be an absolute URL." });
+        }
+        if (BlockedTarget(createUri, options.Value) is { } createBlock)
+        {
+            return createBlock;
         }
 
         var environmentId = await ResolveEnvironmentIdAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
@@ -96,7 +101,7 @@ internal static class AdminWebhooksEndpoints
         return Results.Created($"/api/admin/webhooks/{endpoint.Id}", ToCreatedResponse(endpoint));
     }
 
-    private static async Task<IResult> UpdateAsync(Guid id, WebhookWriteRequest body, StorageFacade store, CancellationToken ct)
+    private static async Task<IResult> UpdateAsync(Guid id, WebhookWriteRequest body, StorageFacade store, IOptions<WebhookOptions> options, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
@@ -104,9 +109,16 @@ internal static class AdminWebhooksEndpoints
         {
             return Results.NotFound(new { error = $"Webhook '{id}' not found." });
         }
-        if (!string.IsNullOrWhiteSpace(body.Url) && !Uri.TryCreate(body.Url, UriKind.Absolute, out _))
+        if (!string.IsNullOrWhiteSpace(body.Url))
         {
-            return Results.BadRequest(new { error = "url must be an absolute URL." });
+            if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var updateUri))
+            {
+                return Results.BadRequest(new { error = "url must be an absolute URL." });
+            }
+            if (BlockedTarget(updateUri, options.Value) is { } updateBlock)
+            {
+                return updateBlock;
+            }
         }
 
         var environmentId = await ResolveEnvironmentIdAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
@@ -225,6 +237,23 @@ internal static class AdminWebhooksEndpoints
         }
         var environment = await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
         return environment?.Id;
+    }
+
+    /// <summary>
+    /// Returns a <c>400</c> result when the URL points at a blocked (internal)
+    /// target and the operator hasn't opted into private targets; <c>null</c>
+    /// when the target is acceptable. Delivery re-checks with DNS (issue #189).
+    /// </summary>
+    private static IResult? BlockedTarget(Uri uri, WebhookOptions options)
+    {
+        if (options.AllowPrivateNetworkTargets || WebhookTargetGuard.IsAllowedAtWrite(uri))
+        {
+            return null;
+        }
+        return Results.BadRequest(new
+        {
+            error = "url must be a public http(s) endpoint; loopback, private, and link-local targets are blocked (set Featly:Webhooks:AllowPrivateNetworkTargets to allow internal receivers).",
+        });
     }
 
     private static string GenerateSecret()

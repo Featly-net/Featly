@@ -258,6 +258,69 @@ public class WebhookEngineTests
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
+    // ---- SSRF guard (issue #189) -------------------------------------------
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]      // loopback
+    [InlineData("10.1.2.3", true)]       // 10/8
+    [InlineData("172.16.5.4", true)]     // 172.16/12
+    [InlineData("192.168.0.10", true)]   // 192.168/16
+    [InlineData("169.254.169.254", true)] // link-local / cloud metadata
+    [InlineData("100.64.1.1", true)]     // CGNAT
+    [InlineData("::1", true)]            // IPv6 loopback
+    [InlineData("fd00::1", true)]        // IPv6 unique-local
+    [InlineData("fe80::1", true)]        // IPv6 link-local
+    [InlineData("8.8.8.8", false)]       // public
+    [InlineData("93.184.216.34", false)] // public (example.com)
+    public void Guard_classifies_internal_addresses_as_blocked(string ip, bool blocked)
+    {
+        WebhookTargetGuard.IsBlocked(System.Net.IPAddress.Parse(ip)).Should().Be(blocked);
+    }
+
+    [Theory]
+    [InlineData("https://example.com/hook", true)]
+    [InlineData("http://example.com/hook", true)]
+    [InlineData("ftp://example.com/hook", false)]   // non-http scheme
+    [InlineData("http://localhost/hook", false)]    // localhost hostname
+    [InlineData("http://127.0.0.1/hook", false)]    // loopback literal
+    [InlineData("http://169.254.169.254/latest/meta-data", false)] // metadata literal
+    public void Guard_write_check_allows_public_http_targets_only(string url, bool allowed)
+    {
+        WebhookTargetGuard.IsAllowedAtWrite(new Uri(url)).Should().Be(allowed);
+    }
+
+    [Fact]
+    public async Task Create_rejects_an_internal_target_by_default()
+    {
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "metadata",
+            url = "http://169.254.169.254/latest/meta-data/iam/",
+        }, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_allows_an_internal_target_when_opted_in()
+    {
+        using var host = await BuildHostAsync(allowPrivateTargets: true);
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await admin.PostAsJsonAsync("/api/admin/webhooks", new
+        {
+            name = "internal",
+            url = "http://10.0.0.5/hook",
+        }, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
@@ -265,7 +328,7 @@ public class WebhookEngineTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
+    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false)
     {
         var builder = new HostBuilder()
             .ConfigureWebHost(web =>
@@ -277,6 +340,7 @@ public class WebhookEngineTests
                     ["Featly:Server:SdkApiKey"] = SdkKey,
                     // Slow the delivery worker right down so it never races the assertions.
                     ["Featly:Webhooks:PollInterval"] = "00:10:00",
+                    ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
                 }));
                 web.ConfigureServices(services =>
                 {
