@@ -28,6 +28,28 @@ jobs:
     name: SonarCloud
     runs-on: ubuntu-latest
 
+    # The Postgres provider's tests are all [Trait("Category","RequiresPostgres")].
+    # Without a database to talk to they were skipped here, so the whole provider
+    # reported as uncovered to SonarCloud even though ci.yml's dedicated job runs
+    # them against a real server. Same service definition as that job.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: featly
+          POSTGRES_DB: postgres
+          # The container lives for this job only and is reachable from nowhere
+          # else, so it takes no password at all — which also keeps a credential
+          # literal out of the workflow.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -99,12 +121,20 @@ jobs:
       # collector emits OpenCover format directly (Format=opencover) — the
       # scanner needs OpenCover, not the Cobertura format ci.yml's own
       # coverage collection uses for its artifact upload.
+      # Runs the whole suite, Postgres provider included, against the service
+      # container above — so coverage reflects every provider rather than
+      # reporting the Postgres one as dead code.
       - name: Test with coverage
+        env:
+          FEATLY_POSTGRES_TEST_HOST: localhost
+          FEATLY_POSTGRES_TEST_PORT: "5432"
+          FEATLY_POSTGRES_TEST_USER: featly
+          # No FEATLY_POSTGRES_TEST_PASSWORD: the container trusts every
+          # connection, so whatever the test host defaults to is accepted.
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
           --no-build
-          --filter "Category!=RequiresPostgres"
           --collect:"XPlat Code Coverage;Format=opencover"
           --results-directory ./TestResults
 

@@ -1,13 +1,23 @@
-namespace Featly.Storage.Sqlite;
+namespace Featly.Storage.EntityFramework;
 
 /// <summary>
-/// SQLite-backed implementation of <see cref="IFeatlyStore"/>. Aggregates
-/// per-entity sub-stores. Created and disposed by the DI container; sub-stores
-/// open per-operation <see cref="FeatlyDbContext"/> instances via the
-/// registered <c>IDbContextFactory&lt;FeatlyDbContext&gt;</c>, so the facade
-/// itself is safe to use as a singleton.
+/// The <see cref="IFeatlyStore"/> facade for a relational provider: it composes
+/// the per-entity sub-stores and holds nothing else.
 /// </summary>
-internal sealed class SqliteFeatlyStore(
+/// <remarks>
+/// <para>
+/// Shared by SQLite and Postgres because there is nothing provider-specific here
+/// — the facade never touches a <c>DbContext</c>; DI hands it whichever
+/// provider's sub-stores are registered. Compiled into each provider assembly as
+/// a linked source file, so ADR-0026's "DbContext is internal and per-provider"
+/// still holds and the two assemblies stay decoupled.
+/// </para>
+/// <para>
+/// Sub-stores open per-operation contexts via the registered
+/// <c>IDbContextFactory&lt;FeatlyDbContext&gt;</c>, so this is safe as a singleton.
+/// </para>
+/// </remarks>
+internal sealed class EfFeatlyStore(
     IFlagStore flags,
     IProjectStore projects,
     IEnvironmentStore environments,
