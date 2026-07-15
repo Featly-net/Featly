@@ -50,9 +50,8 @@ internal sealed class ChangeApplicationService(StorageFacade store, FeatlyServer
                 return false;
         }
 
-        await store.Changes.NotifyAsync(
-            new ChangeNotification(change.EnvironmentId, change.EntityType, change.EntityKey, DateTimeOffset.UtcNow),
-            ct).ConfigureAwait(false);
+        await Endpoints.SnapshotChange.AnnounceAsync(
+            store, change.EnvironmentId, change.EntityType, change.EntityKey, ct).ConfigureAwait(false);
         return true;
     }
 

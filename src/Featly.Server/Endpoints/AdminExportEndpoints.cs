@@ -100,6 +100,15 @@ internal static class AdminExportEndpoints
             segments++;
         }
 
+        // An import rewrites the snapshot wholesale, so it must announce like any
+        // other write: bump the version (SDK caches revalidate) and push the SSE
+        // notification. Previously it did neither and clients only noticed on
+        // their next poll, because the ETag was derived from max(UpdatedAt).
+        if (flags + configs + segments > 0)
+        {
+            await SnapshotChange.AnnounceAsync(store, envId, "Environment", environment.Key, ct).ConfigureAwait(false);
+        }
+
         await events.PublishAsync(
             FeatlyEventTypes.ConfigurationImported,
             entityType: "Environment",

@@ -329,10 +329,8 @@ internal static class AdminFlagsEndpoints
         return string.IsNullOrEmpty(name) ? "anonymous" : name;
     }
 
-    private static ValueTask NotifyChangeAsync(StorageFacade store, Guid environmentId, string flagKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Flag", flagKey, DateTimeOffset.UtcNow),
-            ct);
+    private static Task NotifyChangeAsync(StorageFacade store, Guid environmentId, string flagKey, CancellationToken ct)
+        => SnapshotChange.AnnounceAsync(store, environmentId, "Flag", flagKey, ct);
 }
 
 /// <summary>

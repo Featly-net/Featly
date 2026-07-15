@@ -40,6 +40,40 @@ public class AdminExportEndpointTests
     }
 
     [Fact]
+    public async Task Import_invalidates_the_sdk_snapshot_etag()
+    {
+        // An import rewrites definitions, so SDK caches must revalidate (issue
+        // #228). It used to write without announcing anything — clients only
+        // noticed because the ETag was derived from max(UpdatedAt).
+        using var host = await FeatlyTestHost.CreateAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var admin = AdminClient(host);
+        var sdk = host.SdkClient();
+
+        // Seed a flag and take a real bundle, so the import body is definitely valid.
+        (await admin.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "imported",
+            name = "Imported",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+        var bundleJson = await (await admin.GetAsync(ExportUri, ct)).Content.ReadAsStringAsync(ct);
+
+        var before = await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), ct);
+        before.StatusCode.Should().Be(HttpStatusCode.OK);
+        var beforeEtag = before.Headers.ETag!.Tag;
+
+        using var content = new StringContent(bundleJson, System.Text.Encoding.UTF8, "application/json");
+        (await admin.PostAsync(ImportUri, content, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var after = await sdk.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), ct);
+        after.Headers.ETag!.Tag.Should().NotBe(beforeEtag, "an import rewrites the snapshot");
+    }
+
+    [Fact]
     public async Task Export_then_import_round_trips_definitions()
     {
         using var host = await FeatlyTestHost.CreateAsync();

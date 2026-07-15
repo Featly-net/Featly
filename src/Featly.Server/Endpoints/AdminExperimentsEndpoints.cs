@@ -253,10 +253,8 @@ internal static class AdminExperimentsEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string experimentKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Experiment", experimentKey, DateTimeOffset.UtcNow),
-            ct);
+    private static Task NotifyAsync(StorageFacade store, Guid environmentId, string experimentKey, CancellationToken ct)
+        => SnapshotChange.AnnounceAsync(store, environmentId, "Experiment", experimentKey, ct);
 }
 
 /// <summary>

@@ -51,6 +51,18 @@ internal sealed class InMemoryEnvironmentStore : IEnvironmentStore
         return Task.FromResult<Environment?>(null);
     }
 
+    public Task BumpConfigVersionAsync(Guid id, CancellationToken ct)
+    {
+        if (_byId.TryGetValue(id, out var env))
+        {
+            lock (_byId)
+            {
+                env.ConfigVersion++;
+            }
+        }
+        return Task.CompletedTask;
+    }
+
     public Task UpdateAsync(Environment environment, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(environment);
