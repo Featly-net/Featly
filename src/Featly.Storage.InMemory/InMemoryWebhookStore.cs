@@ -23,6 +23,17 @@ internal sealed class InMemoryWebhookStore : IWebhookStore
         return Task.CompletedTask;
     }
 
+    public Task RecordCircuitStateAsync(Guid id, int consecutiveFailures, DateTimeOffset? circuitOpenUntil, CancellationToken ct)
+    {
+        if (_byId.TryGetValue(id, out var endpoint))
+        {
+            endpoint.ConsecutiveFailures = consecutiveFailures;
+            endpoint.CircuitOpenUntil = circuitOpenUntil;
+            endpoint.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        return Task.CompletedTask;
+    }
+
     public Task DeleteAsync(Guid id, CancellationToken ct)
     {
         _byId.TryRemove(id, out _);

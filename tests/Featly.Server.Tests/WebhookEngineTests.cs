@@ -446,6 +446,72 @@ public class WebhookEngineTests
         leased!.NextAttemptAt.Should().BeCloseTo(leaseUntil, TimeSpan.FromSeconds(1));
     }
 
+    [Fact]
+    public async Task Circuit_opens_after_consecutive_failures_and_short_circuits()
+    {
+        // A target that refuses connections makes each delivery fail fast. With a
+        // threshold of 2 the endpoint's circuit opens on the second failure and any
+        // remaining due delivery is short-circuited without a POST (issue #207).
+        var port = FreeLoopbackPort();
+        using var host = await BuildHostAsync(allowPrivateTargets: true, pollInterval: "00:00:00.200", circuitBreakerThreshold: 2);
+        var store = host.Services.GetRequiredService<Featly.Storage.IFeatlyStore>();
+        var ct = TestContext.Current.CancellationToken;
+
+        var now = DateTimeOffset.UtcNow;
+        var endpoint = new WebhookEndpoint
+        {
+            Id = Guid.NewGuid(),
+            Name = "dead",
+            Url = $"http://127.0.0.1:{port}/hook",
+            Secret = "s",
+            Enabled = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.Webhooks.UpsertAsync(endpoint, ct);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await store.WebhookDeliveries.EnqueueAsync(
+            [
+                new WebhookDelivery
+                {
+                    Id = Guid.NewGuid(),
+                    WebhookEndpointId = endpoint.Id,
+                    EventType = "flag.updated",
+                    Payload = "{}",
+                    Status = WebhookDeliveryStatus.Pending,
+                    NextAttemptAt = now.AddSeconds(-1),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                },
+            ], ct);
+        }
+
+        WebhookEndpoint? state = null;
+        for (var i = 0; i < 50; i++)
+        {
+            state = await store.Webhooks.GetByIdAsync(endpoint.Id, ct);
+            if (state?.CircuitOpenUntil is not null)
+            {
+                break;
+            }
+            await Task.Delay(100, ct);
+        }
+
+        state!.CircuitOpenUntil.Should().NotBeNull("the circuit should trip after two consecutive failures");
+        state.ConsecutiveFailures.Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    private static int FreeLoopbackPort()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
@@ -453,7 +519,7 @@ public class WebhookEngineTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00")
+    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00", int? circuitBreakerThreshold = null)
     {
         var builder = new HostBuilder()
             .ConfigureWebHost(web =>
@@ -467,6 +533,7 @@ public class WebhookEngineTests
                     // assertions (tests that exercise the worker pass a short one).
                     ["Featly:Webhooks:PollInterval"] = pollInterval,
                     ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
+                    ["Featly:Webhooks:CircuitBreakerThreshold"] = circuitBreakerThreshold?.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 }));
                 web.ConfigureServices(services =>
                 {

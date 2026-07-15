@@ -209,6 +209,8 @@ internal sealed class DefaultFeatlySettingsProvider : IFeatlySettingsProvider
             MaxAttempts = o.MaxAttempts,
             BaseRetryDelaySeconds = (int)o.BaseRetryDelay.TotalSeconds,
             MaxRetryDelaySeconds = (int)o.MaxRetryDelay.TotalSeconds,
+            CircuitBreakerThreshold = o.CircuitBreakerThreshold,
+            CircuitBreakerCooldownSeconds = (int)o.CircuitBreakerCooldown.TotalSeconds,
         };
         return (value, _webhookSectionExists ? FeatlySettingsSource.AppSettings : FeatlySettingsSource.HardcodedDefault);
     }

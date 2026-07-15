@@ -19,6 +19,7 @@
          provider; ADR-0026 keeps the DbContext per provider). -->
     <Compile Include="..\Shared\Storage\EfPendingChangeStore.cs" Link="Stores\Shared\EfPendingChangeStore.cs" />
     <Compile Include="..\Shared\Storage\EfWebhookDeliveryStore.cs" Link="Stores\Shared\EfWebhookDeliveryStore.cs" />
+    <Compile Include="..\Shared\Storage\EfWebhookStore.cs" Link="Stores\Shared\EfWebhookStore.cs" />
   </ItemGroup>
 
   <ItemGroup>

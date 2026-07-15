@@ -1089,7 +1089,7 @@ Configurable per Featly instance. A `Webhook` subscribes to a list of event type
 
 **Security.** Each webhook has a secret. Featly signs each delivery with HMAC-SHA256 over the body and attaches the signature in the `X-Featly-Signature` header. Receivers verify the signature to confirm authenticity.
 
-**Reliability.** Delivery has an exponential backoff retry policy (configurable via `WebhookSettings`). After `MaxRetries` consecutive failures, Featly opens a circuit breaker and skips deliveries for a cooldown. `ConsecutiveFailures` is tracked per webhook. The dashboard shows last delivery status and recent failures.
+**Reliability.** Delivery has an exponential backoff retry policy (configurable via `WebhookSettings`), and after the attempt budget a delivery is dead-lettered. A per-endpoint **circuit breaker** ([ADR-0029](docs/adr/0029-webhook-circuit-breaker.md), issue #207) sits on top: once an endpoint reaches `CircuitBreakerThreshold` consecutive failures its circuit opens and the worker short-circuits that endpoint's due deliveries (reschedules them past the cooldown without POSTing, sparing the queue), then admits a half-open probe after the cooldown — success closes the circuit, failure re-opens it. `ConsecutiveFailures` and `CircuitOpenUntil` are persisted on the endpoint; the threshold and cooldown are DB-overridable (a non-positive threshold disables the breaker). The dashboard shows last delivery status and recent failures.
 
 > **Multi-instance workers.** `WebhookDeliveryWorker` and `ScheduledApplyWorker` claim each due row with a single conditional `UPDATE` before acting on it ([issue #237](https://github.com/Featly-net/Featly/issues/237)): the scheduled-apply worker transitions `Approved -> Applied` atomically, and the webhook worker leases a due delivery by pushing its `NextAttemptAt` forward. On a database with concurrent writers (Pattern 2 multi-node, Pattern 3 shared DB) only one instance wins each claim, so a scheduled apply cannot race and a delivery is not sent twice by two instances. A crash between claim and completion lets the lease expire and the row becomes due again — at-least-once, and receivers already deduplicate on the `X-Featly-Delivery` id. (The bundled SQLite provider serializes writers regardless; the guarantee matters for Postgres and other concurrent-writer stores.)
 
@@ -1359,6 +1359,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-026](docs/adr/0026-postgres-storage-provider.md) | PostgreSQL storage provider — Npgsql, own DbContext per provider, LISTEN/NOTIFY | Accepted |
 | [ADR-027](docs/adr/0027-flag-prerequisites.md) | Flag prerequisites — AND-only, write-time cycle rejection, opt-in evaluation cost | Accepted |
 | [ADR-028](docs/adr/0028-scheduled-releases.md) | Scheduled releases — a field on `PendingChange`, drained by a staleness-aware worker | Accepted |
+| [ADR-029](docs/adr/0029-webhook-circuit-breaker.md) | Webhook circuit breaker — per-endpoint open/half-open state persisted on the endpoint | Accepted |
 
 ---
 
