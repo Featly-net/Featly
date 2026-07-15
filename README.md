@@ -3,16 +3,19 @@
 > Feature management for .NET. Feature flags, dynamic configuration, segments, experiments, and enterprise governance. Embed the server, dashboard, and SDK inside your ASP.NET Core process like Hangfire, or host it centrally for many consumers. Bring your own database.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-early%20development-orange.svg)](#status)
+[![NuGet](https://img.shields.io/nuget/vpre/Featly.Sdk.svg?label=nuget)](https://www.nuget.org/packages/Featly.Sdk)
+[![Status](https://img.shields.io/badge/status-preview-blue.svg)](#status)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 
 ---
 
 ## Status
 
-Featly is in **early design and development**. The architecture is documented and the implementation is starting. There are no releases yet. Stars, ideas, and pull requests are welcome.
+**Preview — published on NuGet.** Milestones M1–M12 are complete and shipped: flags, configs, segments, experiments, projects and environments, custom RBAC, approval workflows, audit log, webhooks, the embedded dashboard, an OpenFeature provider, and the `featly` CLI. See [STATUS.md](STATUS.md) for the current milestone and [CHANGELOG.md](CHANGELOG.md) for what landed when.
 
-If you want to know where the project is headed, read [PLAN.md](PLAN.md). If you want to understand the design, read [ARCHITECTURE.md](ARCHITECTURE.md).
+The public API is **pre-1.0 and may still change between previews**, so pin an exact version. Promotion to a stable `v0.1.0` is a separate step.
+
+If you want to know where the project is headed, read [PLAN.md](PLAN.md). If you want to understand the design, read [ARCHITECTURE.md](ARCHITECTURE.md). Stars, ideas, and pull requests are welcome.
 
 ## What is Featly
 
@@ -38,7 +41,7 @@ No other project in the .NET open-source space combines these. That is Featly's 
 - **Dry-run** on any mutation endpoint
 - **Webhooks** with HMAC signing for external integrations (Slack, Teams, Discord, PagerDuty)
 - **OpenFeature provider** shipped as a first-class day-one feature
-- **Storage**: SQLite for embedded, SQL Server and PostgreSQL planned
+- **Storage**: SQLite ships today; PostgreSQL is in progress ([ADR-0026](docs/adr/0026-postgres-storage-provider.md)), SQL Server planned
 - **Observability**: native OpenTelemetry traces and metrics
 
 ## Dashboard
@@ -96,29 +99,47 @@ The same binary supports three patterns. The schema is identical across them.
 
 **Pattern 3 — Embedded with shared database.** Multiple apps embed Featly and point at the same database. The Project concept keeps each service's flags isolated.
 
-## Quick start (planned API)
+## Quick start
 
-Self-host inside your own ASP.NET Core app:
+```shell
+dotnet add package Featly.Server
+dotnet add package Featly.Dashboard
+dotnet add package Featly.Storage.Sqlite
+```
+
+Self-host inside your own ASP.NET Core app — storage is registered separately, so
+you only pay for the provider you reference ([ADR-0015](docs/adr/0015-storage-facade.md)):
 
 ```csharp
 // Program.cs
-builder.Services.AddFeatlyServer(opts =>
-{
-    opts.UseSqlite("Data Source=featly.db");
-});
+using Featly.Dashboard;
+using Featly.Server;
+using Featly.Storage.Sqlite;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddFeatlySqliteStore();   // schema applied on first boot
+builder.Services.AddFeatlyServer();
 
 var app = builder.Build();
 
 app.MapFeatlyDashboard("/featly");    // UI at /featly
 app.MapFeatlyApi();                    // SDK + admin endpoints
+
+app.Run();
 ```
 
 Consume from any .NET app:
 
+```shell
+dotnet add package Featly.Sdk
+dotnet add package Featly.AspNetCore
+```
+
 ```csharp
 builder.Services.AddFeatly()
-    .UseServer("https://features.mycompany.com", apiKey: "...")
-    .UseContextAccessor<HttpContextFeatlyContextAccessor>();
+    .UseServer(serverUrl: "https://features.mycompany.com", apiKey: "...")
+    .UseHttpContextAccessor();
 ```
 
 ```csharp
