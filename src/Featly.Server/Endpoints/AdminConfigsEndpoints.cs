@@ -89,17 +89,16 @@ internal static class AdminConfigsEndpoints
             return Problems.Conflict($"Config '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
-        var gated = await gate.InterceptAsync("Config", body.Key, environment, ChangeAction.Create,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Config", body.Key, environment,
+            ChangeAction.Create, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var config = body.ToEntity(environment.Id, actor);
         await store.Configs.UpsertAsync(environment.Id, config, actor, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, config.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Config", config.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ConfigCreated, "Config", config.Key, environment.Id, user, new { after = config }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/configs/{config.Key}?env={environment.Key}", config);
@@ -137,14 +136,13 @@ internal static class AdminConfigsEndpoints
             return Problems.BadRequest("Cannot rename a config via PUT. Body key must match URL key.");
         }
 
-        var gated = await gate.InterceptAsync("Config", key, environment, ChangeAction.Update,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Config", key, environment,
+            ChangeAction.Update, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
@@ -154,7 +152,7 @@ internal static class AdminConfigsEndpoints
         existing.Rules = body.Rules is null ? [] : [.. body.Rules];
 
         await store.Configs.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Config", existing.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ConfigUpdated, "Config", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
@@ -199,7 +197,7 @@ internal static class AdminConfigsEndpoints
             return Problems.NotFound($"Config '{key}' not found.");
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         if (archived)
         {
@@ -211,7 +209,7 @@ internal static class AdminConfigsEndpoints
         }
 
         var updated = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Config", key, ct).ConfigureAwait(false);
         await events.PublishAsync(
             archived ? FeatlyEventTypes.ConfigArchived : FeatlyEventTypes.ConfigUnarchived,
             "Config", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
@@ -222,16 +220,7 @@ internal static class AdminConfigsEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static string ResolveActor(ClaimsPrincipal user)
-    {
-        var name = user.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 
-    private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string configKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Config", configKey, DateTimeOffset.UtcNow),
-            ct);
 }
 
 /// <summary>

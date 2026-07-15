@@ -129,7 +129,7 @@ internal static class AdminExperimentsEndpoints
 
         var experiment = body.ToEntity(environment.Id);
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Experiment", experiment.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ExperimentCreated, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/experiments/{experiment.Key}?env={environment.Key}", experiment);
@@ -171,7 +171,7 @@ internal static class AdminExperimentsEndpoints
         existing.StickyAssignments = body.StickyAssignments;
 
         await store.Experiments.UpsertAsync(environment.Id, existing, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Experiment", existing.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ExperimentUpdated, "Experiment", existing.Key, environment.Id, user, existing, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
@@ -206,7 +206,7 @@ internal static class AdminExperimentsEndpoints
         experiment.StartedAt = DateTimeOffset.UtcNow;
         experiment.StoppedAt = null;
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Experiment", experiment.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ExperimentStarted, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Ok(experiment);
@@ -244,7 +244,7 @@ internal static class AdminExperimentsEndpoints
 
         experiment.StoppedAt = DateTimeOffset.UtcNow;
         await store.Experiments.UpsertAsync(environment.Id, experiment, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, experiment.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Experiment", experiment.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.ExperimentStopped, "Experiment", experiment.Key, environment.Id, user, experiment, ct).ConfigureAwait(false);
 
         return Results.Ok(experiment);
@@ -253,10 +253,6 @@ internal static class AdminExperimentsEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string experimentKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Experiment", experimentKey, DateTimeOffset.UtcNow),
-            ct);
 }
 
 /// <summary>

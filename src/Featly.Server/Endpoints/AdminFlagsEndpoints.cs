@@ -105,17 +105,16 @@ internal static class AdminFlagsEndpoints
         // Approval gate: when the environment requires approval, this returns a
         // 202 PendingChange (or applies via emergency bypass) instead of a
         // direct create. dryRun never mutates.
-        var gated = await gate.InterceptAsync("Flag", body.Key, environment, ChangeAction.Create,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Flag", body.Key, environment,
+            ChangeAction.Create, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var flag = body.ToEntity(environment.Id, actor);
         await store.Flags.UpsertAsync(environment.Id, flag, actor, ct).ConfigureAwait(false);
-        await NotifyChangeAsync(store, environment.Id, flag.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Flag", flag.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.FlagCreated, "Flag", flag.Key, environment.Id, user, new { after = flag }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/flags/{flag.Key}?env={environment.Key}", flag);
@@ -163,14 +162,13 @@ internal static class AdminFlagsEndpoints
             }
         }
 
-        var gated = await gate.InterceptAsync("Flag", key, environment, ChangeAction.Update,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Flag", key, environment,
+            ChangeAction.Update, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
@@ -183,7 +181,7 @@ internal static class AdminFlagsEndpoints
         existing.Prerequisites = body.Prerequisites is null ? [] : [.. body.Prerequisites];
 
         await store.Flags.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
-        await NotifyChangeAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Flag", existing.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.FlagUpdated, "Flag", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
@@ -228,7 +226,7 @@ internal static class AdminFlagsEndpoints
             return Problems.NotFound($"Flag '{key}' not found.");
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         if (archived)
         {
@@ -240,7 +238,7 @@ internal static class AdminFlagsEndpoints
         }
 
         var updated = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        await NotifyChangeAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Flag", key, ct).ConfigureAwait(false);
         await events.PublishAsync(
             archived ? FeatlyEventTypes.FlagArchived : FeatlyEventTypes.FlagUnarchived,
             "Flag", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
@@ -323,16 +321,7 @@ internal static class AdminFlagsEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static string ResolveActor(ClaimsPrincipal user)
-    {
-        var name = user.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 
-    private static ValueTask NotifyChangeAsync(StorageFacade store, Guid environmentId, string flagKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Flag", flagKey, DateTimeOffset.UtcNow),
-            ct);
 }
 
 /// <summary>

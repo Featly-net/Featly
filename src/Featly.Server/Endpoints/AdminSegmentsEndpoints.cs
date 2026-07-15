@@ -90,17 +90,16 @@ internal static class AdminSegmentsEndpoints
             return Problems.Conflict($"Segment '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
-        var gated = await gate.InterceptAsync("Segment", body.Key, environment, ChangeAction.Create,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Segment", body.Key, environment,
+            ChangeAction.Create, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var segment = body.ToEntity(environment.Id, actor);
         await store.Segments.UpsertAsync(environment.Id, segment, actor, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, segment.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Segment", segment.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.SegmentCreated, "Segment", segment.Key, environment.Id, user, new { after = segment }, ct).ConfigureAwait(false);
 
         return Results.Created($"/api/admin/segments/{segment.Key}?env={environment.Key}", segment);
@@ -138,21 +137,20 @@ internal static class AdminSegmentsEndpoints
             return Problems.BadRequest("Cannot rename a segment via PUT. Body key must match URL key.");
         }
 
-        var gated = await gate.InterceptAsync("Segment", key, environment, ChangeAction.Update,
-            JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
-        if (gated.Outcome == GateOutcome.Handled)
+        if (await AdminWrite.GateOrNullAsync(gate, "Segment", key, environment,
+            ChangeAction.Update, body, user, dryRun, emergency, reason, ct).ConfigureAwait(false) is { } gated)
         {
-            return gated.Response!;
+            return gated;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         existing.Name = body.Name;
         existing.Description = body.Description;
         existing.Conditions = [.. body.Conditions];
 
         await store.Segments.UpsertAsync(environment.Id, existing, actor, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, existing.Key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Segment", existing.Key, ct).ConfigureAwait(false);
         await events.PublishAsync(FeatlyEventTypes.SegmentUpdated, "Segment", existing.Key, environment.Id, user, new { before, after = existing }, ct).ConfigureAwait(false);
 
         return Results.Ok(existing);
@@ -172,10 +170,10 @@ internal static class AdminSegmentsEndpoints
             return guard!;
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         await store.Segments.DeleteAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Segment", key, ct).ConfigureAwait(false);
         object? deletedData = existing is null ? null : new { before = existing };
         await events.PublishAsync(FeatlyEventTypes.SegmentDeleted, "Segment", key, environment.Id, user, deletedData, ct).ConfigureAwait(false);
 
@@ -221,7 +219,7 @@ internal static class AdminSegmentsEndpoints
             return Problems.NotFound($"Segment '{key}' not found.");
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
         if (archived)
         {
@@ -233,7 +231,7 @@ internal static class AdminSegmentsEndpoints
         }
 
         var updated = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        await NotifyAsync(store, environment.Id, key, ct).ConfigureAwait(false);
+        await AdminWrite.NotifyAsync(store, environment.Id, "Segment", key, ct).ConfigureAwait(false);
         await events.PublishAsync(
             archived ? FeatlyEventTypes.SegmentArchived : FeatlyEventTypes.SegmentUnarchived,
             "Segment", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
@@ -244,16 +242,7 @@ internal static class AdminSegmentsEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static string ResolveActor(ClaimsPrincipal user)
-    {
-        var name = user.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 
-    private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string segmentKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Segment", segmentKey, DateTimeOffset.UtcNow),
-            ct);
 }
 
 /// <summary>

@@ -80,7 +80,7 @@ internal static class AdminApiKeysEndpoints
             return Problems.Validation("expiresAt", "expiresAt must be in the future.");
         }
 
-        var actor = ResolveActor(principal);
+        var actor = AdminWrite.ResolveActor(principal);
 
         // Optionally bind the key to a real user (auto-creating the user row on
         // first sight, mirroring the change-workflow auto-provision).
@@ -135,7 +135,7 @@ internal static class AdminApiKeysEndpoints
             return Problems.NotFound($"API key '{id}' not found.");
         }
 
-        await store.ApiKeys.RevokeAsync(id, ResolveActor(principal), ct).ConfigureAwait(false);
+        await store.ApiKeys.RevokeAsync(id, AdminWrite.ResolveActor(principal), ct).ConfigureAwait(false);
         await events.PublishAsync(
             FeatlyEventTypes.ApiKeyRevoked,
             entityType: "ApiKey",
@@ -175,7 +175,7 @@ internal static class AdminApiKeysEndpoints
             return Problems.Validation("expiresAt", "expiresAt must be in the future.");
         }
 
-        var actor = ResolveActor(principal);
+        var actor = AdminWrite.ResolveActor(principal);
         var plaintext = hasher.GenerateToken();
         var replacement = new ApiKey
         {
@@ -261,11 +261,6 @@ internal static class AdminApiKeysEndpoints
         return (await store.Users.GetByIdentifierAsync(identifier, ct).ConfigureAwait(false)) ?? user;
     }
 
-    private static string ResolveActor(ClaimsPrincipal principal)
-    {
-        var name = principal.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 }
 
 /// <summary>Inbound shape for <c>POST /api/admin/apikeys</c>.</summary>

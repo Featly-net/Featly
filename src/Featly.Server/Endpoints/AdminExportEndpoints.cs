@@ -75,7 +75,7 @@ internal static class AdminExportEndpoints
             return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
         }
 
-        var actor = ResolveActor(user);
+        var actor = AdminWrite.ResolveActor(user);
         var envId = environment.Id;
         int flags = 0, configs = 0, segments = 0;
 
@@ -165,11 +165,6 @@ internal static class AdminExportEndpoints
     private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
         => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
-    private static string ResolveActor(ClaimsPrincipal principal)
-    {
-        var name = principal.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 }
 
 /// <summary>A portable bundle of an environment's flag / config / segment definitions.</summary>

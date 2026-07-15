@@ -121,7 +121,7 @@ internal static class AdminUsersEndpoints
             return Problems.Validation("identifier", "identifier is required.");
         }
 
-        var actor = ResolveActor(principal);
+        var actor = AdminWrite.ResolveActor(principal);
         var existing = await store.Users.GetByIdentifierAsync(body.Identifier, ct).ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
 
@@ -152,15 +152,10 @@ internal static class AdminUsersEndpoints
             return Problems.NotFound($"User '{identifier}' not found.");
         }
 
-        await store.Users.DisableAsync(identifier, ResolveActor(principal), ct).ConfigureAwait(false);
+        await store.Users.DisableAsync(identifier, AdminWrite.ResolveActor(principal), ct).ConfigureAwait(false);
         return Results.NoContent();
     }
 
-    private static string ResolveActor(ClaimsPrincipal principal)
-    {
-        var name = principal.Identity?.Name;
-        return string.IsNullOrEmpty(name) ? "anonymous" : name;
-    }
 }
 
 /// <summary>Inbound shape for POST on the admin users endpoint (create / upsert).</summary>
