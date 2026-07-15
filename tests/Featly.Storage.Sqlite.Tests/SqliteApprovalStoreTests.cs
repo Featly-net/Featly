@@ -12,6 +12,37 @@ namespace Featly.Storage.Sqlite.Tests;
 public class SqliteApprovalStoreTests
 {
     [Fact]
+    public async Task TryClaimStatus_transitions_atomically_exactly_once()
+    {
+        // Exercises the shared EF ExecuteUpdateAsync claim on a real SQLite
+        // database (issue #237): the conditional UPDATE ... WHERE status=@from
+        // transitions once and rejects a second claim from the same source status.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        var id = Guid.NewGuid();
+        await host.Store.PendingChanges.CreateAsync(new PendingChange
+        {
+            Id = id,
+            EntityType = "Flag",
+            EntityKey = "claim-flag",
+            EnvironmentId = Guid.NewGuid(),
+            Action = ChangeAction.Create,
+            ProposedState = JsonDocument.Parse("""{"enabled":true}""").RootElement,
+            AuthorUserId = Guid.NewGuid(),
+            Status = ChangeStatus.Approved,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Applied, ct)).Should().BeTrue();
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Applied, ct)).Should().BeFalse();
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Stale, ct)).Should().BeFalse();
+
+        (await host.Store.PendingChanges.GetByIdAsync(id, ct))!.Status.Should().Be(ChangeStatus.Applied);
+    }
+
+    [Fact]
     public async Task PendingChange_round_trips_state_approvals_and_comments()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
@@ -158,6 +189,33 @@ public class SqliteApprovalStoreTests
     }
 
     [Fact]
+    public async Task ListAsync_and_ListByEnvironment_return_newest_first()
+    {
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        var envA = Guid.NewGuid();
+        var envB = Guid.NewGuid();
+        var older = NewPending(envA, "Flag", "a", DateTimeOffset.UtcNow.AddMinutes(-5));
+        var newer = NewPending(envA, "Flag", "b", DateTimeOffset.UtcNow);
+        var otherEnv = NewPending(envB, "Flag", "c");
+
+        await host.Store.PendingChanges.CreateAsync(older, ct);
+        await host.Store.PendingChanges.CreateAsync(newer, ct);
+        await host.Store.PendingChanges.CreateAsync(otherEnv, ct);
+
+        var all = await host.Store.PendingChanges.ListAsync(ct);
+        all.Should().HaveCount(3);
+        all.Should().BeInDescendingOrder(c => c.CreatedAt);
+        all[^1].Id.Should().Be(older.Id); // oldest sorts last
+
+        var inEnvA = await host.Store.PendingChanges.ListByEnvironmentAsync(envA, ct);
+        inEnvA.Should().HaveCount(2);
+        inEnvA[0].Id.Should().Be(newer.Id); // newest first within the environment
+        inEnvA.Should().OnlyContain(c => c.EnvironmentId == envA);
+    }
+
+    [Fact]
     public async Task ApprovalPolicy_round_trips_rules_and_is_one_per_environment()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
@@ -198,7 +256,7 @@ public class SqliteApprovalStoreTests
         (await host.Store.ApprovalPolicies.GetByEnvironmentAsync(envId, ct)).Should().BeNull();
     }
 
-    private static PendingChange NewPending(Guid? env = null, string entityType = "Flag", string entityKey = "demo") => new()
+    private static PendingChange NewPending(Guid? env = null, string entityType = "Flag", string entityKey = "demo", DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.NewGuid(),
         EntityType = entityType,
@@ -208,7 +266,7 @@ public class SqliteApprovalStoreTests
         ProposedState = JsonDocument.Parse("{}").RootElement,
         AuthorUserId = Guid.NewGuid(),
         Status = ChangeStatus.Pending,
-        CreatedAt = DateTimeOffset.UtcNow,
+        CreatedAt = createdAt ?? DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow,
     };
 }

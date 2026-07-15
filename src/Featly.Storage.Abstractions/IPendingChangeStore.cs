@@ -33,4 +33,14 @@ public interface IPendingChangeStore
     /// applied / rejected fields). Idempotent for a missing id (no-op).
     /// </summary>
     Task UpdateAsync(PendingChange change, CancellationToken ct);
+
+    /// <summary>
+    /// Atomically transitions the change's status from <paramref name="from"/> to
+    /// <paramref name="to"/> only if it is currently <paramref name="from"/>,
+    /// returning whether this call performed the transition. Lets a background
+    /// worker claim a change exactly once even when several instances run against
+    /// a shared database (issue #237): the first caller wins, the rest get
+    /// <c>false</c> and skip.
+    /// </summary>
+    Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct);
 }

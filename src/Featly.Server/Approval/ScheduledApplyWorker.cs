@@ -96,9 +96,14 @@ internal sealed partial class ScheduledApplyWorker(
     {
         if (await ChangeStaleness.IsStaleAsync(store, change, ct).ConfigureAwait(false))
         {
-            change.Status = ChangeStatus.Stale;
-            change.UpdatedAt = DateTimeOffset.UtcNow;
-            await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
+            // Atomically move Approved -> Stale. If another instance already
+            // claimed this change, TryClaim returns false and we skip — no
+            // double event, and a change another instance applied can't be
+            // clobbered into Stale (issue #237).
+            if (!await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Stale, ct).ConfigureAwait(false))
+            {
+                return;
+            }
             LogSkippedStale(logger, change.Id, change.EntityType, change.EntityKey);
 
             await events.PublishAsync(new FeatlyDomainEvent
@@ -117,6 +122,14 @@ internal sealed partial class ScheduledApplyWorker(
         if (!applied)
         {
             LogApplyFailed(logger, change.Id, change.EntityType);
+            return;
+        }
+
+        // Apply is an idempotent upsert, so a concurrent double-apply is harmless;
+        // the atomic Approved -> Applied claim then ensures exactly one instance
+        // finalizes and emits the event. The loser skips (returns false).
+        if (!await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Applied, ct).ConfigureAwait(false))
+        {
             return;
         }
 
