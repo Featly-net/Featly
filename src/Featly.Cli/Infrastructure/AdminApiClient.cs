@@ -167,20 +167,6 @@ internal sealed class AdminApiClient(HttpClient http)
                 {
                     return error.GetString();
                 }
-                // RFC 7807 validation problem: surface the per-field messages.
-                if (doc.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
-                {
-                    var messages = errors.EnumerateObject()
-                        .SelectMany(p => p.Value.ValueKind == JsonValueKind.Array
-                            ? p.Value.EnumerateArray().Select(v => v.GetString())
-                            : new[] { p.Value.GetString() })
-                        .Where(m => !string.IsNullOrWhiteSpace(m));
-                    var joined = string.Join(" ", messages);
-                    if (!string.IsNullOrWhiteSpace(joined))
-                    {
-                        return joined;
-                    }
-                }
                 if (doc.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
                 {
                     return detail.GetString();
