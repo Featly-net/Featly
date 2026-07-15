@@ -28,6 +28,21 @@ public sealed class WebhookOptions
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Consecutive failures that trip the per-endpoint circuit breaker (issue
+    /// #207). Once an endpoint reaches this many failures in a row its circuit
+    /// opens and due deliveries are short-circuited for <see cref="CircuitBreakerCooldown"/>.
+    /// A non-positive value disables the breaker (backoff + dead-letter still
+    /// apply). DB-overridable via webhook settings.
+    /// </summary>
+    public int CircuitBreakerThreshold { get; set; } = 5;
+
+    /// <summary>
+    /// How long a tripped circuit stays open before the next half-open probe
+    /// (issue #207). DB-overridable via webhook settings.
+    /// </summary>
+    public TimeSpan CircuitBreakerCooldown { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// When <c>true</c>, disables the SSRF guard that blocks webhook targets on
     /// loopback / private / link-local ranges (issue #189). Off by default;
     /// enable only when you intentionally deliver to an internal receiver and

@@ -106,6 +106,48 @@ public class SqliteWebhookAndAuditStoreTests
     }
 
     [Fact]
+    public async Task RecordCircuitState_persists_and_upsert_preserves_it()
+    {
+        // Issue #207: circuit-breaker fields round-trip and are worker-managed —
+        // an admin UpsertAsync must not reset a tripped circuit.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        var endpoint = new WebhookEndpoint
+        {
+            Id = Guid.NewGuid(),
+            Name = "hook",
+            Url = "https://example.com/hook",
+            Secret = "s",
+            Enabled = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        await host.Store.Webhooks.UpsertAsync(endpoint, ct);
+
+        var openUntil = DateTimeOffset.UtcNow.AddMinutes(5);
+        await host.Store.Webhooks.RecordCircuitStateAsync(endpoint.Id, 3, openUntil, ct);
+
+        var tripped = await host.Store.Webhooks.GetByIdAsync(endpoint.Id, ct);
+        tripped!.ConsecutiveFailures.Should().Be(3);
+        tripped.CircuitOpenUntil.Should().BeCloseTo(openUntil, TimeSpan.FromSeconds(1));
+
+        // An admin edit (rename) must not clear the tripped circuit.
+        endpoint.Name = "renamed";
+        await host.Store.Webhooks.UpsertAsync(endpoint, ct);
+        var afterEdit = await host.Store.Webhooks.GetByIdAsync(endpoint.Id, ct);
+        afterEdit!.Name.Should().Be("renamed");
+        afterEdit.ConsecutiveFailures.Should().Be(3);
+        afterEdit.CircuitOpenUntil.Should().BeCloseTo(openUntil, TimeSpan.FromSeconds(1));
+
+        // A success resets it.
+        await host.Store.Webhooks.RecordCircuitStateAsync(endpoint.Id, 0, null, ct);
+        var closed = await host.Store.Webhooks.GetByIdAsync(endpoint.Id, ct);
+        closed!.ConsecutiveFailures.Should().Be(0);
+        closed.CircuitOpenUntil.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Audit_entries_round_trip_payload_and_filter()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

@@ -15,6 +15,14 @@ public interface IWebhookStore
     /// <summary>Inserts or updates the endpoint matched by id.</summary>
     Task UpsertAsync(WebhookEndpoint endpoint, CancellationToken ct);
 
+    /// <summary>
+    /// Updates only the circuit-breaker fields (<see cref="WebhookEndpoint.ConsecutiveFailures"/>
+    /// and <see cref="WebhookEndpoint.CircuitOpenUntil"/>) for the endpoint matched
+    /// by id, without touching admin-editable fields (issue #207). Idempotent for a
+    /// missing id.
+    /// </summary>
+    Task RecordCircuitStateAsync(Guid id, int consecutiveFailures, DateTimeOffset? circuitOpenUntil, CancellationToken ct);
+
     /// <summary>Deletes an endpoint by id. Idempotent for a missing id.</summary>
     Task DeleteAsync(Guid id, CancellationToken ct);
 }

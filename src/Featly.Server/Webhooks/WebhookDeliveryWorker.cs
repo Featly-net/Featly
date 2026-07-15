@@ -97,6 +97,26 @@ internal sealed partial class WebhookDeliveryWorker(
             return;
         }
 
+        var now = DateTimeOffset.UtcNow;
+
+        // Retry + circuit-breaker tuning is DB-overridable (ARCHITECTURE.md §15):
+        // the effective values come from the settings provider (DB beats
+        // appsettings), not directly from WebhookOptions.
+        var tuning = settings.Webhook;
+
+        // Circuit breaker (issue #207): while this endpoint's circuit is open, skip
+        // the POST entirely and defer the delivery to the half-open probe time, so
+        // a consistently-failing endpoint can't clog the queue. A short-circuited
+        // delivery does not spend the attempt budget.
+        if (tuning.CircuitBreakerThreshold > 0 && endpoint.CircuitOpenUntil is { } openUntil && openUntil > now)
+        {
+            delivery.NextAttemptAt = openUntil;
+            delivery.UpdatedAt = now;
+            await store.WebhookDeliveries.UpdateAsync(delivery, ct).ConfigureAwait(false);
+            LogCircuitOpen(logger, delivery.Id, endpoint.Url, openUntil);
+            return;
+        }
+
         // SSRF guard at delivery time (issue #189): re-resolve the target and
         // refuse internal ranges. This also defeats DNS rebinding, where a host
         // that looked public at create time now resolves to a private address.
@@ -162,14 +182,9 @@ internal sealed partial class WebhookDeliveryWorker(
         }
         activity?.SetStatus(error is null ? ActivityStatusCode.Ok : ActivityStatusCode.Error, error);
 
-        var now = DateTimeOffset.UtcNow;
+        now = DateTimeOffset.UtcNow;
         delivery.LastStatusCode = statusCode;
         delivery.UpdatedAt = now;
-
-        // Retry tuning is DB-overridable (ARCHITECTURE.md §15): the effective
-        // MaxAttempts + backoff bounds come from the settings provider (DB beats
-        // appsettings), not directly from WebhookOptions.
-        var tuning = settings.Webhook;
 
         if (error is null)
         {
@@ -196,6 +211,42 @@ internal sealed partial class WebhookDeliveryWorker(
         }
 
         await store.WebhookDeliveries.UpdateAsync(delivery, ct).ConfigureAwait(false);
+        await RecordCircuitOutcomeAsync(endpoint, success: error is null, tuning, now, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Advances the endpoint's circuit-breaker state after a delivery attempt
+    /// (issue #207): a success closes the circuit and clears the failure streak; a
+    /// failure increments it and opens the circuit once the threshold is reached.
+    /// No-op when the breaker is disabled (threshold &lt;= 0).
+    /// </summary>
+    private async Task RecordCircuitOutcomeAsync(WebhookEndpoint endpoint, bool success, FeatlyWebhookSettings tuning, DateTimeOffset now, CancellationToken ct)
+    {
+        if (tuning.CircuitBreakerThreshold <= 0)
+        {
+            return;
+        }
+
+        if (success)
+        {
+            if (endpoint.ConsecutiveFailures > 0 || endpoint.CircuitOpenUntil is not null)
+            {
+                await store.Webhooks.RecordCircuitStateAsync(endpoint.Id, 0, null, ct).ConfigureAwait(false);
+                LogCircuitClosed(logger, endpoint.Id, endpoint.Url);
+            }
+            return;
+        }
+
+        var failures = endpoint.ConsecutiveFailures + 1;
+        var openUntil = endpoint.CircuitOpenUntil;
+        if (failures >= tuning.CircuitBreakerThreshold)
+        {
+            var reopen = now + TimeSpan.FromSeconds(tuning.CircuitBreakerCooldownSeconds);
+            openUntil = reopen;
+            LogCircuitOpened(logger, endpoint.Id, endpoint.Url, failures, reopen);
+        }
+
+        await store.Webhooks.RecordCircuitStateAsync(endpoint.Id, failures, openUntil, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -236,4 +287,13 @@ internal sealed partial class WebhookDeliveryWorker(
 
     [LoggerMessage(EventId = 4105, Level = LogLevel.Warning, Message = "Webhook delivery {DeliveryId} to {Url} blocked: target resolves to an internal address range.")]
     private static partial void LogBlockedTarget(ILogger logger, Guid deliveryId, string url);
+
+    [LoggerMessage(EventId = 4106, Level = LogLevel.Debug, Message = "Webhook delivery {DeliveryId} to {Url} short-circuited: endpoint circuit is open until {OpenUntil:o}.")]
+    private static partial void LogCircuitOpen(ILogger logger, Guid deliveryId, string url, DateTimeOffset openUntil);
+
+    [LoggerMessage(EventId = 4107, Level = LogLevel.Warning, Message = "Webhook endpoint {EndpointId} ({Url}) circuit opened after {Failures} consecutive failures; suppressing deliveries until {OpenUntil:o}.")]
+    private static partial void LogCircuitOpened(ILogger logger, Guid endpointId, string url, int failures, DateTimeOffset openUntil);
+
+    [LoggerMessage(EventId = 4108, Level = LogLevel.Information, Message = "Webhook endpoint {EndpointId} ({Url}) circuit closed after a successful delivery.")]
+    private static partial void LogCircuitClosed(ILogger logger, Guid endpointId, string url);
 }

@@ -13,13 +13,10 @@ with HMAC-SHA256 signing and exponential-backoff → dead-letter). The
 dashboard) and the full audit-log filter UI. The items below were listed in the
 M10 plan but deliberately left out:
 
-- **Webhook circuit breaker.** The plan paired "exponential backoff retry +
-  circuit breaker". We shipped backoff + dead-letter, which already throttles a
-  consistently-failing endpoint (each failure pushes `NextAttemptAt` further out
-  and the row is abandoned after the attempt budget). A first-class circuit
-  breaker (open/half-open per endpoint, short-circuiting the queue) is a
-  refinement, not a correctness gap. **Revisit if** high-volume deployments show
-  the queue clogging on a dead endpoint.
+- **Webhook circuit breaker.** ~~Deferred.~~ **Shipped** in [ADR-0029](adr/0029-webhook-circuit-breaker.md)
+  (issue #207): a first-class per-endpoint open/half-open breaker now sits on top
+  of the backoff + dead-letter policy, short-circuiting a consistently-failing
+  endpoint's due deliveries so it cannot clog the queue.
 
 - **DB-overridable webhook settings (`WebhookSettings`).** Retry tuning binds
   from `appsettings` (`Featly:Webhooks`) today, not the database. Making it

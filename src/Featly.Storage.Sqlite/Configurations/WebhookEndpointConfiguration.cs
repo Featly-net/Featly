@@ -19,6 +19,13 @@ internal sealed class WebhookEndpointConfiguration : IEntityTypeConfiguration<We
         builder.Property(e => e.Enabled);
         builder.Property(e => e.EnvironmentId);
 
+        // Circuit-breaker state (issue #207).
+        builder.Property(e => e.ConsecutiveFailures);
+        builder.Property(e => e.CircuitOpenUntil)
+            .HasConversion(
+                static v => v.HasValue ? v.Value.UtcTicks : (long?)null,
+                static t => t.HasValue ? new DateTimeOffset(t.Value, TimeSpan.Zero) : (DateTimeOffset?)null);
+
         // Subscribed event types as a JSON array, same pattern as Flag.Tags.
         builder.PrimitiveCollection(e => e.EventTypes);
 

@@ -39,6 +39,24 @@ public sealed class WebhookEndpoint
     /// </summary>
     public Guid? EnvironmentId { get; set; }
 
+    /// <summary>
+    /// Consecutive failed delivery attempts since the last success (issue #207).
+    /// Drives the per-endpoint circuit breaker: once it reaches the configured
+    /// threshold the circuit opens (see <see cref="CircuitOpenUntil"/>). Reset to
+    /// zero on the next successful delivery. Managed by the delivery worker, not
+    /// editable through the admin API.
+    /// </summary>
+    public int ConsecutiveFailures { get; set; }
+
+    /// <summary>
+    /// When set and in the future, the circuit is <b>open</b>: the delivery worker
+    /// short-circuits this endpoint's due deliveries (reschedules them past this
+    /// time without POSTing) so a consistently-failing endpoint cannot clog the
+    /// queue (issue #207). After it elapses the next delivery is a half-open probe;
+    /// success closes the circuit, failure re-opens it. <c>null</c> means closed.
+    /// </summary>
+    public DateTimeOffset? CircuitOpenUntil { get; set; }
+
     /// <summary>Audit: row creation time.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 

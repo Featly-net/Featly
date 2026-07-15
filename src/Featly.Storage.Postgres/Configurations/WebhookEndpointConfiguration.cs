@@ -19,6 +19,11 @@ internal sealed class WebhookEndpointConfiguration : IEntityTypeConfiguration<We
         builder.Property(e => e.Enabled);
         builder.Property(e => e.EnvironmentId);
 
+        // Circuit-breaker state (issue #207). CircuitOpenUntil maps to a native
+        // nullable timestamptz.
+        builder.Property(e => e.ConsecutiveFailures);
+        builder.Property(e => e.CircuitOpenUntil);
+
         // Subscribed event types serialised as a native jsonb array, same
         // pattern as Flag.Tags.
         builder.PrimitiveCollection(e => e.EventTypes);

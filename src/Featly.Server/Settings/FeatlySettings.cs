@@ -54,6 +54,15 @@ public sealed class FeatlyWebhookSettings
 
     /// <summary>Upper bound (seconds) on a single retry delay.</summary>
     public int MaxRetryDelaySeconds { get; set; } = 1800;
+
+    /// <summary>
+    /// Consecutive failures that trip an endpoint's circuit breaker (issue #207).
+    /// A non-positive value disables the breaker.
+    /// </summary>
+    public int CircuitBreakerThreshold { get; set; } = 5;
+
+    /// <summary>How long (seconds) a tripped circuit stays open before a half-open probe.</summary>
+    public int CircuitBreakerCooldownSeconds { get; set; } = 300;
 }
 
 /// <summary>
