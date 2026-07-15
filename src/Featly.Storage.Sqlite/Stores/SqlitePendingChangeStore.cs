@@ -1,3 +1,4 @@
+using Featly.Storage.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 
 namespace Featly.Storage.Sqlite.Stores;
@@ -90,20 +91,6 @@ internal sealed class SqlitePendingChangeStore(IDbContextFactory<FeatlyDbContext
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct)
-    {
-        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
-        // A single atomic UPDATE ... WHERE id=@id AND status=@from: on a shared
-        // database only one concurrent writer's update matches (the others see the
-        // status already changed), so exactly one caller claims (issue #237).
-        var affected = await db.PendingChanges
-            .Where(c => c.Id == id && c.Status == from)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(c => c.Status, to)
-                    .SetProperty(c => c.UpdatedAt, DateTimeOffset.UtcNow),
-                ct)
-            .ConfigureAwait(false);
-        return affected == 1;
-    }
+    public Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct)
+        => contextFactory.TryClaimStatusAsync(id, from, to, ct);
 }

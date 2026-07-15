@@ -15,6 +15,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Shared, provider-agnostic EF Core helpers (compiled into each relational
+         provider; ADR-0026 keeps the DbContext per provider). -->
+    <Compile Include="..\Shared\Storage\EfPendingChangeClaim.cs" Link="Stores\Shared\EfPendingChangeClaim.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />

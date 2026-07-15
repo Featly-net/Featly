@@ -12,6 +12,37 @@ namespace Featly.Storage.Sqlite.Tests;
 public class SqliteApprovalStoreTests
 {
     [Fact]
+    public async Task TryClaimStatus_transitions_atomically_exactly_once()
+    {
+        // Exercises the shared EF ExecuteUpdateAsync claim on a real SQLite
+        // database (issue #237): the conditional UPDATE ... WHERE status=@from
+        // transitions once and rejects a second claim from the same source status.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        var id = Guid.NewGuid();
+        await host.Store.PendingChanges.CreateAsync(new PendingChange
+        {
+            Id = id,
+            EntityType = "Flag",
+            EntityKey = "claim-flag",
+            EnvironmentId = Guid.NewGuid(),
+            Action = ChangeAction.Create,
+            ProposedState = JsonDocument.Parse("""{"enabled":true}""").RootElement,
+            AuthorUserId = Guid.NewGuid(),
+            Status = ChangeStatus.Approved,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Applied, ct)).Should().BeTrue();
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Applied, ct)).Should().BeFalse();
+        (await host.Store.PendingChanges.TryClaimStatusAsync(id, ChangeStatus.Approved, ChangeStatus.Stale, ct)).Should().BeFalse();
+
+        (await host.Store.PendingChanges.GetByIdAsync(id, ct))!.Status.Should().Be(ChangeStatus.Applied);
+    }
+
+    [Fact]
     public async Task PendingChange_round_trips_state_approvals_and_comments()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

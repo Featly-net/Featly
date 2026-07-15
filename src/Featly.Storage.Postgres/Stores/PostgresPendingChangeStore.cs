@@ -1,3 +1,4 @@
+using Featly.Storage.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 
 namespace Featly.Storage.Postgres.Stores;
@@ -90,20 +91,6 @@ internal sealed class PostgresPendingChangeStore(IDbContextFactory<FeatlyDbConte
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct)
-    {
-        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
-        // A single atomic UPDATE ... WHERE id=@id AND status=@from: under real
-        // concurrent writers only one caller's update matches and claims the
-        // change; the rest see the status already changed and get false (#237).
-        var affected = await db.PendingChanges
-            .Where(c => c.Id == id && c.Status == from)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(c => c.Status, to)
-                    .SetProperty(c => c.UpdatedAt, DateTimeOffset.UtcNow),
-                ct)
-            .ConfigureAwait(false);
-        return affected == 1;
-    }
+    public Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct)
+        => contextFactory.TryClaimStatusAsync(id, from, to, ct);
 }
