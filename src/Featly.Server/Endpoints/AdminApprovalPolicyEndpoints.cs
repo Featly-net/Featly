@@ -30,7 +30,7 @@ internal static class AdminApprovalPolicyEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var policy = await store.ApprovalPolicies.GetByEnvironmentAsync(environment.Id, ct).ConfigureAwait(false);
@@ -45,7 +45,7 @@ internal static class AdminApprovalPolicyEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var existing = await store.ApprovalPolicies.GetByEnvironmentAsync(environment.Id, ct).ConfigureAwait(false);
@@ -68,7 +68,7 @@ internal static class AdminApprovalPolicyEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
         await store.ApprovalPolicies.DeleteByEnvironmentAsync(environment.Id, ct).ConfigureAwait(false);
         return Results.NoContent();

@@ -48,7 +48,7 @@ internal static class AdminChangesEndpoints
     private static async Task<IResult> GetAsync(Guid id, StorageFacade store, CancellationToken ct)
     {
         var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
-        return change is null ? Results.NotFound(new { error = $"Change '{id}' not found." }) : Results.Ok(change);
+        return change is null ? Problems.NotFound($"Change '{id}' not found.") : Results.Ok(change);
     }
 
     private static async Task<IResult> ProposeAsync(
@@ -61,11 +61,11 @@ internal static class AdminChangesEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.EntityType) || string.IsNullOrWhiteSpace(body.EntityKey))
         {
-            return Results.BadRequest(new { error = "entityType and entityKey are required." });
+            return Problems.BadRequest("entityType and entityKey are required.");
         }
         if (!ChangeApplicationService.IsSupported(body.EntityType))
         {
-            return Results.BadRequest(new { error = $"Unsupported entityType '{body.EntityType}'." });
+            return Problems.BadRequest($"Unsupported entityType '{body.EntityType}'.");
         }
 
         var author = await ChangeActor.ResolveOrCreateAsync(store, principal, ct).ConfigureAwait(false);
@@ -77,7 +77,7 @@ internal static class AdminChangesEndpoints
         var environment = await ResolveEnvironmentAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{body.EnvironmentKey}' not found." });
+            return Problems.NotFound($"Environment '{body.EnvironmentKey}' not found.");
         }
         if (environment.ReadOnly)
         {
@@ -117,11 +117,11 @@ internal static class AdminChangesEndpoints
         var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return Results.NotFound(new { error = $"Change '{id}' not found." });
+            return Problems.NotFound($"Change '{id}' not found.");
         }
         if (string.IsNullOrWhiteSpace(body.Body))
         {
-            return Results.BadRequest(new { error = "body is required." });
+            return Problems.Validation("body", "body is required.");
         }
 
         var author = await ChangeActor.ResolveOrCreateAsync(store, principal, ct).ConfigureAwait(false);
@@ -156,11 +156,11 @@ internal static class AdminChangesEndpoints
         var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return Results.NotFound(new { error = $"Change '{id}' not found." });
+            return Problems.NotFound($"Change '{id}' not found.");
         }
         if (change.Status != ChangeStatus.Pending)
         {
-            return Results.Conflict(new { error = $"Change is {change.Status}; only pending changes accept decisions." });
+            return Problems.Conflict($"Change is {change.Status}; only pending changes accept decisions.");
         }
 
         var approver = await ChangeActor.ResolveOrCreateAsync(store, principal, ct).ConfigureAwait(false);
@@ -232,7 +232,7 @@ internal static class AdminChangesEndpoints
         }
         if (change.Status != ChangeStatus.Approved)
         {
-            return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be applied." });
+            return Problems.Conflict($"Change is {change.Status}; only approved changes can be applied.");
         }
 
         // Stale check: the underlying entity must not have changed since propose.
@@ -241,7 +241,7 @@ internal static class AdminChangesEndpoints
             change.Status = ChangeStatus.Stale;
             change.UpdatedAt = DateTimeOffset.UtcNow;
             await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
-            return Results.Conflict(new { error = "The target entity changed since this change was proposed. Re-propose to rebase.", status = "Stale" });
+            return Problems.Conflict("The target entity changed since this change was proposed (now Stale). Re-propose to rebase.");
         }
 
         var actor = principal.Identity?.Name ?? "anonymous";
@@ -287,7 +287,7 @@ internal static class AdminChangesEndpoints
         }
         if (change.Status != ChangeStatus.Approved)
         {
-            return Results.Conflict(new { error = $"Change is {change.Status}; only approved changes can be scheduled." });
+            return Problems.Conflict($"Change is {change.Status}; only approved changes can be scheduled.");
         }
 
         change.ScheduledApplyAt = body.ScheduledApplyAt;
@@ -318,11 +318,11 @@ internal static class AdminChangesEndpoints
         }
         if (change.Status is not (ChangeStatus.Pending or ChangeStatus.Approved))
         {
-            return Results.Conflict(new { error = $"Change is {change.Status}; cannot bypass." });
+            return Problems.Conflict($"Change is {change.Status}; cannot bypass.");
         }
         if (string.IsNullOrWhiteSpace(body.Reason))
         {
-            return Results.BadRequest(new { error = "reason is required for an emergency bypass." });
+            return Problems.Validation("reason", "reason is required for an emergency bypass.");
         }
 
         var policy = await store.ApprovalPolicies.GetByEnvironmentAsync(change.EnvironmentId, ct).ConfigureAwait(false);
@@ -373,7 +373,7 @@ internal static class AdminChangesEndpoints
         var change = await store.PendingChanges.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (change is null)
         {
-            return (null, Results.NotFound(new { error = $"Change '{id}' not found." }));
+            return (null, Problems.NotFound($"Change '{id}' not found."));
         }
         var environment = await store.Environments.GetByIdAsync(change.EnvironmentId, ct).ConfigureAwait(false);
         if (environment is { ReadOnly: true })

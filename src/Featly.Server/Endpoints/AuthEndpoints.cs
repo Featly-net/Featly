@@ -57,7 +57,7 @@ internal static class AuthEndpoints
 
         if (string.IsNullOrWhiteSpace(body.ApiKey))
         {
-            return Results.BadRequest(new { error = "apiKey is required." });
+            return Problems.Validation("apiKey", "apiKey is required.");
         }
 
         var identity = await ResolveAsync(body.ApiKey, store, serverOptions.Value, ct).ConfigureAwait(false);

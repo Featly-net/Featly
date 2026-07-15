@@ -815,6 +815,8 @@ When SQL Server and PostgreSQL providers ship, each has its own `Migrations/` fo
 
 Two surfaces, distinguished by auth and audience.
 
+**Error contract.** Every error response is RFC 7807 `application/problem+json` ([ADR-0031](docs/adr/0031-problem-details-error-contract.md), issues #226/#230): a `{ type, title, status, detail }` document, and field-level validation failures add an `errors` map keyed by field. Clients read `detail` (or the `errors` map) rather than a bespoke `{ error }` envelope.
+
 ### SDK API — `/api/sdk/*`
 
 Authenticated by API keys with `SdkRead` scope.
@@ -1364,6 +1366,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-028](docs/adr/0028-scheduled-releases.md) | Scheduled releases — a field on `PendingChange`, drained by a staleness-aware worker | Accepted |
 | [ADR-029](docs/adr/0029-webhook-circuit-breaker.md) | Webhook circuit breaker — per-endpoint open/half-open state persisted on the endpoint | Accepted |
 | [ADR-030](docs/adr/0030-audit-hash-chain.md) | Tamper-evident audit log — per-entry SHA-256 hash chain with a verify endpoint | Accepted |
+| [ADR-031](docs/adr/0031-problem-details-error-contract.md) | RFC 7807 ProblemDetails as the uniform API error contract | Accepted |
 
 ---
 

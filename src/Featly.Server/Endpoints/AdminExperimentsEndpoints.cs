@@ -41,7 +41,7 @@ internal static class AdminExperimentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var experiments = await store.Experiments.ListAsync(environment.Id, ct).ConfigureAwait(false);
@@ -53,12 +53,12 @@ internal static class AdminExperimentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var experiment = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
         return experiment is null
-            ? Results.NotFound(new { error = $"Experiment '{key}' not found." })
+            ? Problems.NotFound($"Experiment '{key}' not found.")
             : Results.Ok(experiment);
     }
 
@@ -67,13 +67,13 @@ internal static class AdminExperimentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var experiment = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (experiment is null)
         {
-            return Results.NotFound(new { error = $"Experiment '{key}' not found." });
+            return Problems.NotFound($"Experiment '{key}' not found.");
         }
 
         var exposures = await store.Events
@@ -103,33 +103,28 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         if (string.IsNullOrWhiteSpace(body.Key) || string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.FlagKey))
         {
-            return Results.BadRequest(new { error = "key, name and flagKey are required." });
+            return Problems.BadRequest("key, name and flagKey are required.");
         }
 
         var existing = await store.Experiments.GetByKeyAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Experiment '{body.Key}' already exists in environment '{environment.Key}'." });
+            return Problems.Conflict($"Experiment '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
         // The experiment is layered on an existing flag in the same environment.
         var flag = await store.Flags.GetAsync(environment.Id, body.FlagKey, ct).ConfigureAwait(false);
         if (flag is null)
         {
-            return Results.BadRequest(new { error = $"Flag '{body.FlagKey}' not found in environment '{environment.Key}'." });
+            return Problems.BadRequest($"Flag '{body.FlagKey}' not found in environment '{environment.Key}'.");
         }
 
         var experiment = body.ToEntity(environment.Id);
@@ -151,26 +146,21 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Experiment '{key}' not found." });
+            return Problems.NotFound($"Experiment '{key}' not found.");
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
-            return Results.BadRequest(new { error = "Cannot rename an experiment via PUT. Body key must match URL key." });
+            return Problems.BadRequest("Cannot rename an experiment via PUT. Body key must match URL key.");
         }
 
         // Name / hypothesis / metric keys / sticky toggle are editable. FlagKey,
@@ -198,18 +188,18 @@ internal static class AdminExperimentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var experiment = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (experiment is null)
         {
-            return Results.NotFound(new { error = $"Experiment '{key}' not found." });
+            return Problems.NotFound($"Experiment '{key}' not found.");
         }
 
         if (experiment.StartedAt is not null && experiment.StoppedAt is null)
         {
-            return Results.Conflict(new { error = $"Experiment '{key}' is already running." });
+            return Problems.Conflict($"Experiment '{key}' is already running.");
         }
 
         // Starting (or restarting a stopped experiment) opens a fresh window.
@@ -233,23 +223,23 @@ internal static class AdminExperimentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var experiment = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (experiment is null)
         {
-            return Results.NotFound(new { error = $"Experiment '{key}' not found." });
+            return Problems.NotFound($"Experiment '{key}' not found.");
         }
 
         if (experiment.StartedAt is null)
         {
-            return Results.Conflict(new { error = $"Experiment '{key}' has not been started." });
+            return Problems.Conflict($"Experiment '{key}' has not been started.");
         }
 
         if (experiment.StoppedAt is not null)
         {
-            return Results.Conflict(new { error = $"Experiment '{key}' is already stopped." });
+            return Problems.Conflict($"Experiment '{key}' is already stopped.");
         }
 
         experiment.StoppedAt = DateTimeOffset.UtcNow;

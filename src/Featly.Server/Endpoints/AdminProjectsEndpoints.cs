@@ -34,7 +34,7 @@ internal static class AdminProjectsEndpoints
     private static async Task<IResult> GetAsync(string key, StorageFacade store, CancellationToken ct)
     {
         var project = await store.Projects.GetByKeyAsync(key, ct).ConfigureAwait(false);
-        return project is null ? Results.NotFound(new { error = $"Project '{key}' not found." }) : Results.Ok(project);
+        return project is null ? Problems.NotFound($"Project '{key}' not found.") : Results.Ok(project);
     }
 
     private static async Task<IResult> CreateAsync(ProjectWriteRequest body, StorageFacade store, CancellationToken ct)
@@ -42,13 +42,13 @@ internal static class AdminProjectsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Key))
         {
-            return Results.BadRequest(new { error = "key is required." });
+            return Problems.Validation("key", "key is required.");
         }
 
         var existing = await store.Projects.GetByKeyAsync(body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Project '{body.Key}' already exists." });
+            return Problems.Conflict($"Project '{body.Key}' already exists.");
         }
 
         var project = new Project
@@ -71,7 +71,7 @@ internal static class AdminProjectsEndpoints
         var existing = await store.Projects.GetByKeyAsync(key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Project '{key}' not found." });
+            return Problems.NotFound($"Project '{key}' not found.");
         }
 
         existing.Name = string.IsNullOrWhiteSpace(body.Name) ? existing.Name : body.Name;

@@ -41,7 +41,7 @@ internal static class AdminFlagsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var flags = archived
@@ -59,11 +59,11 @@ internal static class AdminFlagsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var flag = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        return flag is null ? Results.NotFound(new { error = $"Flag '{key}' not found." }) : Results.Ok(flag);
+        return flag is null ? Problems.NotFound($"Flag '{key}' not found.") : Results.Ok(flag);
     }
 
     private static async Task<IResult> CreateFlagAsync(
@@ -80,21 +80,16 @@ internal static class AdminFlagsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Flags.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Flag '{body.Key}' already exists in environment '{environment.Key}'." });
+            return Problems.Conflict($"Flag '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
         if (body.Prerequisites is { Count: > 0 } proposedPrerequisites)
@@ -103,7 +98,7 @@ internal static class AdminFlagsEndpoints
             var validation = Flags.PrerequisiteValidator.Validate(allFlags, body.Key, proposedPrerequisites);
             if (!validation.IsValid)
             {
-                return Results.Conflict(new { error = validation.Error });
+                return Problems.Conflict(validation.Error!);
             }
         }
 
@@ -141,26 +136,21 @@ internal static class AdminFlagsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Flag '{key}' not found." });
+            return Problems.NotFound($"Flag '{key}' not found.");
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
-            return Results.BadRequest(new { error = "Cannot rename a flag via PUT. Body key must match URL key." });
+            return Problems.BadRequest("Cannot rename a flag via PUT. Body key must match URL key.");
         }
 
         if (body.Prerequisites is { Count: > 0 } proposedPrerequisites)
@@ -169,7 +159,7 @@ internal static class AdminFlagsEndpoints
             var validation = Flags.PrerequisiteValidator.Validate(allFlags, key, proposedPrerequisites);
             if (!validation.IsValid)
             {
-                return Results.Conflict(new { error = validation.Error });
+                return Problems.Conflict(validation.Error!);
             }
         }
 
@@ -226,21 +216,16 @@ internal static class AdminFlagsEndpoints
         bool archived,
         CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Flag '{key}' not found." });
+            return Problems.NotFound($"Flag '{key}' not found.");
         }
 
         var actor = ResolveActor(user);
@@ -275,13 +260,13 @@ internal static class AdminFlagsEndpoints
     {
         if (staleDays < 1)
         {
-            return Results.BadRequest(new { error = "staleDays must be at least 1." });
+            return Problems.Validation("staleDays", "staleDays must be at least 1.");
         }
 
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
@@ -315,7 +300,7 @@ internal static class AdminFlagsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var exposures = await store.Events

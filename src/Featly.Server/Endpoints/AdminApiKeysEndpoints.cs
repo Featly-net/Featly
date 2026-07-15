@@ -41,7 +41,7 @@ internal static class AdminApiKeysEndpoints
         var environment = await ResolveEnvironmentAsync(store, environmentKey, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = "No matching environment found." });
+            return Problems.NotFound("No matching environment found.");
         }
 
         var keys = await store.ApiKeys.ListAsync(environment.Id, ct).ConfigureAwait(false);
@@ -59,25 +59,25 @@ internal static class AdminApiKeysEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Name))
         {
-            return Results.BadRequest(new { error = "name is required." });
+            return Problems.Validation("name", "name is required.");
         }
 
         var scope = ApiKeyScope.AdminWrite;
         if (!string.IsNullOrWhiteSpace(body.Scope) &&
             !Enum.TryParse(body.Scope, ignoreCase: true, out scope))
         {
-            return Results.BadRequest(new { error = $"scope must be one of: {string.Join(", ", Enum.GetNames<ApiKeyScope>())}." });
+            return Problems.BadRequest($"scope must be one of: {string.Join(", ", Enum.GetNames<ApiKeyScope>())}.");
         }
 
         var environment = await ResolveEnvironmentAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.BadRequest(new { error = "No matching environment found; create a project + environment first." });
+            return Problems.BadRequest("No matching environment found; create a project + environment first.");
         }
 
         if (body.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow)
         {
-            return Results.BadRequest(new { error = "expiresAt must be in the future." });
+            return Problems.Validation("expiresAt", "expiresAt must be in the future.");
         }
 
         var actor = ResolveActor(principal);
@@ -132,7 +132,7 @@ internal static class AdminApiKeysEndpoints
         var existing = await store.ApiKeys.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"API key '{id}' not found." });
+            return Problems.NotFound($"API key '{id}' not found.");
         }
 
         await store.ApiKeys.RevokeAsync(id, ResolveActor(principal), ct).ConfigureAwait(false);
@@ -163,16 +163,16 @@ internal static class AdminApiKeysEndpoints
         var existing = await store.ApiKeys.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"API key '{id}' not found." });
+            return Problems.NotFound($"API key '{id}' not found.");
         }
         if (existing.Revoked)
         {
-            return Results.Conflict(new { error = "A revoked API key cannot be rotated; mint a new key instead." });
+            return Problems.Conflict("A revoked API key cannot be rotated; mint a new key instead.");
         }
 
         if (body?.ExpiresAt is { } explicitExpiry && explicitExpiry <= DateTimeOffset.UtcNow)
         {
-            return Results.BadRequest(new { error = "expiresAt must be in the future." });
+            return Problems.Validation("expiresAt", "expiresAt must be in the future.");
         }
 
         var actor = ResolveActor(principal);

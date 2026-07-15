@@ -51,7 +51,7 @@ internal static class SdkEventsEndpoints
         var environment = await SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
         if (!SdkEnvironmentScope.Allows(bound, environment.Id))
         {
@@ -71,7 +71,7 @@ internal static class SdkEventsEndpoints
         {
             if (string.IsNullOrWhiteSpace(dto.SubjectKey))
             {
-                return Results.BadRequest(new { error = "Every event requires a subjectKey." });
+                return Problems.BadRequest("Every event requires a subjectKey.");
             }
 
             events.Add(new Event

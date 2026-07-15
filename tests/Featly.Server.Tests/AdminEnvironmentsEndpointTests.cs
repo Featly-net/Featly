@@ -61,6 +61,41 @@ public class AdminEnvironmentsEndpointTests
     }
 
     [Fact]
+    public async Task Errors_use_rfc7807_problem_json_shape()
+    {
+        // Issue #226: a not-found returns application/problem+json with a detail.
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        var notFound = await client.GetAsync(new Uri("/api/admin/flags/does-not-exist", UriKind.Relative), ct);
+        notFound.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        notFound.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        using var body = System.Text.Json.JsonDocument.Parse(await notFound.Content.ReadAsStringAsync(ct));
+        body.RootElement.GetProperty("status").GetInt32().Should().Be(404);
+        body.RootElement.GetProperty("detail").GetString().Should().Contain("does-not-exist");
+    }
+
+    [Fact]
+    public async Task Field_validation_uses_rfc7807_errors_map()
+    {
+        // Issue #230: a missing required field surfaces as a ValidationProblemDetails
+        // with the offending field under `errors`.
+        using var host = await BuildHostAsync();
+        var client = host.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await client.PostAsJsonAsync("/api/admin/environments", new { key = "", name = "No Key" }, ct);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        using var body = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        body.RootElement.GetProperty("errors").TryGetProperty("key", out var keyErrors).Should().BeTrue();
+        keyErrors.EnumerateArray().Select(e => e.GetString()).Should().Contain(m => m!.Contains("required"));
+    }
+
+    [Fact]
     public async Task Lock_then_unlock_toggles_readonly_and_gates_mutations()
     {
         using var host = await BuildHostAsync();

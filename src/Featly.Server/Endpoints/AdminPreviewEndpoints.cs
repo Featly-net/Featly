@@ -54,13 +54,13 @@ internal static class AdminPreviewEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var flag = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (flag is null)
         {
-            return Results.NotFound(new { error = $"Flag '{key}' not found." });
+            return Problems.NotFound($"Flag '{key}' not found.");
         }
 
         var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);
@@ -96,13 +96,13 @@ internal static class AdminPreviewEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var config = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (config is null)
         {
-            return Results.NotFound(new { error = $"Config '{key}' not found." });
+            return Problems.NotFound($"Config '{key}' not found.");
         }
 
         var segments = await store.Segments.ListAsync(environment.Id, ct).ConfigureAwait(false);

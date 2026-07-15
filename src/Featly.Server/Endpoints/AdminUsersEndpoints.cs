@@ -37,7 +37,7 @@ internal static class AdminUsersEndpoints
     private static async Task<IResult> GetAsync(string identifier, StorageFacade store, CancellationToken ct)
     {
         var user = await store.Users.GetByIdentifierAsync(identifier, ct).ConfigureAwait(false);
-        return user is null ? Results.NotFound(new { error = $"User '{identifier}' not found." }) : Results.Ok(user);
+        return user is null ? Problems.NotFound($"User '{identifier}' not found.") : Results.Ok(user);
     }
 
     // GET /{identifier}/effective-access?projectId=&environmentId=
@@ -54,7 +54,7 @@ internal static class AdminUsersEndpoints
         var user = await store.Users.GetByIdentifierAsync(identifier, ct).ConfigureAwait(false);
         if (user is null)
         {
-            return Results.NotFound(new { error = $"User '{identifier}' not found." });
+            return Problems.NotFound($"User '{identifier}' not found.");
         }
 
         // Resolve the scope project: default to the bootstrap project.
@@ -118,7 +118,7 @@ internal static class AdminUsersEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Identifier))
         {
-            return Results.BadRequest(new { error = "identifier is required." });
+            return Problems.Validation("identifier", "identifier is required.");
         }
 
         var actor = ResolveActor(principal);
@@ -149,7 +149,7 @@ internal static class AdminUsersEndpoints
         var existing = await store.Users.GetByIdentifierAsync(identifier, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"User '{identifier}' not found." });
+            return Problems.NotFound($"User '{identifier}' not found.");
         }
 
         await store.Users.DisableAsync(identifier, ResolveActor(principal), ct).ConfigureAwait(false);

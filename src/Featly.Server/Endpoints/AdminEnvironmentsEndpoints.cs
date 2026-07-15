@@ -47,19 +47,19 @@ internal static class AdminEnvironmentsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Key))
         {
-            return Results.BadRequest(new { error = "key is required." });
+            return Problems.Validation("key", "key is required.");
         }
 
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Results.NotFound(new { error = "No default project." });
+            return Problems.NotFound("No default project.");
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Environment '{body.Key}' already exists." });
+            return Problems.Conflict($"Environment '{body.Key}' already exists.");
         }
 
         var environment = new Environment
@@ -83,13 +83,13 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Results.NotFound(new { error = "No default project." });
+            return Problems.NotFound("No default project.");
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+            return Problems.NotFound($"Environment '{key}' not found.");
         }
 
         existing.Name = string.IsNullOrWhiteSpace(body.Name) ? existing.Name : body.Name;
@@ -102,13 +102,13 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Results.NotFound(new { error = "No default project." });
+            return Problems.NotFound("No default project.");
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+            return Problems.NotFound($"Environment '{key}' not found.");
         }
 
         if (existing.IsDefault)
@@ -122,7 +122,7 @@ internal static class AdminEnvironmentsEndpoints
         var segments = await store.Segments.ListAsync(existing.Id, ct).ConfigureAwait(false);
         if (flags.Count > 0 || configs.Count > 0 || segments.Count > 0)
         {
-            return Results.Conflict(new { error = "Environment is not empty; remove its flags, configs and segments first." });
+            return Problems.Conflict("Environment is not empty; remove its flags, configs and segments first.");
         }
 
         await store.Environments.DeleteAsync(existing.Id, ct).ConfigureAwait(false);
@@ -146,13 +146,13 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Results.NotFound(new { error = "No default project." });
+            return Problems.NotFound("No default project.");
         }
 
         var environment = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+            return Problems.NotFound($"Environment '{key}' not found.");
         }
 
         var updated = await store.Environments.SetReadOnlyAsync(environment.Id, readOnly, ct).ConfigureAwait(false);
@@ -175,13 +175,13 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Results.NotFound(new { error = "No default project." });
+            return Problems.NotFound("No default project.");
         }
 
         var environment = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{key}' not found." });
+            return Problems.NotFound($"Environment '{key}' not found.");
         }
 
         return Results.Ok(activity.GetSnapshot(environment.Id));

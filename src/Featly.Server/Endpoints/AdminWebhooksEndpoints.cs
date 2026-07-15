@@ -44,7 +44,7 @@ internal static class AdminWebhooksEndpoints
     private static async Task<IResult> GetAsync(Guid id, StorageFacade store, CancellationToken ct)
     {
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
-        return endpoint is null ? Results.NotFound(new { error = $"Webhook '{id}' not found." }) : Results.Ok(ToResponse(endpoint));
+        return endpoint is null ? Problems.NotFound($"Webhook '{id}' not found.") : Results.Ok(ToResponse(endpoint));
     }
 
     private static async Task<IResult> DeliveriesAsync(Guid id, StorageFacade store, CancellationToken ct)
@@ -52,7 +52,7 @@ internal static class AdminWebhooksEndpoints
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (endpoint is null)
         {
-            return Results.NotFound(new { error = $"Webhook '{id}' not found." });
+            return Problems.NotFound($"Webhook '{id}' not found.");
         }
 
         var deliveries = await store.WebhookDeliveries.ListByEndpointAsync(id, RecentDeliveries, ct).ConfigureAwait(false);
@@ -64,11 +64,11 @@ internal static class AdminWebhooksEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.Url))
         {
-            return Results.BadRequest(new { error = "name and url are required." });
+            return Problems.BadRequest("name and url are required.");
         }
         if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var createUri))
         {
-            return Results.BadRequest(new { error = "url must be an absolute URL." });
+            return Problems.Validation("url", "url must be an absolute URL.");
         }
         if (BlockedTarget(createUri, options.Value) is { } createBlock)
         {
@@ -78,7 +78,7 @@ internal static class AdminWebhooksEndpoints
         var environmentId = await ResolveEnvironmentIdAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
         if (body.EnvironmentKey is not null && environmentId is null)
         {
-            return Results.NotFound(new { error = $"Environment '{body.EnvironmentKey}' not found." });
+            return Problems.NotFound($"Environment '{body.EnvironmentKey}' not found.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -107,13 +107,13 @@ internal static class AdminWebhooksEndpoints
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (endpoint is null)
         {
-            return Results.NotFound(new { error = $"Webhook '{id}' not found." });
+            return Problems.NotFound($"Webhook '{id}' not found.");
         }
         if (!string.IsNullOrWhiteSpace(body.Url))
         {
             if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var updateUri))
             {
-                return Results.BadRequest(new { error = "url must be an absolute URL." });
+                return Problems.Validation("url", "url must be an absolute URL.");
             }
             if (BlockedTarget(updateUri, options.Value) is { } updateBlock)
             {
@@ -124,7 +124,7 @@ internal static class AdminWebhooksEndpoints
         var environmentId = await ResolveEnvironmentIdAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
         if (body.EnvironmentKey is not null && environmentId is null)
         {
-            return Results.NotFound(new { error = $"Environment '{body.EnvironmentKey}' not found." });
+            return Problems.NotFound($"Environment '{body.EnvironmentKey}' not found.");
         }
 
         if (!string.IsNullOrWhiteSpace(body.Name))
@@ -164,7 +164,7 @@ internal static class AdminWebhooksEndpoints
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (endpoint is null)
         {
-            return Results.NotFound(new { error = $"Webhook '{id}' not found." });
+            return Problems.NotFound($"Webhook '{id}' not found.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -199,13 +199,13 @@ internal static class AdminWebhooksEndpoints
         var endpoint = await store.Webhooks.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (endpoint is null)
         {
-            return Results.NotFound(new { error = $"Webhook '{id}' not found." });
+            return Problems.NotFound($"Webhook '{id}' not found.");
         }
 
         var original = await store.WebhookDeliveries.GetByIdAsync(deliveryId, ct).ConfigureAwait(false);
         if (original is null || original.WebhookEndpointId != id)
         {
-            return Results.NotFound(new { error = $"Delivery '{deliveryId}' not found for webhook '{id}'." });
+            return Problems.NotFound($"Delivery '{deliveryId}' not found for webhook '{id}'.");
         }
 
         var now = DateTimeOffset.UtcNow;
