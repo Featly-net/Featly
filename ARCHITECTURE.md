@@ -869,7 +869,11 @@ Every mutation endpoint supports `?dryRun=true`. The server computes the diff an
 
 ### Versioning
 
-**Planned (not yet implemented — see [issue #227](https://github.com/Featly-net/Featly/issues/227)).** The intended design: API version is negotiated via the `Accept-Version` header. SDK clients pin a major version. The server retains compatibility for the most recent two major versions; a deprecated version emits a `Deprecation` response header with a sunset date. Today the HTTP surface is unversioned; the API is pre-1.0 and unstable, so this lands before the API is declared stable.
+API version is negotiated with the **`Accept-Version`** request header (issue #227). A client pins the major version it was written against (`Accept-Version: 1`; `1.4` and `v1` both pin major `1`). Every `/api` response echoes the version actually served in **`Featly-Version`**. A pin the server does not serve is refused with **`406 Not Acceptable`** and a ProblemDetails listing the supported versions — better than silently returning a shape the client cannot parse. Requests that pin nothing get the current version.
+
+The server keeps answering the most recent two majors. Once a major is scheduled for removal it is listed in `FeatlyApiVersion.Deprecated` with a sunset date: requests pinned to it keep working, but each response also carries `Deprecation: true` and a **`Sunset`** date (RFC 8594). Only major `1` exists today, so nothing is deprecated yet.
+
+> This shipped **before** the API is declared stable on purpose: a client can only be protected from a future breaking change if it is already pinning today. Introducing a v2 against a population of unpinned clients has no safe answer.
 
 ---
 
