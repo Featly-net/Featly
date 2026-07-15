@@ -28,6 +28,7 @@ namespace Featly.Server.Authentication;
 internal sealed partial class AuthBootstrapHostedService(
     StorageFacade store,
     IOptions<FeatlyAuthorizationOptions> options,
+    IOptions<FeatlyServerOptions> serverOptions,
     ILogger<AuthBootstrapHostedService> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -44,6 +45,18 @@ internal sealed partial class AuthBootstrapHostedService(
         LogSystemRolesSeeded(logger, templates.Count);
 
         // 2. Bootstrap admin user, if configured and not yet present.
+        await ProvisionBootstrapAdminAsync(cancellationToken).ConfigureAwait(false);
+
+        // 3. Advise retiring the shared static admin key once a real admin can
+        //    take over (issue #209). Advisory only — never disabled automatically.
+        if (await BootstrapKeyAdvisor.ShouldWarnAsync(store, serverOptions.Value.AdminApiKey, cancellationToken).ConfigureAwait(false))
+        {
+            LogStaticAdminKeyShouldBeRetired(logger);
+        }
+    }
+
+    private async Task ProvisionBootstrapAdminAsync(CancellationToken cancellationToken)
+    {
         var bootstrap = options.Value.BootstrapAdminIdentifier;
         if (string.IsNullOrWhiteSpace(bootstrap))
         {
@@ -92,4 +105,8 @@ internal sealed partial class AuthBootstrapHostedService(
     [LoggerMessage(EventId = 4004, Level = LogLevel.Information,
         Message = "Provisioned bootstrap admin '{Identifier}'. Promote a real user before tightening AutoProvisionMode to Closed.")]
     private static partial void LogBootstrapAdminCreated(ILogger logger, string identifier);
+
+    [LoggerMessage(EventId = 4005, Level = LogLevel.Warning,
+        Message = "A static Featly:Server:AdminApiKey is configured while a real admin user already exists. The static key is shared, unattributable, and non-rotatable — remove it and rely on per-user admin API keys.")]
+    private static partial void LogStaticAdminKeyShouldBeRetired(ILogger logger);
 }
