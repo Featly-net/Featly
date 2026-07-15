@@ -1,3 +1,4 @@
+using Featly.Storage.EntityFramework;
 using Featly.Storage.Postgres.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -93,9 +94,9 @@ public static class PostgresStorageServiceCollectionExtensions
         services.TryAddSingleton<IApiKeyStore, PostgresApiKeyStore>();
         services.TryAddSingleton<ISystemSettingsStore, PostgresSystemSettingsStore>();
 
-        services.TryAddSingleton<PostgresFeatlyStore>();
-        services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<PostgresFeatlyStore>());
-        services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<PostgresFeatlyStore>());
+        services.TryAddSingleton<EfFeatlyStore>();
+        services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<EfFeatlyStore>());
+        services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<EfFeatlyStore>());
 
         services.AddHostedService<PostgresAutoMigrationHostedService>();
 

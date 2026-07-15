@@ -1,4 +1,5 @@
 using Featly.Storage;
+using Featly.Storage.EntityFramework;
 using Featly.Storage.Sqlite.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -70,9 +71,9 @@ public static class SqliteStorageServiceCollectionExtensions
         services.TryAddSingleton<IApiKeyStore, SqliteApiKeyStore>();
         services.TryAddSingleton<ISystemSettingsStore, SqliteSystemSettingsStore>();
 
-        services.TryAddSingleton<SqliteFeatlyStore>();
-        services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<SqliteFeatlyStore>());
-        services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<SqliteFeatlyStore>());
+        services.TryAddSingleton<EfFeatlyStore>();
+        services.TryAddSingleton<StorageFacade>(sp => sp.GetRequiredService<EfFeatlyStore>());
+        services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<EfFeatlyStore>());
 
         services.AddHostedService<SqliteAutoMigrationHostedService>();
 

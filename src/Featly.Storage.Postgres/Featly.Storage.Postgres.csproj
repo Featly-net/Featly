@@ -22,6 +22,7 @@
     <Compile Include="..\Shared\Storage\EfWebhookStore.cs" Link="Stores\Shared\EfWebhookStore.cs" />
     <Compile Include="..\Shared\Storage\EfAuditStore.cs" Link="Stores\Shared\EfAuditStore.cs" />
     <Compile Include="..\Shared\Storage\EfEnvironmentStore.cs" Link="Stores\Shared\EfEnvironmentStore.cs" />
+    <Compile Include="..\Shared\Storage\EfFeatlyStore.cs" Link="Stores\Shared\EfFeatlyStore.cs" />
   </ItemGroup>
 
   <ItemGroup>
