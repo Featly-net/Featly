@@ -33,7 +33,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Login_with_legacy_admin_key_returns_identity_and_sets_cookie()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync(
@@ -55,7 +55,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Login_with_unknown_key_returns_401()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync(
@@ -72,7 +72,7 @@ public class AuthEndpointsTests
         // SDK keys give SDK clients read access to /api/sdk/*. They are not
         // dashboard users — the dashboard wants write access, audit logs, and
         // a real human identity. Refuse to mint a session for them.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync(
@@ -86,7 +86,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Login_with_missing_apiKey_returns_400()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync(
@@ -100,7 +100,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Login_with_new_admin_api_key_returns_identity_and_sets_cookie()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var hasher = host.Services.GetRequiredService<ApiKeyHasher>();
 
@@ -142,7 +142,7 @@ public class AuthEndpointsTests
         // Expiry is enforced on the Bearer path since the expiry feature; the
         // dashboard login must refuse the same key — otherwise an expired key
         // could still open a 7-day sliding cookie session.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var hasher = host.Services.GetRequiredService<ApiKeyHasher>();
 
@@ -177,7 +177,7 @@ public class AuthEndpointsTests
     {
         // Same reasoning as the legacy SDK key case: SdkRead scope is not a
         // dashboard user, even when it lives in the ApiKey store.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var hasher = host.Services.GetRequiredService<ApiKeyHasher>();
 
@@ -210,7 +210,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Me_without_cookie_returns_401()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var response = await client.GetAsync(new Uri("/api/auth/me", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -221,7 +221,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Me_after_login_returns_identity_with_cookie()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var login = await client.PostAsJsonAsync(
@@ -247,7 +247,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Logout_returns_204_and_clears_cookie()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var login = await client.PostAsJsonAsync(
@@ -273,7 +273,7 @@ public class AuthEndpointsTests
     {
         // The whole point of the cookie scheme is that the dashboard can hit
         // /api/admin/* with credentials: 'include' and no Authorization header.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
 
         var login = await client.PostAsJsonAsync(
@@ -294,7 +294,7 @@ public class AuthEndpointsTests
     {
         // Regression: adding the cookie scheme to the admin policy must not
         // break the existing Bearer flow that SDKs and scripts rely on.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -302,32 +302,4 @@ public class AuthEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

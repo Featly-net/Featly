@@ -72,7 +72,7 @@ public class AuditAndEventsTests
     [Fact]
     public async Task Creating_then_updating_a_flag_writes_audit_entries()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -131,7 +131,7 @@ public class AuditAndEventsTests
     {
         // Issue #208: real audited mutations build a hash chain that
         // GET /api/admin/audit/verify reports as intact.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -159,7 +159,7 @@ public class AuditAndEventsTests
     [Fact]
     public async Task Audit_query_filters_by_entity_type()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -188,7 +188,7 @@ public class AuditAndEventsTests
     [Fact]
     public async Task Audit_endpoint_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = host.GetTestClient();
         sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -203,33 +203,4 @@ public class AuditAndEventsTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

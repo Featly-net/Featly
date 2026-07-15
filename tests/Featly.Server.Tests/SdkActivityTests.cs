@@ -31,7 +31,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Sdk_activity_is_empty_before_any_client_connects()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -46,7 +46,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Config_sync_records_the_timestamp_without_opening_a_connection()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var sdk = SdkClient(host);
         var ct = TestContext.Current.CancellationToken;
@@ -63,7 +63,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Sdk_activity_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = SdkClient(host);
 
         var resp = await sdk.GetAsync(new Uri("/api/admin/environments/development/sdk-activity", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -74,7 +74,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Sdk_activity_returns_NotFound_for_unknown_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
 
         var resp = await admin.GetAsync(new Uri("/api/admin/environments/ghost/sdk-activity", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -85,7 +85,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Flag_activity_is_null_for_a_flag_with_no_experiment_history()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -109,7 +109,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Flag_activity_reports_the_most_recent_exposure()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var sdk = SdkClient(host);
         var ct = TestContext.Current.CancellationToken;
@@ -148,7 +148,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Stream_opens_and_emits_the_hello_frame()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = SdkClient(host);
 
         // The SSE stream is long-lived, so cap the read: we only need to confirm
@@ -171,7 +171,7 @@ public class SdkActivityTests
     [Fact]
     public async Task Events_ingest_rejects_a_batch_over_the_cap()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = SdkClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -200,32 +200,4 @@ public class SdkActivityTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

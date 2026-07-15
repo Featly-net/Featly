@@ -71,7 +71,7 @@ public class WritePayloadLimitsTests
     [Fact]
     public async Task Create_flag_with_too_many_variants_is_rejected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -100,7 +100,7 @@ public class WritePayloadLimitsTests
     [Fact]
     public async Task Create_config_with_too_many_rules_is_rejected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -124,7 +124,7 @@ public class WritePayloadLimitsTests
     [Fact]
     public async Task Create_segment_with_too_many_conditions_is_rejected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -143,30 +143,4 @@ public class WritePayloadLimitsTests
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

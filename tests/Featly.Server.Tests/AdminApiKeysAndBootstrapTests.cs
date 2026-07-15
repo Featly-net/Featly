@@ -33,7 +33,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Mint_rejects_unauthenticated_and_sdk_scope()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
 
         var anon = host.GetTestClient();
@@ -49,7 +49,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Minted_key_authenticates_over_bearer()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -67,7 +67,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Bound_key_acts_as_the_user_not_blanket_admin()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -99,7 +99,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Revoked_key_no_longer_authenticates()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -119,7 +119,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task List_returns_metadata_without_secret()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -136,7 +136,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Bootstrap_provisions_first_admin_once_and_attributes_to_real_user()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
 
         // First call (unauthenticated) provisions the first admin.
@@ -172,7 +172,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Mint_with_past_expiry_is_rejected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -188,7 +188,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Mint_with_future_expiry_returns_and_lists_it()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -211,7 +211,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Expired_key_no_longer_authenticates()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
 
         // Seed an already-expired key straight into the store — the mint
@@ -242,7 +242,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Rotate_mints_replacement_and_revokes_old()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -278,7 +278,7 @@ public class AdminApiKeysAndBootstrapTests
     [Fact]
     public async Task Rotate_refuses_a_revoked_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -297,32 +297,4 @@ public class AdminApiKeysAndBootstrapTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

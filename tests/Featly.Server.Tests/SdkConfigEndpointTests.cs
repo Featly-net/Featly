@@ -23,7 +23,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_requires_sdk_token()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.GetAsync(new Uri("/api/sdk/config", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -34,7 +34,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_returns_snapshot_with_etag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -67,7 +67,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_includes_segments_alongside_flags()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -94,7 +94,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_etag_invalidates_when_segment_changes()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -119,7 +119,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_includes_configs_alongside_flags_and_segments()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -145,7 +145,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_etag_invalidates_when_config_changes()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -171,7 +171,7 @@ public class SdkConfigEndpointTests
     [Fact]
     public async Task GET_sdk_config_returns_304_when_etag_matches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var sdk = host.GetTestClient();
@@ -201,33 +201,4 @@ public class SdkConfigEndpointTests
         second.StatusCode.Should().Be(HttpStatusCode.NotModified);
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

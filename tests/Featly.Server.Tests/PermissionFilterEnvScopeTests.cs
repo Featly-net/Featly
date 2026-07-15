@@ -41,7 +41,7 @@ public class PermissionFilterEnvScopeTests
     [Fact]
     public async Task Env_scoped_editor_can_write_in_its_environment_but_not_another()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
 
@@ -87,7 +87,7 @@ public class PermissionFilterEnvScopeTests
     [Fact]
     public async Task Wildcard_editor_can_write_in_any_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
 
@@ -173,26 +173,4 @@ public class PermissionFilterEnvScopeTests
         return plaintext;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

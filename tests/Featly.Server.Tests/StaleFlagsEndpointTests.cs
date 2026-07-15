@@ -29,7 +29,7 @@ public class StaleFlagsEndpointTests
     [Fact]
     public async Task No_candidates_when_every_flag_is_actively_targeted()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -61,7 +61,7 @@ public class StaleFlagsEndpointTests
     [Fact]
     public async Task A_no_rules_flag_untouched_past_the_threshold_is_reported()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -87,7 +87,7 @@ public class StaleFlagsEndpointTests
     [Fact]
     public async Task Rejects_a_non_positive_staleDays()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
 
         var resp = await admin.GetAsync(new Uri("/api/admin/flags/stale?env=development&staleDays=0", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -100,7 +100,7 @@ public class StaleFlagsEndpointTests
     {
         // Routing regression guard: "/admin/flags/stale" must resolve to the
         // stale-report endpoint, not GetFlagAsync("stale").
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -114,7 +114,7 @@ public class StaleFlagsEndpointTests
     [Fact]
     public async Task Rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = SdkClient(host);
 
         var resp = await sdk.GetAsync(new Uri("/api/admin/flags/stale?env=development", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -125,7 +125,7 @@ public class StaleFlagsEndpointTests
     [Fact]
     public async Task Archived_flag_with_a_still_active_experiment_is_reported()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -172,32 +172,4 @@ public class StaleFlagsEndpointTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

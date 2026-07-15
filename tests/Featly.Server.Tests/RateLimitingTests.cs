@@ -194,40 +194,6 @@ public class RateLimitingTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync(Dictionary<string, string?>? extraConfig = null)
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) =>
-                {
-                    var data = new Dictionary<string, string?>
-                    {
-                        ["Featly:Server:AdminApiKey"] = AdminKey,
-                        ["Featly:Server:SdkApiKey"] = SdkKey,
-                    };
-                    foreach (var kv in extraConfig ?? [])
-                    {
-                        data[kv.Key] = kv.Value;
-                    }
-                    config.AddInMemoryCollection(data);
-                });
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
+    private static Task<IHost> BuildHostAsync(Dictionary<string, string?>? extraConfig = null)
+        => FeatlyTestHost.CreateAsync(extraConfig);
 }

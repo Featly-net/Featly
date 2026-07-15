@@ -24,7 +24,7 @@ public class SdkEnvironmentScopeTests
     [Fact]
     public async Task Persisted_sdk_key_is_denied_a_different_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
 
@@ -43,7 +43,7 @@ public class SdkEnvironmentScopeTests
     [Fact]
     public async Task Persisted_sdk_key_reads_its_own_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var ct = TestContext.Current.CancellationToken;
 
         var (token, envKey) = await MintSdkKeyForDefaultEnvironmentAsync(host, ct);
@@ -64,7 +64,7 @@ public class SdkEnvironmentScopeTests
     [Fact]
     public async Task Persisted_sdk_key_stream_is_denied_a_different_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
 
@@ -83,7 +83,7 @@ public class SdkEnvironmentScopeTests
     [Fact]
     public async Task Persisted_sdk_key_events_are_scoped_to_its_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync(withStaticApiKeys: false);
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
 
@@ -151,27 +151,4 @@ public class SdkEnvironmentScopeTests
         return env;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

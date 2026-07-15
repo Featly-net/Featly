@@ -30,7 +30,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_rejects_unauthenticated_requests()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync("/api/admin/preview/flags/demo", new
@@ -45,7 +45,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -57,7 +57,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_returns_default_when_no_rules_match()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -79,7 +79,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_returns_targeting_match_when_rule_fires()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -101,7 +101,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_resolves_in_segment_conditions()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -159,7 +159,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_honors_an_unmet_prerequisite()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -203,7 +203,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_flag_returns_404_when_flag_missing()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -215,7 +215,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_config_returns_rule_value_on_match()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -256,7 +256,7 @@ public class AdminPreviewEndpointTests
     [Fact]
     public async Task POST_preview_config_returns_default_when_no_rule_matches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -307,33 +307,4 @@ public class AdminPreviewEndpointTests
         });
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

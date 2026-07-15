@@ -24,7 +24,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task POST_admin_flags_rejects_unauthenticated_requests()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync("/api/admin/flags", new
@@ -43,7 +43,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task POST_admin_flags_creates_a_flag_when_admin_key_is_supplied()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -74,7 +74,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task PUT_admin_flags_persists_rules_array()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -159,7 +159,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task Archive_then_unarchive_moves_flag_between_active_and_archived_lists()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -198,7 +198,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task Archive_returns_404_for_unknown_flag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -209,7 +209,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task POST_admin_flags_rejects_when_using_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -229,7 +229,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task POST_admin_flags_persists_prerequisites_when_the_referenced_flag_exists()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -249,7 +249,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task POST_admin_flags_rejects_a_prerequisite_on_an_unknown_flag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -265,7 +265,7 @@ public class AdminFlagsEndpointTests
     [Fact]
     public async Task PUT_admin_flags_rejects_a_prerequisite_cycle()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -299,33 +299,4 @@ public class AdminFlagsEndpointTests
         },
     };
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

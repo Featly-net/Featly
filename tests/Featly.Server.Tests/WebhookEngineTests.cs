@@ -519,38 +519,13 @@ public class WebhookEngineTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00", int? circuitBreakerThreshold = null)
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                    // Slow the delivery worker right down so it never races the
-                    // assertions (tests that exercise the worker pass a short one).
-                    ["Featly:Webhooks:PollInterval"] = pollInterval,
-                    ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
-                    ["Featly:Webhooks:CircuitBreakerThreshold"] = circuitBreakerThreshold?.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
+    private static Task<IHost> BuildHostAsync(bool allowPrivateTargets = false, string pollInterval = "00:10:00", int? circuitBreakerThreshold = null)
+        => FeatlyTestHost.CreateAsync(new Dictionary<string, string?>
+        {
+            // Slow the delivery worker right down so it never races the
+            // assertions (tests that exercise the worker pass a short one).
+            ["Featly:Webhooks:PollInterval"] = pollInterval,
+            ["Featly:Webhooks:AllowPrivateNetworkTargets"] = allowPrivateTargets ? "true" : "false",
+            ["Featly:Webhooks:CircuitBreakerThreshold"] = circuitBreakerThreshold?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        });
 }
