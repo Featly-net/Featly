@@ -77,15 +77,10 @@ internal static class AdminConfigsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Problems.NotFound($"Environment '{env}' not found.");
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Configs.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
@@ -125,15 +120,10 @@ internal static class AdminConfigsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Problems.NotFound($"Environment '{env}' not found.");
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
@@ -197,15 +187,10 @@ internal static class AdminConfigsEndpoints
         bool archived,
         CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Problems.NotFound($"Environment '{env}' not found.");
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
 namespace Featly.Server.Endpoints;
@@ -25,5 +26,28 @@ internal static class EnvironmentResolver
         return string.IsNullOrWhiteSpace(envKey)
             ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
             : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolves the target environment for a <b>write</b>: returns the environment,
+    /// or a ready-to-return problem result — 404 when it does not exist, 403 when it
+    /// is <see cref="Environment.ReadOnly"/>. Consolidates the identical preamble the
+    /// create/update/mutation handlers shared across the flag/config/segment/
+    /// experiment endpoints.
+    /// </summary>
+    public static async Task<(Environment? Environment, IResult? Guard)> ResolveWritableAsync(StorageFacade store, string? envKey, CancellationToken ct)
+    {
+        var environment = await ResolveAsync(store, envKey, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return (null, Problems.NotFound($"Environment '{envKey}' not found."));
+        }
+
+        if (environment.ReadOnly)
+        {
+            return (null, Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden));
+        }
+
+        return (environment, null);
     }
 }

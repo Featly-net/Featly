@@ -103,15 +103,10 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Problems.NotFound($"Environment '{env}' not found.");
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         if (string.IsNullOrWhiteSpace(body.Key) || string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.FlagKey))
@@ -151,15 +146,10 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Problems.NotFound($"Environment '{env}' not found.");
-        }
-
-        if (environment.ReadOnly)
-        {
-            return Results.Problem(detail: "Environment is ReadOnly.", statusCode: StatusCodes.Status403Forbidden);
+            return guard!;
         }
 
         var existing = await store.Experiments.GetByKeyAsync(environment.Id, key, ct).ConfigureAwait(false);
