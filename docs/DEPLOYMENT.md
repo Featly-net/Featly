@@ -42,6 +42,14 @@ centralized-server instance, or accept polling-interval freshness across
 replicas. SQLite's single-writer model points the same way — multi-replica
 deployments are the target of the post-1.0 Postgres provider.
 
+The background workers reinforce the same rule: `WebhookDeliveryWorker` and
+`ScheduledApplyWorker` claim due rows by listing them, not by an atomic
+transaction, so two instances against a shared database would **deliver a
+webhook twice and race a scheduled apply**. Run the workers on a single node
+until atomic row claiming lands ([issue #237](https://github.com/Featly-net/Featly/issues/237)).
+If you must run several server replicas before then, keep only one as the
+"worker" node.
+
 ### 3. Consumer (SDK only)
 
 An app that only reads flags from a remote Featly server. No server or dashboard
