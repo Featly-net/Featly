@@ -70,6 +70,27 @@ If the feature touches the architectural surface (new top-level concept, new ent
 - User-facing changes need a `CHANGELOG.md` entry under `[Unreleased]`.
 - New architectural decisions need an ADR.
 
+### Passing the CI quality gates
+
+Every PR runs build (Ubuntu + Windows), tests, CodeQL, a Playwright dashboard
+smoke, and SonarCloud. These fail more often on style than on logic — save a
+round-trip by checking them locally before pushing:
+
+- **Formatting.** The Ubuntu build runs `dotnet format` with warnings-as-errors;
+  a single-line `if (x) { return; }` or a stray line-ending fails it. Run
+  `dotnet format Featly.sln --verify-no-changes` before every push.
+- **SonarCloud quality gate (on new code).** Coverage must be **≥ 80 %** and
+  duplicated lines **≤ 3 %**, and ratings must stay at 1. Two habits keep you
+  green: add tests for every new branch, and extract shared helpers instead of
+  copy-pasting guard blocks — a repeated `if (…) { return …; }` across handlers
+  is the usual cause of a duplication failure.
+- **CodeQL** posts inline review comments (for example "prefer LINQ `Select`/
+  `Where`" over a `foreach`, or "dereferenced variable may be null"). Branch
+  protection requires conversation resolution, so an unresolved CodeQL thread
+  blocks the merge even when every check is green. Fix the code (use
+  `Assert.NotNull(x)` rather than `x!` to satisfy the null-flow analysis); if a
+  thread is left as `outdated` after the fix, resolve it.
+
 ### Review and merge
 
 - All PRs need at least one maintainer approval.
