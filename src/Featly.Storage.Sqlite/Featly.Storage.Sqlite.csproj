@@ -20,6 +20,7 @@
     <Compile Include="..\Shared\Storage\EfPendingChangeStore.cs" Link="Stores\Shared\EfPendingChangeStore.cs" />
     <Compile Include="..\Shared\Storage\EfWebhookDeliveryStore.cs" Link="Stores\Shared\EfWebhookDeliveryStore.cs" />
     <Compile Include="..\Shared\Storage\EfWebhookStore.cs" Link="Stores\Shared\EfWebhookStore.cs" />
+    <Compile Include="..\Shared\Storage\EfAuditStore.cs" Link="Stores\Shared\EfAuditStore.cs" />
   </ItemGroup>
 
   <ItemGroup>
