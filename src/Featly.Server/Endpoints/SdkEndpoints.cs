@@ -55,18 +55,12 @@ internal static class SdkEndpoints
         // the hot path" evaluation guarantee is untouched.
         activity.RecordConfigSync(environment.Id);
 
-        // Compose the ETag from the most recent flag, segment, config, AND
-        // experiment update so an edit in any bucket invalidates cached snapshots
-        // on the SDK side. Every SDK client runs this on each revalidation, so the
-        // four lookups fire concurrently (each sub-store opens its own DbContext,
-        // so this is safe) — one round-trip of latency instead of four (issue #228).
-        var mostRecents = await Task.WhenAll(
-            store.Flags.GetMostRecentUpdateAsync(environment.Id, ct),
-            store.Segments.GetMostRecentUpdateAsync(environment.Id, ct),
-            store.Configs.GetMostRecentUpdateAsync(environment.Id, ct),
-            store.Experiments.GetMostRecentUpdateAsync(environment.Id, ct)).ConfigureAwait(false);
-        var mostRecent = mostRecents.Aggregate(default(DateTimeOffset?), Latest);
-        var etag = ComputeEtag(environment.Id, mostRecent);
+        // The ETag is the environment's snapshot version (issue #228), which every
+        // flag/segment/config/experiment write bumps via SnapshotChange. The
+        // environment row is already in hand from resolving ?env=, so a
+        // revalidation — what every SDK client does on every poll — now costs zero
+        // extra queries, where it used to fan out to four max(UpdatedAt) lookups.
+        var etag = ComputeEtag(environment.Id, environment.ConfigVersion);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
 
@@ -188,19 +182,7 @@ internal static class SdkEndpoints
         await response.Body.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    private static string ComputeEtag(Guid environmentId, DateTimeOffset? mostRecent)
-    {
-        var ticks = mostRecent.HasValue ? mostRecent.Value.UtcTicks : 0L;
-        return $"\"{environmentId:N}-{ticks.ToString(CultureInfo.InvariantCulture)}\"";
-    }
-
-    private static DateTimeOffset? Latest(DateTimeOffset? a, DateTimeOffset? b)
-    {
-        if (a is null)
-        { return b; }
-        if (b is null)
-        { return a; }
-        return a.Value >= b.Value ? a : b;
-    }
+    private static string ComputeEtag(Guid environmentId, long configVersion)
+        => $"\"{environmentId:N}-v{configVersion.ToString(CultureInfo.InvariantCulture)}\"";
 }
 

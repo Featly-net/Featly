@@ -823,7 +823,7 @@ Authenticated by API keys with `SdkRead` scope.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/sdk/config` | Full snapshot of flags + configs + segments for the environment. ETag / `If-None-Match` supported. |
+| `GET` | `/api/sdk/config` | Full snapshot of flags + configs + segments for the environment. ETag / `If-None-Match` supported — the ETag is the environment's `ConfigVersion`, bumped by every snapshot-affecting write (issue #228), so a revalidation costs no extra queries. |
 | `GET` | `/api/sdk/stream` | Server-Sent Events stream of change notifications. |
 | `POST` | `/api/sdk/events` | Batch ingestion of exposure and custom events. |
 

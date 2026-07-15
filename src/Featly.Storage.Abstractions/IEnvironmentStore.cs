@@ -31,4 +31,12 @@ public interface IEnvironmentStore
     /// matched by id. Returns the updated environment, or <c>null</c> if missing.
     /// </summary>
     Task<Environment?> SetReadOnlyAsync(Guid id, bool readOnly, CancellationToken ct);
+
+    /// <summary>
+    /// Atomically increments <see cref="Environment.ConfigVersion"/> — called
+    /// whenever a flag, segment, config or experiment write changes this
+    /// environment's SDK snapshot (issue #228). A single conditional UPDATE, so
+    /// concurrent writers cannot lose a bump. Idempotent for a missing id.
+    /// </summary>
+    Task BumpConfigVersionAsync(Guid id, CancellationToken ct);
 }

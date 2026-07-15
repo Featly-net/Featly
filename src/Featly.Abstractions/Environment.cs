@@ -37,6 +37,20 @@ public sealed class Environment
     /// </summary>
     public bool ReadOnly { get; set; }
 
+    /// <summary>
+    /// Monotonic counter bumped every time this environment's SDK snapshot
+    /// changes — any flag, segment, config or experiment write (issue #228). The
+    /// SDK's <c>GET /api/sdk/config</c> derives its ETag from this, so a
+    /// revalidation costs nothing beyond the environment lookup it already does.
+    /// </summary>
+    /// <remarks>
+    /// Every write path that alters the snapshot must bump this, or SDK clients
+    /// will keep serving a stale cache. That pairing is enforced by going through
+    /// the one helper that bumps and notifies together, rather than leaving the
+    /// bump as a step each new handler has to remember.
+    /// </remarks>
+    public long ConfigVersion { get; set; }
+
     /// <summary>Audit: row creation time.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 }

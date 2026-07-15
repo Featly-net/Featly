@@ -250,10 +250,8 @@ internal static class AdminSegmentsEndpoints
         return string.IsNullOrEmpty(name) ? "anonymous" : name;
     }
 
-    private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string segmentKey, CancellationToken ct)
-        => store.Changes.NotifyAsync(
-            new ChangeNotification(environmentId, "Segment", segmentKey, DateTimeOffset.UtcNow),
-            ct);
+    private static Task NotifyAsync(StorageFacade store, Guid environmentId, string segmentKey, CancellationToken ct)
+        => SnapshotChange.AnnounceAsync(store, environmentId, "Segment", segmentKey, ct);
 }
 
 /// <summary>
