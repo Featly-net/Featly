@@ -79,6 +79,33 @@ public class SqliteWebhookAndAuditStoreTests
     }
 
     [Fact]
+    public async Task TryClaimDue_leases_a_due_row_once_and_hides_it_from_a_second_claim()
+    {
+        // Multi-instance safety (issue #237): the first claim leases the row by
+        // pushing NextAttemptAt forward, so a concurrent worker's due query and a
+        // second claim both miss it. A not-yet-due row can never be claimed.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var endpointId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var dueNow = NewDelivery(endpointId, now.AddSeconds(-5));
+        var future = NewDelivery(endpointId, now.AddMinutes(10));
+        await host.Store.WebhookDeliveries.EnqueueAsync([dueNow, future], ct);
+
+        var leaseUntil = now.AddMinutes(1);
+        (await host.Store.WebhookDeliveries.TryClaimDueAsync(dueNow.Id, now, leaseUntil, ct)).Should().BeTrue();
+        (await host.Store.WebhookDeliveries.TryClaimDueAsync(dueNow.Id, now, leaseUntil, ct)).Should().BeFalse();
+        (await host.Store.WebhookDeliveries.TryClaimDueAsync(future.Id, now, leaseUntil, ct)).Should().BeFalse();
+
+        // The lease removed the row from the due set until leaseUntil.
+        (await host.Store.WebhookDeliveries.ListDueAsync(now, 10, ct)).Should().BeEmpty();
+        var leased = await host.Store.WebhookDeliveries.GetByIdAsync(dueNow.Id, ct);
+        leased!.NextAttemptAt.Should().BeCloseTo(leaseUntil, TimeSpan.FromSeconds(1));
+        leased.Status.Should().Be(WebhookDeliveryStatus.Pending);
+    }
+
+    [Fact]
     public async Task Audit_entries_round_trip_payload_and_filter()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

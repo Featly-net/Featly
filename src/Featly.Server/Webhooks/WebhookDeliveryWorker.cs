@@ -60,11 +60,27 @@ internal sealed partial class WebhookDeliveryWorker(
         }
     }
 
+    /// <summary>
+    /// Safety margin added on top of a single request timeout when leasing a row,
+    /// so the lease reliably outlasts one delivery attempt (issue #237).
+    /// </summary>
+    private static readonly TimeSpan LeaseMargin = TimeSpan.FromSeconds(30);
+
     private async Task DrainOnceAsync(WebhookOptions opts, CancellationToken ct)
     {
-        var due = await store.WebhookDeliveries.ListDueAsync(DateTimeOffset.UtcNow, opts.BatchSize, ct).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        var due = await store.WebhookDeliveries.ListDueAsync(now, opts.BatchSize, ct).ConfigureAwait(false);
         foreach (var delivery in due)
         {
+            // Multi-instance safety (issue #237): lease the row before attempting
+            // it so another instance draining the same queue treats it as not-yet-
+            // due and skips it. AttemptAsync's write below overwrites the lease with
+            // the real outcome; the loser of the race just moves on.
+            var leaseUntil = DateTimeOffset.UtcNow + opts.RequestTimeout + LeaseMargin;
+            if (!await store.WebhookDeliveries.TryClaimDueAsync(delivery.Id, now, leaseUntil, ct).ConfigureAwait(false))
+            {
+                continue;
+            }
             await AttemptAsync(delivery, opts, ct).ConfigureAwait(false);
         }
     }

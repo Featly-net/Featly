@@ -5,6 +5,7 @@ namespace Featly.Storage.InMemory;
 internal sealed class InMemoryWebhookDeliveryStore : IWebhookDeliveryStore
 {
     private readonly ConcurrentDictionary<Guid, WebhookDelivery> _byId = new();
+    private readonly Lock _claimGate = new();
 
     public Task EnqueueAsync(IReadOnlyList<WebhookDelivery> deliveries, CancellationToken ct)
     {
@@ -24,6 +25,22 @@ internal sealed class InMemoryWebhookDeliveryStore : IWebhookDeliveryStore
             .Take(max)
             .ToList();
         return Task.FromResult<IReadOnlyList<WebhookDelivery>>(list);
+    }
+
+    public Task<bool> TryClaimDueAsync(Guid id, DateTimeOffset dueBefore, DateTimeOffset leaseUntil, CancellationToken ct)
+    {
+        lock (_claimGate)
+        {
+            if (_byId.TryGetValue(id, out var delivery)
+                && delivery.Status == WebhookDeliveryStatus.Pending
+                && delivery.NextAttemptAt <= dueBefore)
+            {
+                delivery.NextAttemptAt = leaseUntil;
+                delivery.UpdatedAt = DateTimeOffset.UtcNow;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
     }
 
     public Task UpdateAsync(WebhookDelivery delivery, CancellationToken ct)
