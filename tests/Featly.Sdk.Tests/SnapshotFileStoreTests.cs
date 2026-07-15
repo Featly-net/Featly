@@ -134,6 +134,31 @@ public class SnapshotFileStoreTests
     }
 
     [Fact]
+    public async Task Save_creates_missing_directories_and_a_null_snapshot_payload_reads_as_null()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var dir = Path.Join(Path.GetTempPath(), $"featly-nested-{Guid.NewGuid():N}", "cache");
+        var path = Path.Join(dir, "snapshot.json");
+        try
+        {
+            // SaveCacheAsync creates the (missing) directory tree.
+            await FeatlySnapshotFileStore.SaveCacheAsync(path, SampleSnapshot(), null, ct);
+            File.Exists(path).Should().BeTrue();
+
+            // A payload whose snapshot is null reads back as null (not a throw).
+            await File.WriteAllTextAsync(path, "{\"etag\":\"x\",\"snapshot\":null}", ct);
+            (await FeatlySnapshotFileStore.LoadCacheAsync(path, ct)).Should().BeNull();
+        }
+        finally
+        {
+            if (Directory.Exists(Path.GetDirectoryName(Path.GetDirectoryName(path)!)!))
+            {
+                Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(path)!)!, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Missing_and_corrupt_files_return_null()
     {
         var ct = TestContext.Current.CancellationToken;
