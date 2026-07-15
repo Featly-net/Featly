@@ -314,6 +314,36 @@ public class ApiErrorPathsTests
         (await sdk.PostAsJsonAsync("/api/sdk/events", missingSubject, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task More_error_branches_webhooks_roles_settings()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+        var id = Guid.NewGuid();
+
+        // Webhook sub-resources on an unknown endpoint.
+        (await c.GetAsync(new Uri($"/api/admin/webhooks/{id}/deliveries", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsync(new Uri($"/api/admin/webhooks/{id}/test", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsync(new Uri($"/api/admin/webhooks/{id}/deliveries/{id}/resend", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Update unknown role / group -> 404.
+        (await c.PutAsJsonAsync("/api/admin/roles/nope", new { key = "nope", name = "n", permissions = Array.Empty<string>() }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PutAsJsonAsync("/api/admin/groups/nope", new { key = "nope", name = "n" }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Role upgrade request for a non-existent role -> 400.
+        (await c.PostAsJsonAsync("/api/admin/role-upgrade-requests", new { requestedRoleId = id }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Settings validation (approval defaults + authorization).
+        (await c.PutAsJsonAsync("/api/admin/settings/approval-defaults", new { prod = new { minApprovals = 0 }, nonProd = new { minApprovals = 1 } }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Role assignment onto a real role but an unknown assignee -> 400.
+        var roles = await c.GetFromJsonAsync<List<Role>>("/api/admin/roles", TestJson.Options, ct);
+        var adminRoleId = roles!.First(r => r.Key == SystemRoles.AdminKey).Id;
+        (await c.PostAsJsonAsync("/api/admin/role-assignments", new { roleId = adminRoleId, assigneeType = "User", assigneeId = id }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsJsonAsync("/api/admin/role-assignments", new { roleId = adminRoleId, assigneeType = "Group", assigneeId = id }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static HttpClient Admin(IHost host)
     {
         var client = host.GetTestClient();
