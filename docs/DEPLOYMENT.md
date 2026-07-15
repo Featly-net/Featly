@@ -36,11 +36,11 @@ replica B. It does **not** break correctness: every SDK also polls with an ETag
 (`FeatlyConfigSyncService`), so all clients converge within one polling
 interval; only the "instant" push is per-replica.
 
-Until a distributed notifier ships (a Redis-backed `IChangeNotifier` is on the
-post-1.0 roadmap, see [PLAN.md](../PLAN.md) "Post-1.0 extensions"), run **one**
+Until a distributed notifier ships (Postgres `LISTEN`/`NOTIFY`, tracked in
+[#179](https://github.com/Featly-net/Featly/issues/179)), run **one**
 centralized-server instance, or accept polling-interval freshness across
-replicas. SQLite's single-writer model points the same way — multi-replica
-deployments are the target of the post-1.0 Postgres provider.
+replicas. If you do run several, use the PostgreSQL provider — SQLite's
+single-writer model does not fit multiple replicas sharing one database.
 
 The background workers are safe to run on several replicas against a shared
 database: `WebhookDeliveryWorker` and `ScheduledApplyWorker` claim each due row
@@ -48,8 +48,7 @@ with a single conditional `UPDATE` before acting on it
 ([issue #237](https://github.com/Featly-net/Featly/issues/237)), so only one
 instance wins each claim — a scheduled apply cannot race and a delivery is not
 sent twice by two instances. This matters for a concurrent-writer store such as
-the post-1.0 Postgres provider; the bundled SQLite provider serializes writers
-anyway. (Freshness across replicas still depends on the distributed notifier
+the PostgreSQL provider; the bundled SQLite provider serializes writers anyway. (Freshness across replicas still depends on the distributed notifier
 above; that is a separate concern from worker correctness.)
 
 ### 3. Consumer (SDK only)
@@ -105,11 +104,65 @@ API, reusing its permission checks, audit log, and webhooks
 
 ## Storage providers
 
-SQLite is the built-in default (`Featly.Storage.Sqlite`), ideal for the embedded
-quickstart and small/medium centralized deployments. `IFeatlyStore` is an
-interface ([ADR-0015](adr/0015-storage-facade.md)); SQL Server, Postgres, and
-Redis providers are designed but deferred until after v0.1.0 (see
-[DEFERRED.md](DEFERRED.md)).
+`IFeatlyStore` is an interface ([ADR-0015](adr/0015-storage-facade.md)), so the
+provider is a one-line swap — nothing above the storage layer changes.
+
+### SQLite (default)
+
+`Featly.Storage.Sqlite` is the built-in default: ideal for the embedded
+quickstart and for a single-instance centralized server.
+
+```csharp
+builder.Services.AddFeatlySqliteStore();   // Featly:Storage:Sqlite
+```
+
+### PostgreSQL
+
+`Featly.Storage.Postgres` ([ADR-0026](adr/0026-postgres-storage-provider.md)) is
+the provider for a centralized server with **several replicas sharing one
+database** — SQLite's single-writer model does not fit that shape.
+
+```csharp
+builder.Services.AddFeatlyPostgresStore(o =>
+    o.ConnectionString = "Host=db;Database=featly;Username=featly;Password=...");
+```
+
+Or bind it from configuration instead:
+
+```json
+{
+  "Featly": {
+    "Storage": {
+      "Postgres": {
+        "ConnectionString": "Host=db;Database=featly;Username=featly;Password=...",
+        "AutoMigrate": true
+      }
+    }
+  }
+}
+```
+
+There is no default connection string — the host fails at startup with a clear
+message rather than at the first query.
+
+**Turn `AutoMigrate` off when you run more than one replica.** It defaults to
+`true` (each host applies pending migrations on boot), which is what you want for
+a single instance; with several replicas booting together they would each race to
+migrate the same database. Apply the schema once as a deploy step and start the
+replicas with `AutoMigrate: false`.
+
+> **Change notifications are in-process for now.** An SSE client connected to
+> replica A is not pushed a change made through replica B — it catches up on its
+> next poll instead (see "Scaling out" above). The Postgres-native
+> `LISTEN`/`NOTIFY` notifier that closes this is tracked in
+> [#179](https://github.com/Featly-net/Featly/issues/179). Everything else —
+> including the background workers, which claim rows atomically — is safe across
+> replicas.
+
+### Planned
+
+SQL Server and a Redis cache / change pub-sub provider are designed but not
+built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
 
 ## Health checks
 
