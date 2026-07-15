@@ -28,13 +28,20 @@ internal sealed class FeatlyRateLimiter : IDisposable
 {
     private readonly PartitionedRateLimiter<RateKey> _limiter;
 
+    // A one-minute window split into segments: a sliding window rejects bursts
+    // that a fixed window would let through at the boundary (up to 2x the limit
+    // across two adjacent windows). Six 10-second segments keep the accounting
+    // cheap while smoothing the edge (issue #221).
+    private const int SegmentsPerWindow = 6;
+
     public FeatlyRateLimiter()
     {
         _limiter = PartitionedRateLimiter.Create<RateKey, RateKey>(static key =>
-            RateLimitPartition.GetFixedWindowLimiter(key, static k => new FixedWindowRateLimiterOptions
+            RateLimitPartition.GetSlidingWindowLimiter(key, static k => new SlidingWindowRateLimiterOptions
             {
                 PermitLimit = k.Limit,
                 Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = SegmentsPerWindow,
                 QueueLimit = 0,
                 AutoReplenishment = true,
             }));
