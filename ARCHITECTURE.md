@@ -20,7 +20,7 @@ Featly is what you get when you combine the developer experience of Hangfire (em
 - **Storage is an interface.** `IFeatlyStore` is the contract. SQLite and in-memory providers ship first; SQL Server, PostgreSQL, and Redis follow. Migrations are EF Core.
 - **DB beats config.** Settings have a three-layer precedence: hardcoded default, `appsettings.json`, then database. Anything editable in the UI lives in the database and overrides `appsettings`.
 - **Predictable, not magical.** Small APIs, explicit contracts, no compile-time reflection tricks. No required source generators. Everything you can do in the UI you can also do via the HTTP API.
-- **Resilient by default.** The SDK serves the last known good configuration if the server is unreachable. Bootstrap from a static JSON file is supported for cold starts in air-gapped or serverless environments.
+- **Resilient by default.** The SDK serves the last known good configuration (in memory) if the server is unreachable. On-disk cache and static-JSON bootstrap for cold starts are planned (see §6).
 
 ---
 
@@ -740,7 +740,7 @@ sequenceDiagram
 
 ### Resilience
 
-The in-memory cache survives server outages. Optional on-disk cache survives application restarts when the server is unreachable. Cold-start bootstrap from a static JSON file is supported for air-gapped or serverless environments. After repeated failures, the client backs off exponentially before retrying.
+The in-memory cache survives server outages: on a failed sync the SDK keeps serving the last known good snapshot, and after repeated failures it backs off exponentially (1 s → 30 s) while falling back from streaming to polling. **Planned (not yet implemented — see [issue #238](https://github.com/Featly-net/Featly/issues/238)):** an optional on-disk cache that survives application restarts when the server is unreachable, and cold-start bootstrap from a static JSON file for air-gapped or serverless environments. Today resilience is in-memory only, so a process restart while the server is unreachable starts cold.
 
 ---
 
@@ -1090,6 +1090,8 @@ Configurable per Featly instance. A `Webhook` subscribes to a list of event type
 **Security.** Each webhook has a secret. Featly signs each delivery with HMAC-SHA256 over the body and attaches the signature in the `X-Featly-Signature` header. Receivers verify the signature to confirm authenticity.
 
 **Reliability.** Delivery has an exponential backoff retry policy (configurable via `WebhookSettings`). After `MaxRetries` consecutive failures, Featly opens a circuit breaker and skips deliveries for a cooldown. `ConsecutiveFailures` is tracked per webhook. The dashboard shows last delivery status and recent failures.
+
+> **Single-instance workers (current limitation).** `WebhookDeliveryWorker` and `ScheduledApplyWorker` claim due rows by listing them, not by an atomic transaction, so **run only one instance of the worker per database**. With more than one instance against a shared database (Pattern 2 multi-node, Pattern 3 shared DB) a delivery can be sent twice and a scheduled apply can race. Atomic row claiming is tracked in [issue #237](https://github.com/Featly-net/Featly/issues/237); until it lands, scale the SDK-facing surface horizontally but keep the background workers on a single node (or disable them on the extras).
 
 Email (SMTP) notifications are a planned extension and not part of the core platform.
 
