@@ -411,6 +411,38 @@ public class ChangeWorkflowEndpointsTests
         deliveries.Should().Contain(d => d.EventType == FeatlyEventTypes.ChangeProposed);
     }
 
+    [Fact]
+    public async Task Gated_emergency_bypass_is_audited_and_webhooked()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+        await store.ApprovalPolicies.UpsertAsync(new ApprovalPolicy { Id = Guid.NewGuid(), EnvironmentId = env.Id, Required = true, AllowEmergencyBypass = true, MinApprovals = 1 }, ct);
+
+        var hookId = await SubscribeWebhookAsync(host, FeatlyEventTypes.ChangeApplied, ct);
+
+        // A direct flag write with ?emergency=true routes through the ChangeGate,
+        // which applies immediately. That bypass must be loudly recorded (issue #235).
+        using var admin = await CookieClientAsync(host, store, "admin-eb@example.com", ct, SystemRoles.AdminKey);
+        var resp = await admin.PostAsJsonAsync(
+            new Uri("/api/admin/flags?emergency=true&reason=incident-42", UriKind.Relative), MinimalFlag("eb-flag"), ct);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Applied immediately...
+        (await store.Flags.GetAsync(env.Id, "eb-flag", ct)).Should().NotBeNull();
+
+        // ...and recorded: a change.applied webhook delivery + an audit entry.
+        using var adminBearer = AdminClient(host);
+        var deliveries = await adminBearer.GetFromJsonAsync<List<WebhookDelivery>>(
+            $"/api/admin/webhooks/{hookId}/deliveries", TestJson.Options, ct);
+        deliveries.Should().Contain(d => d.EventType == FeatlyEventTypes.ChangeApplied);
+
+        var audit = await adminBearer.GetFromJsonAsync<List<AuditEntry>>(
+            "/api/admin/audit?entityType=Change", TestJson.Options, ct);
+        audit.Should().Contain(a => a.Action == FeatlyEventTypes.ChangeApplied);
+    }
+
     // ---------- helpers ----------
 
     private static async Task<Guid> SubscribeWebhookAsync(IHost host, string eventType, CancellationToken ct)

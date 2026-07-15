@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Endpoints;
 using Featly.Server.Events;
+using Featly.Server.Telemetry;
 using Microsoft.AspNetCore.Http;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
@@ -17,7 +18,7 @@ namespace Featly.Server.Approval;
 /// <c>?dryRun=true</c> request never mutates and just reports whether approval
 /// would be required.
 /// </summary>
-internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier, Settings.IFeatlySettingsProvider settings, IFeatlyEventPublisher events)
+internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier, Settings.IFeatlySettingsProvider settings, IFeatlyEventPublisher events, FeatlyServerMetrics metrics)
 {
     /// <summary>
     /// Decides how a mutation should proceed. When <see cref="GateResult.Outcome"/>
@@ -97,6 +98,13 @@ internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService a
             await store.PendingChanges.CreateAsync(bypass, ct).ConfigureAwait(false);
             await applier.ApplyAsync(bypass, principal.Identity?.Name ?? "anonymous", ct).ConfigureAwait(false);
             await ChangeStaleness.MarkSiblingsStaleAsync(store, bypass, ct).ConfigureAwait(false);
+            // An emergency bypass must be loudly recorded — publish change.applied
+            // (emergency=true) so it lands in the audit log and fires webhooks, the
+            // same as the explicit /bypass endpoint (issue #235). Without this the
+            // transparent-gate bypass mutated production silently.
+            metrics.RecordChangeApplied(bypass.Action, bypassed: true);
+            await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", bypass.Id.ToString(), bypass.EnvironmentId, principal,
+                new { bypass.Id, bypass.EntityType, bypass.EntityKey, bypass.Action, emergency = true }, ct).ConfigureAwait(false);
             return GateResult.Handled(Results.Ok(bypass));
         }
 
