@@ -38,4 +38,22 @@ public sealed class FeatlySdkOptions
     /// SSE connection uses its own per-event timeout.
     /// </summary>
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Optional path to an on-disk snapshot cache (issue #238). When set, the SDK
+    /// writes each fresh snapshot to this file and, on startup, seeds the cache
+    /// from it before the first network fetch — so a process restart while the
+    /// server is unreachable keeps serving the last known good configuration
+    /// instead of starting cold. Null (the default) disables the on-disk cache.
+    /// </summary>
+    public string? OfflineCachePath { get; set; }
+
+    /// <summary>
+    /// Optional path to a static JSON snapshot used for cold-start bootstrap in
+    /// air-gapped or serverless environments (issue #238). When set and the
+    /// on-disk cache is absent, the SDK seeds the cache from this file at startup
+    /// so evaluations have a baseline before (or without) any server contact. The
+    /// file has the same shape the server returns from <c>GET /api/sdk/config</c>.
+    /// </summary>
+    public string? BootstrapFilePath { get; set; }
 }

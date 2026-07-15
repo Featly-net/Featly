@@ -1,0 +1,181 @@
+using System.Text.Json;
+using AwesomeAssertions;
+using Featly.Sdk.Internal;
+using Xunit;
+
+namespace Featly.Sdk.Tests;
+
+/// <summary>
+/// Covers the SDK's on-disk snapshot cache and static bootstrap file (issue #238):
+/// a fresh snapshot round-trips through the cache file, a bare server-shaped
+/// snapshot loads as a bootstrap, and missing / corrupt files fail soft to null.
+/// </summary>
+public class SnapshotFileStoreTests
+{
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+    private static readonly JsonElement True = JsonSerializer.SerializeToElement(true);
+    private static readonly JsonElement False = JsonSerializer.SerializeToElement(false);
+
+    private static ConfigSnapshot SampleSnapshot() => new(
+        Guid.NewGuid(),
+        "development",
+        DateTimeOffset.UtcNow,
+        Flags: [new Flag
+        {
+            Id = Guid.NewGuid(),
+            Key = "demo",
+            Name = "Demo",
+            Type = FlagType.Boolean,
+            Enabled = true,
+            DefaultVariantKey = "off",
+            EnvironmentId = Guid.NewGuid(),
+            Variants =
+            [
+                new Variant { Key = "on", Name = "On", Value = True },
+                new Variant { Key = "off", Name = "Off", Value = False },
+            ],
+        }],
+        Segments: [],
+        Configs: []);
+
+    [Fact]
+    public async Task Cache_round_trips_snapshot_and_etag()
+    {
+        var path = Path.Join(Path.GetTempPath(), $"featly-cache-{Guid.NewGuid():N}.json");
+        var ct = TestContext.Current.CancellationToken;
+        try
+        {
+            var snapshot = SampleSnapshot();
+            await FeatlySnapshotFileStore.SaveCacheAsync(path, snapshot, "\"etag-123\"", ct);
+
+            var loaded = await FeatlySnapshotFileStore.LoadCacheAsync(path, ct);
+
+            loaded.Should().NotBeNull();
+            loaded!.Value.Etag.Should().Be("\"etag-123\"");
+            loaded.Value.Snapshot.Flags.Should().ContainSingle(f => f.Key == "demo" && f.Enabled);
+            loaded.Value.Snapshot.Flags[0].Variants.Should().Contain(v => v.Key == "on");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Bootstrap_loads_a_bare_server_shaped_snapshot()
+    {
+        var path = Path.Join(Path.GetTempPath(), $"featly-boot-{Guid.NewGuid():N}.json");
+        var ct = TestContext.Current.CancellationToken;
+        try
+        {
+            // The bootstrap file is exactly what GET /api/sdk/config returns.
+            var json = JsonSerializer.Serialize(SampleSnapshot(), Web);
+            await File.WriteAllTextAsync(path, json, ct);
+
+            var loaded = await FeatlySnapshotFileStore.LoadBootstrapAsync(path, ct);
+
+            loaded.Should().NotBeNull();
+            loaded!.Flags.Should().ContainSingle(f => f.Key == "demo");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Seed_prefers_the_on_disk_cache_then_the_bootstrap_file()
+    {
+        var cachePath = Path.Join(Path.GetTempPath(), $"featly-seed-cache-{Guid.NewGuid():N}.json");
+        var bootPath = Path.Join(Path.GetTempPath(), $"featly-seed-boot-{Guid.NewGuid():N}.json");
+        var ct = TestContext.Current.CancellationToken;
+        try
+        {
+            await FeatlySnapshotFileStore.SaveCacheAsync(cachePath, SampleSnapshot(), "\"e\"", ct);
+            await File.WriteAllTextAsync(bootPath, JsonSerializer.Serialize(SampleSnapshot(), Web), ct);
+
+            // On-disk cache wins when present.
+            var cache = new FeatlySnapshotCache();
+            (await FeatlySnapshotFileStore.SeedCacheAsync(cache, cachePath, bootPath, ct)).Should().Be("on-disk cache");
+            cache.TryGetFlag("demo").Should().NotBeNull();
+
+            // Bootstrap is used when there is no on-disk cache.
+            var cache2 = new FeatlySnapshotCache();
+            (await FeatlySnapshotFileStore.SeedCacheAsync(cache2, offlineCachePath: null, bootPath, ct)).Should().Be("bootstrap file");
+            cache2.TryGetFlag("demo").Should().NotBeNull();
+
+            // A warm cache is left untouched; nothing configured seeds nothing.
+            (await FeatlySnapshotFileStore.SeedCacheAsync(cache, cachePath, bootPath, ct)).Should().BeNull();
+            (await FeatlySnapshotFileStore.SeedCacheAsync(new FeatlySnapshotCache(), null, null, ct)).Should().BeNull();
+        }
+        finally
+        {
+            File.Delete(cachePath);
+            File.Delete(bootPath);
+        }
+    }
+
+    [Fact]
+    public async Task TryPersist_writes_when_configured_and_is_a_noop_otherwise()
+    {
+        var path = Path.Join(Path.GetTempPath(), $"featly-persist-{Guid.NewGuid():N}.json");
+        var ct = TestContext.Current.CancellationToken;
+        try
+        {
+            (await FeatlySnapshotFileStore.TryPersistCacheAsync(null, SampleSnapshot(), "\"e\"", ct)).Should().BeFalse();
+            (await FeatlySnapshotFileStore.TryPersistCacheAsync(path, SampleSnapshot(), "\"e\"", ct)).Should().BeTrue();
+            File.Exists(path).Should().BeTrue();
+            (await FeatlySnapshotFileStore.LoadCacheAsync(path, ct)).Should().NotBeNull();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Save_creates_missing_directories_and_a_null_snapshot_payload_reads_as_null()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var dir = Path.Join(Path.GetTempPath(), $"featly-nested-{Guid.NewGuid():N}", "cache");
+        var path = Path.Join(dir, "snapshot.json");
+        try
+        {
+            // SaveCacheAsync creates the (missing) directory tree.
+            await FeatlySnapshotFileStore.SaveCacheAsync(path, SampleSnapshot(), null, ct);
+            File.Exists(path).Should().BeTrue();
+
+            // A payload whose snapshot is null reads back as null (not a throw).
+            await File.WriteAllTextAsync(path, "{\"etag\":\"x\",\"snapshot\":null}", ct);
+            (await FeatlySnapshotFileStore.LoadCacheAsync(path, ct)).Should().BeNull();
+        }
+        finally
+        {
+            if (Directory.Exists(Path.GetDirectoryName(Path.GetDirectoryName(path)!)!))
+            {
+                Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(path)!)!, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Missing_and_corrupt_files_return_null()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var missing = Path.Join(Path.GetTempPath(), $"featly-missing-{Guid.NewGuid():N}.json");
+        (await FeatlySnapshotFileStore.LoadCacheAsync(missing, ct)).Should().BeNull();
+        (await FeatlySnapshotFileStore.LoadBootstrapAsync(missing, ct)).Should().BeNull();
+
+        var corrupt = Path.Join(Path.GetTempPath(), $"featly-corrupt-{Guid.NewGuid():N}.json");
+        try
+        {
+            await File.WriteAllTextAsync(corrupt, "{ not valid json", ct);
+            (await FeatlySnapshotFileStore.LoadCacheAsync(corrupt, ct)).Should().BeNull();
+            (await FeatlySnapshotFileStore.LoadBootstrapAsync(corrupt, ct)).Should().BeNull();
+        }
+        finally
+        {
+            File.Delete(corrupt);
+        }
+    }
+}

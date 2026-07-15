@@ -26,7 +26,18 @@ internal sealed partial class FeatlyConfigSyncService(
     {
         var opts = options.Value;
 
-        // Initial fetch — if it fails we still keep trying.
+        // Seed from disk before the first fetch so evaluations have a baseline
+        // even offline / on a cold start (issue #238).
+        var seededFrom = await FeatlySnapshotFileStore
+            .SeedCacheAsync(cache, opts.OfflineCachePath, opts.BootstrapFilePath, stoppingToken)
+            .ConfigureAwait(false);
+        if (seededFrom is not null)
+        {
+            LogSeeded(logger, seededFrom, cache.Current.Snapshot!.Flags.Count);
+        }
+
+        // Initial fetch — if it fails we still keep trying (and keep serving the
+        // seeded snapshot in the meantime).
         await TryRefreshAsync(opts, stoppingToken).ConfigureAwait(false);
 
         if (opts.EnableStreaming)
@@ -137,6 +148,7 @@ internal sealed partial class FeatlyConfigSyncService(
             {
                 cache.Replace(result.Snapshot, result.Etag);
                 LogSnapshotUpdated(logger, result.Snapshot.Flags.Count, result.Etag ?? "<none>");
+                await FeatlySnapshotFileStore.TryPersistCacheAsync(opts.OfflineCachePath, result.Snapshot, result.Etag, ct).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -152,6 +164,9 @@ internal sealed partial class FeatlyConfigSyncService(
             LogRefreshError(logger, ex);
         }
     }
+
+    [LoggerMessage(EventId = 2006, Level = LogLevel.Information, Message = "Featly cache seeded from {Source}: {FlagCount} flag(s).")]
+    private static partial void LogSeeded(ILogger logger, string source, int flagCount);
 
     [LoggerMessage(EventId = 2001, Level = LogLevel.Debug, Message = "Featly config not modified.")]
     private static partial void LogNotModified(ILogger logger);

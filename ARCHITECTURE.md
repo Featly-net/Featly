@@ -20,7 +20,7 @@ Featly is what you get when you combine the developer experience of Hangfire (em
 - **Storage is an interface.** `IFeatlyStore` is the contract. SQLite and in-memory providers ship first; SQL Server, PostgreSQL, and Redis follow. Migrations are EF Core.
 - **DB beats config.** Settings have a three-layer precedence: hardcoded default, `appsettings.json`, then database. Anything editable in the UI lives in the database and overrides `appsettings`.
 - **Predictable, not magical.** Small APIs, explicit contracts, no compile-time reflection tricks. No required source generators. Everything you can do in the UI you can also do via the HTTP API.
-- **Resilient by default.** The SDK serves the last known good configuration (in memory) if the server is unreachable. On-disk cache and static-JSON bootstrap for cold starts are planned (see §6).
+- **Resilient by default.** The SDK serves the last known good configuration if the server is unreachable — in memory, and optionally from an on-disk cache that survives restarts or a static-JSON bootstrap for cold starts (see §6).
 
 ---
 
@@ -740,7 +740,7 @@ sequenceDiagram
 
 ### Resilience
 
-The in-memory cache survives server outages: on a failed sync the SDK keeps serving the last known good snapshot, and after repeated failures it backs off exponentially (1 s → 30 s) while falling back from streaming to polling. **Planned (not yet implemented — see [issue #238](https://github.com/Featly-net/Featly/issues/238)):** an optional on-disk cache that survives application restarts when the server is unreachable, and cold-start bootstrap from a static JSON file for air-gapped or serverless environments. Today resilience is in-memory only, so a process restart while the server is unreachable starts cold.
+The in-memory cache survives server outages: on a failed sync the SDK keeps serving the last known good snapshot, and after repeated failures it backs off exponentially (1 s → 30 s) while falling back from streaming to polling. Two optional file-backed layers extend this across restarts: set `FeatlySdkOptions.OfflineCachePath` and the SDK writes each fresh snapshot to disk and re-seeds the cache from it at startup, so a process restart while the server is unreachable resumes with the last known good configuration instead of starting cold; set `FeatlySdkOptions.BootstrapFilePath` (a static JSON file in the exact shape `GET /api/sdk/config` returns) and the SDK seeds from it on a cold start when no on-disk cache exists, for air-gapped or serverless environments. Both are off unless a path is configured.
 
 ---
 
