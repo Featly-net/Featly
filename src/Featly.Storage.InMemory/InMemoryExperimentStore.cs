@@ -62,10 +62,4 @@ internal sealed class InMemoryExperimentStore : IExperimentStore
         return Task.CompletedTask;
     }
 
-    public Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        var values = _byEnvKey.Values.Where(e => e.EnvironmentId == environmentId).ToList();
-        DateTimeOffset? mostRecent = values.Count == 0 ? null : values.Max(e => e.UpdatedAt);
-        return Task.FromResult(mostRecent);
-    }
 }

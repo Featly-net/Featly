@@ -86,13 +86,4 @@ internal sealed class PostgresExperimentStore(IDbContextFactory<FeatlyDbContext>
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
-        return await db.Experiments.AsNoTracking()
-            .Where(e => e.EnvironmentId == environmentId)
-            .Select(e => (DateTimeOffset?)e.UpdatedAt)
-            .MaxAsync(ct)
-            .ConfigureAwait(false);
-    }
 }

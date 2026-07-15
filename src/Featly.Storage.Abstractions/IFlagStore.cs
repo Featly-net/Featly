@@ -26,10 +26,4 @@ public interface IFlagStore
     /// <summary>Clears the archived flag, returning the flag to the active list.</summary>
     Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
 
-    /// <summary>
-    /// Returns the most recent <see cref="Flag.UpdatedAt"/> across all flags
-    /// in the environment, or <c>null</c> when there are none. Used by the
-    /// SDK config endpoint to compute its ETag.
-    /// </summary>
-    Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct);
 }

@@ -122,21 +122,6 @@ public class SqliteConfigStoreTests
         loaded.DefaultValue.GetRawText().Should().Be(rawJsonValue);
     }
 
-    [Fact]
-    public async Task GetMostRecentUpdate_tracks_updates()
-    {
-        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
-        var ct = TestContext.Current.CancellationToken;
-        var envId = Guid.NewGuid();
-
-        var initial = await host.Store.Configs.GetMostRecentUpdateAsync(envId, ct);
-        initial.Should().BeNull();
-
-        await host.Store.Configs.UpsertAsync(envId, NewIntConfig(envId, "first"), "t", ct);
-        var after = await host.Store.Configs.GetMostRecentUpdateAsync(envId, ct);
-        after.Should().NotBeNull();
-    }
-
     private static Config NewIntConfig(Guid envId, string key) => new()
     {
         Id = Guid.NewGuid(),

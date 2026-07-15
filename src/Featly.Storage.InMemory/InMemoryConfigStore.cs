@@ -63,10 +63,4 @@ internal sealed class InMemoryConfigStore : IConfigStore
         return Task.CompletedTask;
     }
 
-    public Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        var snapshot = _configs.Values.Where(c => c.EnvironmentId == environmentId).ToList();
-        return Task.FromResult<DateTimeOffset?>(
-            snapshot.Count == 0 ? null : snapshot.Max(c => c.UpdatedAt));
-    }
 }
