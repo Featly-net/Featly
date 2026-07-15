@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Approval;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Http;
 using ChangeNotification = Featly.Storage.ChangeNotification;
 using StorageFacade = Featly.Storage.IFeatlyStore;
@@ -67,5 +68,70 @@ internal static class AdminWrite
         var gated = await gate.InterceptAsync(entityType, key, environment, action,
             JsonSerializer.SerializeToElement(body, ChangeJson.Options), user, dryRun, emergency, reason, ct).ConfigureAwait(false);
         return gated.Outcome == GateOutcome.Handled ? gated.Response! : null;
+    }
+
+    /// <summary>
+    /// The archive / unarchive flow, shared by the flag, config and segment
+    /// endpoints (issue #224): resolve a writable environment, load the entity,
+    /// flip the archived bit through the sub-store, then announce it with a
+    /// before/after payload. Archiving is not gated by the approval workflow.
+    /// </summary>
+    /// <remarks>
+    /// The three sub-stores expose the same shape (<c>GetAsync</c> /
+    /// <c>ArchiveAsync</c> / <c>UnarchiveAsync</c> over
+    /// <c>(environmentId, key, actor, ct)</c>), so the entity-specific part is
+    /// just those three calls plus the event names.
+    /// </remarks>
+    public static async Task<IResult> SetArchivedAsync<TEntity>(
+        StorageFacade store,
+        IFeatlyEventPublisher events,
+        string? env,
+        ClaimsPrincipal user,
+        string entityType,
+        string key,
+        bool archived,
+        Func<Guid, string, CancellationToken, Task<TEntity?>> getAsync,
+        Func<Guid, string, string, CancellationToken, Task> archiveAsync,
+        Func<Guid, string, string, CancellationToken, Task> unarchiveAsync,
+        string archivedEvent,
+        string unarchivedEvent,
+        CancellationToken ct)
+        where TEntity : class
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        ArgumentNullException.ThrowIfNull(getAsync);
+        ArgumentNullException.ThrowIfNull(archiveAsync);
+        ArgumentNullException.ThrowIfNull(unarchiveAsync);
+
+        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
+        if (environment is null)
+        {
+            return guard!;
+        }
+
+        var existing = await getAsync(environment.Id, key, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Problems.NotFound($"{entityType} '{key}' not found.");
+        }
+
+        var actor = ResolveActor(user);
+        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
+        if (archived)
+        {
+            await archiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await unarchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
+        }
+
+        var updated = await getAsync(environment.Id, key, ct).ConfigureAwait(false);
+        await NotifyAsync(store, environment.Id, entityType, key, ct).ConfigureAwait(false);
+        await events.PublishAsync(
+            archived ? archivedEvent : unarchivedEvent,
+            entityType, key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
+
+        return Results.Ok(updated);
     }
 }

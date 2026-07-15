@@ -205,7 +205,7 @@ internal static class AdminFlagsEndpoints
         CancellationToken ct)
         => SetArchivedAsync(key, store, events, env, user, archived: false, ct);
 
-    private static async Task<IResult> SetArchivedAsync(
+    private static Task<IResult> SetArchivedAsync(
         string key,
         StorageFacade store,
         IFeatlyEventPublisher events,
@@ -213,38 +213,11 @@ internal static class AdminFlagsEndpoints
         ClaimsPrincipal user,
         bool archived,
         CancellationToken ct)
-    {
-        var (environment, guard) = await EnvironmentResolver.ResolveWritableAsync(store, env, ct).ConfigureAwait(false);
-        if (environment is null)
-        {
-            return guard!;
-        }
-
-        var existing = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        if (existing is null)
-        {
-            return Problems.NotFound($"Flag '{key}' not found.");
-        }
-
-        var actor = AdminWrite.ResolveActor(user);
-        var before = JsonSerializer.SerializeToElement(existing, ChangeJson.Options);
-        if (archived)
-        {
-            await store.Flags.ArchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
-        }
-        else
-        {
-            await store.Flags.UnarchiveAsync(environment.Id, key, actor, ct).ConfigureAwait(false);
-        }
-
-        var updated = await store.Flags.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        await AdminWrite.NotifyAsync(store, environment.Id, "Flag", key, ct).ConfigureAwait(false);
-        await events.PublishAsync(
-            archived ? FeatlyEventTypes.FlagArchived : FeatlyEventTypes.FlagUnarchived,
-            "Flag", key, environment.Id, user, new { before, after = updated }, ct).ConfigureAwait(false);
-
-        return Results.Ok(updated);
-    }
+        => AdminWrite.SetArchivedAsync(store, events, env, user, "Flag", key, archived,
+            (e, k, c) => store.Flags.GetAsync(e, k, c),
+            (e, k, a, c) => store.Flags.ArchiveAsync(e, k, a, c),
+            (e, k, a, c) => store.Flags.UnarchiveAsync(e, k, a, c),
+            FeatlyEventTypes.FlagArchived, FeatlyEventTypes.FlagUnarchived, ct);
 
     // GET /admin/flags/stale?staleDays= — cleanup candidates: no targeting
     // rules left, a stalled experiment, or an archived flag whose experiment
