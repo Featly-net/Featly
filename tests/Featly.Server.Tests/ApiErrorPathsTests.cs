@@ -183,6 +183,91 @@ public class ApiErrorPathsTests
         (await c.PutAsJsonAsync($"/api/admin/webhooks/{body!.Id}", update, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Rbac_and_directory_endpoints_error_branches()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+        var id = Guid.NewGuid();
+
+        // API keys.
+        (await c.PostAsJsonAsync("/api/admin/apikeys", new { name = "", scope = "AdminWrite" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsJsonAsync("/api/admin/apikeys", new { name = "k", scope = "Nope" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsync(new Uri($"/api/admin/apikeys/{id}/revoke", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync($"/api/admin/apikeys/{id}/rotate", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Groups / roles / users.
+        (await c.GetAsync(new Uri("/api/admin/groups/nope", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/groups", new { key = "", name = "g" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.GetAsync(new Uri("/api/admin/roles/nope", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/roles", new { key = "", name = "r" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsJsonAsync("/api/admin/roles", new { key = "admin", name = "r", permissions = Array.Empty<string>() }, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.GetAsync(new Uri("/api/admin/users/nope@x.com", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/users", new { identifier = "" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsync(new Uri("/api/admin/users/nope@x.com/disable", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Role upgrade requests + assignments.
+        (await c.PostAsync(new Uri($"/api/admin/role-upgrade-requests/{id}/approve", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsync(new Uri($"/api/admin/role-upgrade-requests/{id}/reject", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/role-assignments", new { roleId = id, assigneeType = "User", assigneeId = id }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Preview_and_approval_policy_and_settings_error_branches()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Preview: unknown env, then unknown key.
+        (await c.PostAsJsonAsync("/api/admin/preview/flags/x" + BadEnv, new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/preview/flags/nope", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/preview/configs/nope", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Approval policies are addressed by environment key.
+        (await c.GetAsync(new Uri("/api/admin/approval-policies/does-not-exist", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.DeleteAsync(new Uri("/api/admin/approval-policies/does-not-exist", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Settings validation.
+        (await c.PutAsJsonAsync("/api/admin/settings/rate-limit", new { enabled = true, authPermitsPerMinute = -1, adminPermitsPerMinute = 1, sdkPermitsPerMinute = 1 }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PutAsJsonAsync("/api/admin/settings/audit", new { retentionDays = -5 }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PutAsJsonAsync("/api/admin/settings/webhook", new { maxAttempts = 0, baseRetryDelaySeconds = 1, maxRetryDelaySeconds = 1 }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PutAsJsonAsync("/api/admin/settings/authorization", new { autoProvisionMode = "Bogus" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Environment_write_error_branches()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await c.PostAsJsonAsync("/api/admin/environments", new { key = "development", name = "dupe" }, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PutAsJsonAsync("/api/admin/environments/nope", new { name = "x" }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.DeleteAsync(new Uri("/api/admin/environments/nope", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsync(new Uri("/api/admin/environments/nope/lock", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsync(new Uri("/api/admin/environments/nope/unlock", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Config_and_segment_duplicate_and_rename_conflicts()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        object config = new { key = "cfg", name = "Cfg", type = "Int", defaultValue = 30 };
+        (await c.PostAsJsonAsync("/api/admin/configs", config, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await c.PostAsJsonAsync("/api/admin/configs", config, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PutAsJsonAsync("/api/admin/configs/cfg", new { key = "other", name = "Cfg", type = "Int", defaultValue = 30 }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        object segment = new { key = "seg", name = "Seg", conditions = Array.Empty<object>() };
+        (await c.PostAsJsonAsync("/api/admin/segments", segment, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await c.PostAsJsonAsync("/api/admin/segments", segment, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PutAsJsonAsync("/api/admin/segments/seg", new { key = "other", name = "Seg", conditions = Array.Empty<object>() }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static HttpClient Admin(IHost host)
     {
         var client = host.GetTestClient();
