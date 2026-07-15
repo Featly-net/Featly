@@ -73,5 +73,70 @@ internal static class FeatlySnapshotFileStore
         }
     }
 
+    /// <summary>
+    /// Seeds <paramref name="cache"/> before the first network fetch when it is
+    /// still empty: prefers the on-disk cache, then the static bootstrap file.
+    /// Returns the human-readable source it seeded from (for logging), or
+    /// <c>null</c> when the cache was already warm or neither file was present.
+    /// </summary>
+    public static async Task<string?> SeedCacheAsync(FeatlySnapshotCache cache, string? offlineCachePath, string? bootstrapPath, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(cache);
+        if (cache.Current.Snapshot is not null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(offlineCachePath))
+        {
+            var cached = await LoadCacheAsync(offlineCachePath, ct).ConfigureAwait(false);
+            if (cached is { } entry)
+            {
+                cache.Replace(entry.Snapshot, entry.Etag);
+                return "on-disk cache";
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(bootstrapPath))
+        {
+            var bootstrap = await LoadBootstrapAsync(bootstrapPath, ct).ConfigureAwait(false);
+            if (bootstrap is not null)
+            {
+                // No ETag from a static file — the first fetch pulls a full snapshot.
+                cache.Replace(bootstrap, etag: null);
+                return "bootstrap file";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Best-effort write of the fresh snapshot to the on-disk cache. Returns
+    /// <c>true</c> when written, <c>false</c> when no cache path is configured or
+    /// the write failed (a failed cache write never breaks a refresh).
+    /// </summary>
+    public static async Task<bool> TryPersistCacheAsync(string? offlineCachePath, ConfigSnapshot snapshot, string? etag, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(offlineCachePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            await SaveCacheAsync(offlineCachePath, snapshot, etag, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private sealed record PersistedSnapshot(string? Etag, ConfigSnapshot? Snapshot);
 }

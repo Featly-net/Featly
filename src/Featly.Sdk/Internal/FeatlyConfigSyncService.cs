@@ -28,7 +28,13 @@ internal sealed partial class FeatlyConfigSyncService(
 
         // Seed from disk before the first fetch so evaluations have a baseline
         // even offline / on a cold start (issue #238).
-        await SeedFromDiskAsync(opts, stoppingToken).ConfigureAwait(false);
+        var seededFrom = await FeatlySnapshotFileStore
+            .SeedCacheAsync(cache, opts.OfflineCachePath, opts.BootstrapFilePath, stoppingToken)
+            .ConfigureAwait(false);
+        if (seededFrom is not null)
+        {
+            LogSeeded(logger, seededFrom, cache.Current.Snapshot!.Flags.Count);
+        }
 
         // Initial fetch — if it fails we still keep trying (and keep serving the
         // seeded snapshot in the meantime).
@@ -142,7 +148,7 @@ internal sealed partial class FeatlyConfigSyncService(
             {
                 cache.Replace(result.Snapshot, result.Etag);
                 LogSnapshotUpdated(logger, result.Snapshot.Flags.Count, result.Etag ?? "<none>");
-                await PersistToDiskAsync(opts, result.Snapshot, result.Etag, ct).ConfigureAwait(false);
+                await FeatlySnapshotFileStore.TryPersistCacheAsync(opts.OfflineCachePath, result.Snapshot, result.Etag, ct).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -159,70 +165,8 @@ internal sealed partial class FeatlyConfigSyncService(
         }
     }
 
-    /// <summary>
-    /// Seeds the cache from the on-disk cache (preferred) or the static bootstrap
-    /// file before the first network fetch, when the cache is still empty. Both
-    /// are optional (<see cref="FeatlySdkOptions.OfflineCachePath"/> /
-    /// <see cref="FeatlySdkOptions.BootstrapFilePath"/>); when neither is set or
-    /// present, the SDK simply starts cold as before.
-    /// </summary>
-    private async Task SeedFromDiskAsync(FeatlySdkOptions opts, CancellationToken ct)
-    {
-        if (cache.Current.Snapshot is not null)
-        {
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(opts.OfflineCachePath))
-        {
-            var cached = await FeatlySnapshotFileStore.LoadCacheAsync(opts.OfflineCachePath, ct).ConfigureAwait(false);
-            if (cached is { } entry)
-            {
-                cache.Replace(entry.Snapshot, entry.Etag);
-                LogSeeded(logger, "on-disk cache", entry.Snapshot.Flags.Count);
-                return;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(opts.BootstrapFilePath))
-        {
-            var bootstrap = await FeatlySnapshotFileStore.LoadBootstrapAsync(opts.BootstrapFilePath, ct).ConfigureAwait(false);
-            if (bootstrap is not null)
-            {
-                // No ETag from a static file — the first fetch pulls a full snapshot.
-                cache.Replace(bootstrap, etag: null);
-                LogSeeded(logger, "bootstrap file", bootstrap.Flags.Count);
-            }
-        }
-    }
-
-    /// <summary>Best-effort write of the fresh snapshot to the on-disk cache; never fails a refresh.</summary>
-    private async Task PersistToDiskAsync(FeatlySdkOptions opts, ConfigSnapshot snapshot, string? etag, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(opts.OfflineCachePath))
-        {
-            return;
-        }
-
-        try
-        {
-            await FeatlySnapshotFileStore.SaveCacheAsync(opts.OfflineCachePath, snapshot, etag, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            LogCachePersistError(logger, ex);
-        }
-    }
-
     [LoggerMessage(EventId = 2006, Level = LogLevel.Information, Message = "Featly cache seeded from {Source}: {FlagCount} flag(s).")]
     private static partial void LogSeeded(ILogger logger, string source, int flagCount);
-
-    [LoggerMessage(EventId = 2007, Level = LogLevel.Warning, Message = "Featly on-disk cache write failed.")]
-    private static partial void LogCachePersistError(ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = 2001, Level = LogLevel.Debug, Message = "Featly config not modified.")]
     private static partial void LogNotModified(ILogger logger);
