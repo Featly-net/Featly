@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AwesomeAssertions;
 using Featly.Server;
 using Featly.Server.Approval;
@@ -154,6 +155,42 @@ public class ScheduledApplyWorkerTests
 
         var stillLive = await store.Flags.GetAsync(env.Id, "stale-flag", ct);
         stillLive!.Name.Should().Be("Edited out from under the scheduled change");
+    }
+
+    [Fact]
+    public async Task TryClaimStatus_transitions_a_change_exactly_once()
+    {
+        // The atomic claim is what makes the worker multi-instance safe (issue
+        // #237): the first caller wins the Approved -> Applied transition and the
+        // rest get false, so a shared-DB deployment can't double-finalize or clobber.
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+
+        var change = new PendingChange
+        {
+            Id = Guid.NewGuid(),
+            EntityType = "Flag",
+            EntityKey = "claim-flag",
+            EnvironmentId = env.Id,
+            Action = ChangeAction.Create,
+            ProposedState = JsonSerializer.SerializeToElement(MinimalFlag("claim-flag")),
+            AuthorUserId = Guid.NewGuid(),
+            Status = ChangeStatus.Approved,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        await store.PendingChanges.CreateAsync(change, ct);
+
+        (await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Applied, ct))
+            .Should().BeTrue("the first caller claims the change");
+        (await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Applied, ct))
+            .Should().BeFalse("it is no longer Approved");
+        (await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Stale, ct))
+            .Should().BeFalse("a stale-claim from the wrong status must not win either");
+
+        (await store.PendingChanges.GetByIdAsync(change.Id, ct))!.Status.Should().Be(ChangeStatus.Applied);
     }
 
     private static ScheduledApplyWorker Worker(IHost host)

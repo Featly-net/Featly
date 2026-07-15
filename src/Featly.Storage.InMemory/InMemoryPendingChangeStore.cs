@@ -5,6 +5,7 @@ namespace Featly.Storage.InMemory;
 internal sealed class InMemoryPendingChangeStore : IPendingChangeStore
 {
     private readonly ConcurrentDictionary<Guid, PendingChange> _byId = new();
+    private readonly Lock _claimGate = new();
 
     public Task<PendingChange?> GetByIdAsync(Guid id, CancellationToken ct)
         => Task.FromResult(_byId.TryGetValue(id, out var c) ? c : null);
@@ -54,5 +55,21 @@ internal sealed class InMemoryPendingChangeStore : IPendingChangeStore
         ArgumentNullException.ThrowIfNull(change);
         _byId.AddOrUpdate(change.Id, change, (_, _) => change);
         return Task.CompletedTask;
+    }
+
+    public Task<bool> TryClaimStatusAsync(Guid id, ChangeStatus from, ChangeStatus to, CancellationToken ct)
+    {
+        // The gate makes the check-and-set atomic across threads in this process
+        // (the in-memory store is single-process, so that is the only contention).
+        lock (_claimGate)
+        {
+            if (_byId.TryGetValue(id, out var change) && change.Status == from)
+            {
+                change.Status = to;
+                change.UpdatedAt = DateTimeOffset.UtcNow;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
     }
 }
