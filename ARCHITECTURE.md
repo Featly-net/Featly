@@ -840,6 +840,7 @@ Selected non-CRUD endpoints:
 - `POST /api/admin/environments/{id}/lock` / `unlock` — toggle `ReadOnly`
 - `GET /api/admin/inbox?userId=` — pending changes and role upgrade requests awaiting the user
 - `GET /api/admin/audit?from=&to=&entity=` — audit log search
+- `GET /api/admin/audit/verify` — recompute the audit hash chain; reports tampering (ADR-0030)
 - `GET /api/admin/environments/{key}/sdk-activity` — connected SSE clients + last config sync (in-process, best-effort)
 - `GET /api/admin/flags/{key}/activity` — a flag's last exposure timestamp + count, aggregated on read from the `Event` store
 - `GET /api/admin/flags/stale?staleDays=` — flag cleanup candidates (no rules left, a stalled experiment, or archived-but-referenced), aggregated on read
@@ -1072,6 +1073,8 @@ Every mutation endpoint accepts `?dryRun=true`. The server computes the would-ap
 ### Audit log
 
 Every mutation, every approval, every login, every settings change generates an `AuditLog` entry with `Actor`, `Action`, `EntityType`, `EntityId`, `Before`, `After`, `At`, `EnvironmentId`. Special events have semantically named actions (`change.bypassed`, `env.locked`, `setting.changed`) so log queries remain meaningful.
+
+Entries form a **tamper-evident hash chain** ([ADR-0030](docs/adr/0030-audit-hash-chain.md), issue #208): each entry carries a monotonic `Sequence`, a `PreviousHash`, and a SHA-256 `Hash` over its own content plus the previous entry's hash. Appends are serialized so the chain stays linear. `GET /api/admin/audit/verify` recomputes the chain and reports whether any entry was modified, deleted, or reordered after the fact; retention pruning trims the oldest entries and the surviving suffix stays verifiable. This detects casual post-hoc tampering with the log; it is not a substitute for an external notary against an attacker who can rewrite the whole chain.
 
 ---
 
@@ -1360,6 +1363,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-027](docs/adr/0027-flag-prerequisites.md) | Flag prerequisites — AND-only, write-time cycle rejection, opt-in evaluation cost | Accepted |
 | [ADR-028](docs/adr/0028-scheduled-releases.md) | Scheduled releases — a field on `PendingChange`, drained by a staleness-aware worker | Accepted |
 | [ADR-029](docs/adr/0029-webhook-circuit-breaker.md) | Webhook circuit breaker — per-endpoint open/half-open state persisted on the endpoint | Accepted |
+| [ADR-030](docs/adr/0030-audit-hash-chain.md) | Tamper-evident audit log — per-entry SHA-256 hash chain with a verify endpoint | Accepted |
 
 ---
 

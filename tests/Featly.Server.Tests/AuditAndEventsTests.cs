@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AwesomeAssertions;
 using Featly.Server;
 using Featly.Server.Events;
+using Featly.Storage;
 using Featly.Storage.InMemory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -123,6 +124,36 @@ public class AuditAndEventsTests
         data.GetProperty("before").GetProperty("name").GetString().Should().Be("Demo");
         data.GetProperty("after").GetProperty("enabled").GetBoolean().Should().BeFalse();
         data.GetProperty("after").GetProperty("name").GetString().Should().Be("Demo (edited)");
+    }
+
+    [Fact]
+    public async Task Audit_verify_endpoint_reports_an_intact_chain()
+    {
+        // Issue #208: real audited mutations build a hash chain that
+        // GET /api/admin/audit/verify reports as intact.
+        using var host = await BuildHostAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        for (var i = 0; i < 3; i++)
+        {
+            await admin.PostAsJsonAsync("/api/admin/flags", new
+            {
+                key = $"demo{i}",
+                name = "Demo",
+                type = "Boolean",
+                enabled = true,
+                defaultVariantKey = "off",
+                variants = new[] { new { key = "off", name = "Off", value = false } },
+            }, ct);
+        }
+
+        var verdict = await admin.GetFromJsonAsync<AuditChainVerification>(
+            "/api/admin/audit/verify", TestJson.Options, ct);
+        verdict.Should().NotBeNull();
+        verdict!.IsIntact.Should().BeTrue();
+        verdict.EntriesChecked.Should().BeGreaterThanOrEqualTo(3);
+        verdict.BrokenAtSequence.Should().BeNull();
     }
 
     [Fact]

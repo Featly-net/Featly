@@ -17,8 +17,17 @@ internal static class AdminAuditEndpoints
         var admin = group.MapGroup("/admin/audit").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
 
         admin.MapGet("/", QueryAsync).WithName("Featly.Admin.Audit.Query").RequirePermission(Permission.AuditRead);
+        admin.MapGet("/verify", VerifyAsync).WithName("Featly.Admin.Audit.Verify").RequirePermission(Permission.AuditRead);
 
         return group;
+    }
+
+    private static async Task<IResult> VerifyAsync(StorageFacade store, CancellationToken ct)
+    {
+        // Tamper-evidence check (issue #208): recompute the hash chain and report
+        // whether any entry was modified, deleted, or reordered after the fact.
+        var result = await store.Audit.VerifyChainAsync(ct).ConfigureAwait(false);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> QueryAsync(

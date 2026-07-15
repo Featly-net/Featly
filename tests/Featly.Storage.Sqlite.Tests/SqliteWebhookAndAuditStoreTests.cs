@@ -196,6 +196,91 @@ public class SqliteWebhookAndAuditStoreTests
     }
 
     [Fact]
+    public async Task Audit_append_builds_a_verifiable_hash_chain()
+    {
+        // Issue #208: appends form a linear, tamper-evident chain — monotonic
+        // Sequence, each PreviousHash pointing at the prior entry's Hash.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        for (var i = 0; i < 3; i++)
+        {
+            await host.Store.Audit.AppendAsync(new AuditEntry
+            {
+                Id = Guid.NewGuid(),
+                At = DateTimeOffset.UtcNow.AddSeconds(i),
+                Action = FeatlyEventTypes.FlagUpdated,
+                EntityType = "Flag",
+                EntityKey = $"k{i}",
+                Data = JsonDocument.Parse("""{"n":1}""").RootElement,
+            }, ct);
+        }
+
+        var chain = (await host.Store.Audit.QueryAsync(limit: 100, ct: ct)).OrderBy(e => e.Sequence).ToList();
+        chain.Select(e => e.Sequence).Should().Equal(1, 2, 3);
+        chain[0].PreviousHash.Should().BeNull(); // genesis
+        chain[1].PreviousHash.Should().Be(chain[0].Hash);
+        chain[2].PreviousHash.Should().Be(chain[1].Hash);
+        chain.Should().OnlyContain(e => e.Hash != null);
+
+        var verdict = await host.Store.Audit.VerifyChainAsync(ct);
+        verdict.IsIntact.Should().BeTrue();
+        verdict.EntriesChecked.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Audit_verifier_detects_modification_and_deletion()
+    {
+        // Build a real chain via the store, then tamper with the read-back list to
+        // prove the verifier catches a modified field and a deleted middle entry.
+        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        for (var i = 0; i < 3; i++)
+        {
+            await host.Store.Audit.AppendAsync(new AuditEntry
+            {
+                Id = Guid.NewGuid(),
+                At = DateTimeOffset.UtcNow.AddSeconds(i),
+                Action = FeatlyEventTypes.FlagUpdated,
+                EntityType = "Flag",
+                EntityKey = $"k{i}",
+            }, ct);
+        }
+
+        var chain = (await host.Store.Audit.QueryAsync(limit: 100, ct: ct)).OrderBy(e => e.Sequence).ToList();
+        AuditChainVerifier.Verify(chain).IsIntact.Should().BeTrue();
+
+        // Modify a field without recomputing its Hash (content fields are init-only,
+        // so rebuild the row with the tampered value but the original chain fields)
+        // -> content mismatch detected at that entry.
+        var tampered = new AuditEntry
+        {
+            Id = chain[1].Id,
+            At = chain[1].At,
+            Action = chain[1].Action,
+            EntityType = chain[1].EntityType,
+            EntityKey = chain[1].EntityKey,
+            EnvironmentId = chain[1].EnvironmentId,
+            ActorIdentifier = "attacker@example.com",
+            Data = chain[1].Data,
+            Sequence = chain[1].Sequence,
+            PreviousHash = chain[1].PreviousHash,
+            Hash = chain[1].Hash,
+        };
+        var modified = AuditChainVerifier.Verify([chain[0], tampered, chain[2]]);
+        modified.IsIntact.Should().BeFalse();
+        modified.BrokenAtSequence.Should().Be(chain[1].Sequence);
+        modified.Detail.Should().Contain("modified");
+
+        // Delete the middle entry -> broken previous-hash link at the next entry.
+        var deleted = AuditChainVerifier.Verify([chain[0], chain[2]]);
+        deleted.IsIntact.Should().BeFalse();
+        deleted.BrokenAtSequence.Should().Be(chain[2].Sequence);
+        deleted.Detail.Should().Contain("deleted");
+    }
+
+    [Fact]
     public async Task Prune_removes_entries_older_than_the_cutoff()
     {
         await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);

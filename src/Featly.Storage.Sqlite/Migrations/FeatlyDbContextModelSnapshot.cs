@@ -163,11 +163,24 @@ namespace Featly.Storage.Sqlite.Migrations
                     b.Property<Guid?>("EnvironmentId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PreviousHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("At");
 
                     b.HasIndex("EnvironmentId");
+
+                    b.HasIndex("Sequence");
 
                     b.HasIndex("EntityType", "EntityKey");
 

@@ -9,8 +9,28 @@ internal sealed class InMemoryAuditStore : IAuditStore
     public Task AppendAsync(AuditEntry entry, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        _entries.Enqueue(entry);
+        // Chain the entry (issue #208) under the same lock that guards pruning, so
+        // the read-tail -> chain -> enqueue sequence is atomic and the chain stays
+        // linear.
+        lock (_entries)
+        {
+            var tail = _entries.LastOrDefault();
+            entry.Sequence = (tail?.Sequence ?? 0) + 1;
+            entry.PreviousHash = tail?.Hash;
+            entry.Hash = AuditHash.Compute(entry, entry.PreviousHash);
+            _entries.Enqueue(entry);
+        }
         return Task.CompletedTask;
+    }
+
+    public Task<AuditChainVerification> VerifyChainAsync(CancellationToken ct)
+    {
+        List<AuditEntry> ordered;
+        lock (_entries)
+        {
+            ordered = _entries.Where(e => e.Hash is not null).OrderBy(e => e.Sequence).ToList();
+        }
+        return Task.FromResult(AuditChainVerifier.Verify(ordered));
     }
 
     public Task<int> PruneOlderThanAsync(DateTimeOffset cutoff, CancellationToken ct)

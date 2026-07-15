@@ -36,4 +36,27 @@ public sealed class AuditEntry
     /// event payload. Stored as raw JSON so the dashboard can render a diff.
     /// </summary>
     public JsonElement? Data { get; init; }
+
+    /// <summary>
+    /// Monotonic append order within the tamper-evident hash chain (issue #208),
+    /// assigned by the store on append. Orders the chain independently of
+    /// <see cref="At"/> (which is the event clock and need not be unique).
+    /// </summary>
+    public long Sequence { get; set; }
+
+    /// <summary>
+    /// The <see cref="Hash"/> of the preceding chain entry, or <c>null</c> for the
+    /// first entry (genesis, or the oldest surviving entry after retention pruning).
+    /// Assigned by the store on append.
+    /// </summary>
+    public string? PreviousHash { get; set; }
+
+    /// <summary>
+    /// Tamper-evident SHA-256 (lowercase hex) over this entry's content plus
+    /// <see cref="PreviousHash"/> (issue #208), assigned by the store on append.
+    /// Recomputing it detects any post-hoc modification; a mismatched
+    /// <see cref="PreviousHash"/> link detects deletion or reordering. <c>null</c>
+    /// on legacy rows written before the chain existed.
+    /// </summary>
+    public string? Hash { get; set; }
 }
