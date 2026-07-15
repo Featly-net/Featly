@@ -69,7 +69,7 @@ internal static class SdkEndpoints
             store.Segments.GetMostRecentUpdateAsync(environment.Id, ct),
             store.Configs.GetMostRecentUpdateAsync(environment.Id, ct),
             store.Experiments.GetMostRecentUpdateAsync(environment.Id, ct)).ConfigureAwait(false);
-        var mostRecent = mostRecents.Aggregate((DateTimeOffset?)null, Latest);
+        var mostRecent = mostRecents.Aggregate(default(DateTimeOffset?), Latest);
         var etag = ComputeEtag(environment.Id, mostRecent);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
