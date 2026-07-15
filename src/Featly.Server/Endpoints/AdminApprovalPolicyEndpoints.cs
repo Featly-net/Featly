@@ -27,7 +27,7 @@ internal static class AdminApprovalPolicyEndpoints
 
     private static async Task<IResult> GetAsync(string env, StorageFacade store, CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -42,7 +42,7 @@ internal static class AdminApprovalPolicyEndpoints
     private static async Task<IResult> UpsertAsync(string env, ApprovalPolicyWriteRequest body, StorageFacade store, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -65,7 +65,7 @@ internal static class AdminApprovalPolicyEndpoints
 
     private static async Task<IResult> DeleteAsync(string env, StorageFacade store, CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -74,6 +74,8 @@ internal static class AdminApprovalPolicyEndpoints
         return Results.NoContent();
     }
 
+    private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+        => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 }
 
 /// <summary>Inbound shape for PUT on the approval-policy endpoint.</summary>

@@ -6,7 +6,8 @@ namespace Featly.Server.Endpoints;
 /// Shared environment resolution for the admin endpoints (issue #220). Resolves
 /// the default project's environment by key, or its default environment when no
 /// key is given. Consolidates the copy of this logic that previously lived in
-/// every admin endpoint file. SDK endpoints use
+/// every admin endpoint file; the per-file <c>ResolveEnvironmentAsync</c> helpers
+/// now delegate here. SDK endpoints use
 /// <see cref="Authentication.SdkEnvironmentScope"/> instead, which layers the
 /// per-key environment binding on top.
 /// </summary>

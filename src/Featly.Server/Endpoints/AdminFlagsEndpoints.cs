@@ -38,7 +38,7 @@ internal static class AdminFlagsEndpoints
         CancellationToken ct,
         bool archived = false)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -56,7 +56,7 @@ internal static class AdminFlagsEndpoints
         string? env,
         CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -80,7 +80,7 @@ internal static class AdminFlagsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -141,7 +141,7 @@ internal static class AdminFlagsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -226,7 +226,7 @@ internal static class AdminFlagsEndpoints
         bool archived,
         CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -278,7 +278,7 @@ internal static class AdminFlagsEndpoints
             return Results.BadRequest(new { error = "staleDays must be at least 1." });
         }
 
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -312,7 +312,7 @@ internal static class AdminFlagsEndpoints
         string? env,
         CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -335,6 +335,8 @@ internal static class AdminFlagsEndpoints
         return [.. active, .. archived];
     }
 
+    private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+        => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
     private static string ResolveActor(ClaimsPrincipal user)
     {

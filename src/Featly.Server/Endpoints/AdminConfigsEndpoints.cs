@@ -35,7 +35,7 @@ internal static class AdminConfigsEndpoints
 
     private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct, bool archived = false)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -53,7 +53,7 @@ internal static class AdminConfigsEndpoints
         string? env,
         CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -77,7 +77,7 @@ internal static class AdminConfigsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -125,7 +125,7 @@ internal static class AdminConfigsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -197,7 +197,7 @@ internal static class AdminConfigsEndpoints
         bool archived,
         CancellationToken ct)
     {
-        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -234,6 +234,8 @@ internal static class AdminConfigsEndpoints
         return Results.Ok(updated);
     }
 
+    private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+        => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
     private static string ResolveActor(ClaimsPrincipal user)
     {
