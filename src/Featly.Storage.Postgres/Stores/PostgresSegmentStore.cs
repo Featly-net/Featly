@@ -133,14 +133,4 @@ internal sealed class PostgresSegmentStore(IDbContextFactory<FeatlyDbContext> co
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
-
-        return await db.Segments.AsNoTracking()
-            .Where(s => s.EnvironmentId == environmentId)
-            .Select(s => (DateTimeOffset?)s.UpdatedAt)
-            .MaxAsync(ct)
-            .ConfigureAwait(false);
-    }
 }

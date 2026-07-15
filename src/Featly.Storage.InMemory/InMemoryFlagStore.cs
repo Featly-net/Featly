@@ -63,14 +63,4 @@ internal sealed class InMemoryFlagStore : IFlagStore
         return Task.CompletedTask;
     }
 
-    public Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        var snapshot = _flags.Values.Where(f => f.EnvironmentId == environmentId).ToList();
-        if (snapshot.Count == 0)
-        {
-            return Task.FromResult<DateTimeOffset?>(null);
-        }
-
-        return Task.FromResult<DateTimeOffset?>(snapshot.Max(f => f.UpdatedAt));
-    }
 }

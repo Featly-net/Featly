@@ -146,21 +146,6 @@ public class SqliteSegmentStoreTests
         loaded.UpdatedBy.Should().Be("restorer");
     }
 
-    [Fact]
-    public async Task GetMostRecentUpdate_tracks_updates()
-    {
-        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
-        var ct = TestContext.Current.CancellationToken;
-        var envId = Guid.NewGuid();
-
-        var initial = await host.Store.Segments.GetMostRecentUpdateAsync(envId, ct);
-        initial.Should().BeNull();
-
-        await host.Store.Segments.UpsertAsync(envId, NewSegment(envId, "first"), "t", ct);
-        var after = await host.Store.Segments.GetMostRecentUpdateAsync(envId, ct);
-        after.Should().NotBeNull();
-    }
-
     private static Segment NewSegment(Guid envId, string key) => new()
     {
         Id = Guid.NewGuid(),

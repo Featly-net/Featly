@@ -74,27 +74,6 @@ public class SqliteFlagStoreTests
         list[0].Key.Should().Be("alpha");
     }
 
-    [Fact]
-    public async Task GetMostRecentUpdateAsync_returns_null_when_empty_then_tracks_updates()
-    {
-        await using var host = await SqliteTestHost.CreateAsync(TestContext.Current.CancellationToken);
-        var ct = TestContext.Current.CancellationToken;
-        var envId = Guid.NewGuid();
-
-        var initial = await host.Store.Flags.GetMostRecentUpdateAsync(envId, ct);
-        initial.Should().BeNull();
-
-        await host.Store.Flags.UpsertAsync(envId, NewBooleanFlag(envId, "first"), "t", ct);
-        var afterFirst = await host.Store.Flags.GetMostRecentUpdateAsync(envId, ct);
-        afterFirst.Should().NotBeNull();
-
-        await Task.Delay(10, ct);
-        await host.Store.Flags.UpsertAsync(envId, NewBooleanFlag(envId, "second"), "t", ct);
-        var afterSecond = await host.Store.Flags.GetMostRecentUpdateAsync(envId, ct);
-        afterSecond.Should().NotBeNull();
-        afterSecond!.Value.Should().BeOnOrAfter(afterFirst!.Value);
-    }
-
     private static Flag NewBooleanFlag(Guid environmentId, string key) => new()
     {
         Id = Guid.NewGuid(),

@@ -27,10 +27,4 @@ public interface IConfigStore
     /// <summary>Clears the archived flag, returning the config to the active list.</summary>
     Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
 
-    /// <summary>
-    /// Returns the most recent <see cref="Config.UpdatedAt"/> across all configs
-    /// in the environment, or <c>null</c> when there are none. Folded into the
-    /// SDK config endpoint's ETag.
-    /// </summary>
-    Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct);
 }

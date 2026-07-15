@@ -29,10 +29,4 @@ public interface ISegmentStore
     /// <summary>Clears the archived flag, returning the segment to the active list.</summary>
     Task UnarchiveAsync(Guid environmentId, string key, string actor, CancellationToken ct);
 
-    /// <summary>
-    /// Returns the most recent <see cref="Segment.UpdatedAt"/> across all segments
-    /// in the environment, or <c>null</c> when there are none. Folded into the
-    /// SDK config endpoint's ETag so segment edits invalidate cached snapshots.
-    /// </summary>
-    Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct);
 }

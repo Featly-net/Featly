@@ -70,13 +70,4 @@ internal sealed class InMemorySegmentStore : ISegmentStore
         return Task.CompletedTask;
     }
 
-    public Task<DateTimeOffset?> GetMostRecentUpdateAsync(Guid environmentId, CancellationToken ct)
-    {
-        var snapshot = _segments.Values.Where(s => s.EnvironmentId == environmentId).ToList();
-        if (snapshot.Count == 0)
-        {
-            return Task.FromResult<DateTimeOffset?>(null);
-        }
-        return Task.FromResult<DateTimeOffset?>(snapshot.Max(s => s.UpdatedAt));
-    }
 }

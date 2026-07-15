@@ -154,22 +154,6 @@ public class PostgresSegmentStoreTests
         loaded.UpdatedBy.Should().Be("restorer");
     }
 
-    [Fact]
-    public async Task GetMostRecentUpdate_tracks_updates()
-    {
-        await using var host = await PostgresTestHost.CreateAsync(TestContext.Current.CancellationToken);
-        var ct = TestContext.Current.CancellationToken;
-        var store = host.SegmentStore;
-        var envId = Guid.NewGuid();
-
-        var initial = await store.GetMostRecentUpdateAsync(envId, ct);
-        initial.Should().BeNull();
-
-        await store.UpsertAsync(envId, NewSegment(envId, "first"), "t", ct);
-        var after = await store.GetMostRecentUpdateAsync(envId, ct);
-        after.Should().NotBeNull();
-    }
-
     private static Segment NewSegment(Guid envId, string key) => new()
     {
         Id = Guid.NewGuid(),

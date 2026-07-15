@@ -172,27 +172,6 @@ public class PostgresFlagStoreTests
         (await store.GetAsync(envId, "toggle-me", ct))!.Archived.Should().BeFalse();
     }
 
-    [Fact]
-    public async Task GetMostRecentUpdateAsync_returns_null_when_empty_then_tracks_updates()
-    {
-        await using var host = await PostgresTestHost.CreateAsync(TestContext.Current.CancellationToken);
-        var ct = TestContext.Current.CancellationToken;
-        var envId = Guid.NewGuid();
-        var store = host.FlagStore;
-
-        var initial = await store.GetMostRecentUpdateAsync(envId, ct);
-        initial.Should().BeNull();
-
-        await store.UpsertAsync(envId, NewBooleanFlag(envId, "first"), "t", ct);
-        var afterFirst = await store.GetMostRecentUpdateAsync(envId, ct);
-        afterFirst.Should().NotBeNull();
-
-        await Task.Delay(10, ct);
-        await store.UpsertAsync(envId, NewBooleanFlag(envId, "second"), "t", ct);
-        var afterSecond = await store.GetMostRecentUpdateAsync(envId, ct);
-        afterSecond.Should().BeAfter(afterFirst!.Value);
-    }
-
     private static Flag NewBooleanFlag(Guid environmentId, string key) => new()
     {
         Id = Guid.NewGuid(),
