@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AwesomeAssertions;
 using Featly.Server;
+using Featly.Server.Authentication;
 using Featly.Storage.InMemory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -97,6 +98,55 @@ public class AuthBootstrapHostedServiceTests
 
         var bobCanRead = await checker.HasAsync(resolvedStranger, Guid.Empty, null, Permission.FlagRead, TestContext.Current.CancellationToken);
         bobCanRead.Should().BeTrue("non-bootstrap users get the viewer role");
+    }
+
+    [Fact]
+    public async Task Advisor_warns_only_when_static_key_set_and_a_real_admin_exists()
+    {
+        // Issue #209: the boot advisory fires when the shared static AdminApiKey
+        // coexists with a real, role-bound admin — the cue to retire the key.
+        var services = new ServiceCollection();
+        services.AddFeatlyInMemoryStore();
+        await using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+
+        // No key configured -> never warns, even with an admin present.
+        (await BootstrapKeyAdvisor.ShouldWarnAsync(store, "", ct)).Should().BeFalse();
+
+        // Key set but no admin role seeded / no admin user yet -> no warning.
+        (await BootstrapKeyAdvisor.ShouldWarnAsync(store, "static-admin-key", ct)).Should().BeFalse();
+
+        // Seed the admin role and a disabled admin user -> still no warning.
+        await store.Roles.UpsertSystemRoleAsync(SystemRoles.Templates().Single(r => r.Key == SystemRoles.AdminKey), ct);
+        var adminRole = await store.Roles.GetByKeyAsync(SystemRoles.AdminKey, ct);
+        var now = DateTimeOffset.UtcNow;
+        var disabledAdmin = new User { Id = Guid.NewGuid(), Identifier = "old@x.com", DisplayName = "Old", Disabled = true, CreatedAt = now, UpdatedAt = now, CreatedBy = "t", UpdatedBy = "t" };
+        await store.Users.UpsertAsync(disabledAdmin, "t", ct);
+        await store.RoleAssignments.CreateAsync(new RoleAssignment
+        {
+            Id = Guid.NewGuid(),
+            AssigneeType = AssigneeType.User,
+            AssigneeId = disabledAdmin.Id,
+            ProjectId = Guid.NewGuid(),
+            RoleId = adminRole!.Id,
+            AssignedAt = now,
+        }, ct);
+        (await BootstrapKeyAdvisor.ShouldWarnAsync(store, "static-admin-key", ct)).Should().BeFalse("a disabled admin does not count");
+
+        // Add an enabled admin user -> now it warns.
+        var admin = new User { Id = Guid.NewGuid(), Identifier = "alice@x.com", DisplayName = "Alice", Disabled = false, CreatedAt = now, UpdatedAt = now, CreatedBy = "t", UpdatedBy = "t" };
+        await store.Users.UpsertAsync(admin, "t", ct);
+        await store.RoleAssignments.CreateAsync(new RoleAssignment
+        {
+            Id = Guid.NewGuid(),
+            AssigneeType = AssigneeType.User,
+            AssigneeId = admin.Id,
+            ProjectId = Guid.NewGuid(),
+            RoleId = adminRole.Id,
+            AssignedAt = now,
+        }, ct);
+        (await BootstrapKeyAdvisor.ShouldWarnAsync(store, "static-admin-key", ct)).Should().BeTrue();
     }
 
     private static async Task<IHost> BuildHostAsync(string bootstrapAdmin)
