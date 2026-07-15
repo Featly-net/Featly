@@ -369,7 +369,61 @@ public class ChangeWorkflowEndpointsTests
         afterDelete!.Required.Should().BeFalse(); // no policy => not required
     }
 
+    [Fact]
+    public async Task Explicit_propose_publishes_change_proposed()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        await DefaultProjectEnvAsync(store, ct);
+
+        var hookId = await SubscribeWebhookAsync(host, FeatlyEventTypes.ChangeProposed, ct);
+
+        using var alice = await CookieClientAsync(host, store, "alice-cp@example.com", ct);
+        await ProposeFlagAsync(alice, "cp-flag", ct);
+
+        using var admin = AdminClient(host);
+        var deliveries = await admin.GetFromJsonAsync<List<WebhookDelivery>>(
+            $"/api/admin/webhooks/{hookId}/deliveries", TestJson.Options, ct);
+        deliveries.Should().Contain(d => d.EventType == FeatlyEventTypes.ChangeProposed);
+    }
+
+    [Fact]
+    public async Task Gated_direct_write_publishes_change_proposed()
+    {
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<StorageFacade>();
+        var ct = TestContext.Current.CancellationToken;
+        var (_, env) = await DefaultProjectEnvAsync(store, ct);
+        await store.ApprovalPolicies.UpsertAsync(new ApprovalPolicy { Id = Guid.NewGuid(), EnvironmentId = env.Id, Required = true, MinApprovals = 1 }, ct);
+
+        var hookId = await SubscribeWebhookAsync(host, FeatlyEventTypes.ChangeProposed, ct);
+
+        // A direct flag write against an approval-required env routes through the
+        // ChangeGate, which creates a PendingChange and must publish change.proposed.
+        using var editor = await CookieClientAsync(host, store, "ed-cp@example.com", ct);
+        (await editor.PostAsJsonAsync(new Uri("/api/admin/flags", UriKind.Relative), MinimalFlag("gated-cp-flag"), ct))
+            .StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        using var admin = AdminClient(host);
+        var deliveries = await admin.GetFromJsonAsync<List<WebhookDelivery>>(
+            $"/api/admin/webhooks/{hookId}/deliveries", TestJson.Options, ct);
+        deliveries.Should().Contain(d => d.EventType == FeatlyEventTypes.ChangeProposed);
+    }
+
     // ---------- helpers ----------
+
+    private static async Task<Guid> SubscribeWebhookAsync(IHost host, string eventType, CancellationToken ct)
+    {
+        using var admin = AdminClient(host);
+        var created = await (await admin.PostAsJsonAsync(new Uri("/api/admin/webhooks", UriKind.Relative), new
+        {
+            name = "cr-relay",
+            url = "https://example.com/hook",
+            eventTypes = new[] { eventType },
+        }, ct)).Content.ReadFromJsonAsync<WebhookEndpoint>(TestJson.Options, ct);
+        return created!.Id;
+    }
 
     private static object MinimalFlag(string key) => new
     {

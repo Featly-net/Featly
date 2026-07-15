@@ -54,6 +54,7 @@ internal static class AdminChangesEndpoints
     private static async Task<IResult> ProposeAsync(
         ChangeProposeRequest body,
         StorageFacade store,
+        IFeatlyEventPublisher events,
         ClaimsPrincipal principal,
         CancellationToken ct)
     {
@@ -100,6 +101,8 @@ internal static class AdminChangesEndpoints
             UpdatedAt = now,
         };
         await store.PendingChanges.CreateAsync(change, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ChangeProposed, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
         return Results.Created($"/api/admin/changes/{change.Id}", change);
     }
 

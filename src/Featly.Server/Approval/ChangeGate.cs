@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Featly.Server.Endpoints;
+using Featly.Server.Events;
 using Microsoft.AspNetCore.Http;
 using StorageFacade = Featly.Storage.IFeatlyStore;
 
@@ -16,7 +17,7 @@ namespace Featly.Server.Approval;
 /// <c>?dryRun=true</c> request never mutates and just reports whether approval
 /// would be required.
 /// </summary>
-internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier, Settings.IFeatlySettingsProvider settings)
+internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService applier, Settings.IFeatlySettingsProvider settings, IFeatlyEventPublisher events)
 {
     /// <summary>
     /// Decides how a mutation should proceed. When <see cref="GateResult.Outcome"/>
@@ -123,6 +124,8 @@ internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService a
             UpdatedAt = now,
         };
         await store.PendingChanges.CreateAsync(change, ct).ConfigureAwait(false);
+        await events.PublishAsync(FeatlyEventTypes.ChangeProposed, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
         return GateResult.Handled(Results.Accepted($"/api/admin/changes/{change.Id}", change));
     }
 }
