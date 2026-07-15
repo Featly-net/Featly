@@ -866,7 +866,7 @@ Every mutation endpoint supports `?dryRun=true`. The server computes the diff an
 
 ### Versioning
 
-API version is negotiated via the `Accept-Version` header. SDK clients pin a major version. The server retains compatibility for the most recent two major versions; a deprecated version emits a `Deprecation` response header with a sunset date.
+**Planned (not yet implemented — see [issue #227](https://github.com/Featly-net/Featly/issues/227)).** The intended design: API version is negotiated via the `Accept-Version` header. SDK clients pin a major version. The server retains compatibility for the most recent two major versions; a deprecated version emits a `Deprecation` response header with a sunset date. Today the HTTP surface is unversioned; the API is pre-1.0 and unstable, so this lands before the API is declared stable.
 
 ---
 
