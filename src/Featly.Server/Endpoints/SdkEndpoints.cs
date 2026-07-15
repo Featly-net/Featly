@@ -59,14 +59,17 @@ internal static class SdkEndpoints
         // the hot path" evaluation guarantee is untouched.
         activity.RecordConfigSync(environment.Id);
 
-        // Compose the ETag from the most recent flag, segment, AND config update
-        // so edits in any of the three buckets invalidate cached snapshots on
-        // the SDK side.
-        var flagsMostRecent = await store.Flags.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var segmentsMostRecent = await store.Segments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var configsMostRecent = await store.Configs.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var experimentsMostRecent = await store.Experiments.GetMostRecentUpdateAsync(environment.Id, ct).ConfigureAwait(false);
-        var mostRecent = Latest(Latest(Latest(flagsMostRecent, segmentsMostRecent), configsMostRecent), experimentsMostRecent);
+        // Compose the ETag from the most recent flag, segment, config, AND
+        // experiment update so an edit in any bucket invalidates cached snapshots
+        // on the SDK side. Every SDK client runs this on each revalidation, so the
+        // four lookups fire concurrently (each sub-store opens its own DbContext,
+        // so this is safe) — one round-trip of latency instead of four (issue #228).
+        var mostRecents = await Task.WhenAll(
+            store.Flags.GetMostRecentUpdateAsync(environment.Id, ct),
+            store.Segments.GetMostRecentUpdateAsync(environment.Id, ct),
+            store.Configs.GetMostRecentUpdateAsync(environment.Id, ct),
+            store.Experiments.GetMostRecentUpdateAsync(environment.Id, ct)).ConfigureAwait(false);
+        var mostRecent = mostRecents.Aggregate(default(DateTimeOffset?), Latest);
         var etag = ComputeEtag(environment.Id, mostRecent);
         context.Response.Headers.ETag = etag;
         context.Response.Headers.CacheControl = "no-cache";
