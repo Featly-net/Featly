@@ -42,13 +42,15 @@ centralized-server instance, or accept polling-interval freshness across
 replicas. SQLite's single-writer model points the same way — multi-replica
 deployments are the target of the post-1.0 Postgres provider.
 
-The background workers reinforce the same rule: `WebhookDeliveryWorker` and
-`ScheduledApplyWorker` claim due rows by listing them, not by an atomic
-transaction, so two instances against a shared database would **deliver a
-webhook twice and race a scheduled apply**. Run the workers on a single node
-until atomic row claiming lands ([issue #237](https://github.com/Featly-net/Featly/issues/237)).
-If you must run several server replicas before then, keep only one as the
-"worker" node.
+The background workers are safe to run on several replicas against a shared
+database: `WebhookDeliveryWorker` and `ScheduledApplyWorker` claim each due row
+with a single conditional `UPDATE` before acting on it
+([issue #237](https://github.com/Featly-net/Featly/issues/237)), so only one
+instance wins each claim — a scheduled apply cannot race and a delivery is not
+sent twice by two instances. This matters for a concurrent-writer store such as
+the post-1.0 Postgres provider; the bundled SQLite provider serializes writers
+anyway. (Freshness across replicas still depends on the distributed notifier
+above; that is a separate concern from worker correctness.)
 
 ### 3. Consumer (SDK only)
 

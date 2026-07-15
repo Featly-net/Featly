@@ -402,6 +402,50 @@ public class WebhookEngineTests
         processed.LastError.Should().Contain("blocked");
     }
 
+    [Fact]
+    public async Task Claim_leases_a_due_delivery_once_so_a_second_instance_skips_it()
+    {
+        // Multi-instance safety (issue #237): the delivery queue is drained by a
+        // worker per instance. TryClaimDueAsync leases a row atomically so only the
+        // first caller processes it; the rest get false and move on.
+        using var host = await BuildHostAsync();
+        var store = host.Services.GetRequiredService<Featly.Storage.IFeatlyStore>();
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+
+        var due = new WebhookDelivery
+        {
+            Id = Guid.NewGuid(),
+            WebhookEndpointId = Guid.NewGuid(),
+            EventType = "flag.updated",
+            Payload = "{}",
+            Status = WebhookDeliveryStatus.Pending,
+            NextAttemptAt = now.AddSeconds(-1),
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        var notDue = new WebhookDelivery
+        {
+            Id = Guid.NewGuid(),
+            WebhookEndpointId = due.WebhookEndpointId,
+            EventType = "flag.updated",
+            Payload = "{}",
+            Status = WebhookDeliveryStatus.Pending,
+            NextAttemptAt = now.AddMinutes(5),
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.WebhookDeliveries.EnqueueAsync([due, notDue], ct);
+
+        var leaseUntil = now.AddMinutes(1);
+        (await store.WebhookDeliveries.TryClaimDueAsync(due.Id, now, leaseUntil, ct)).Should().BeTrue();
+        (await store.WebhookDeliveries.TryClaimDueAsync(due.Id, now, leaseUntil, ct)).Should().BeFalse();
+        (await store.WebhookDeliveries.TryClaimDueAsync(notDue.Id, now, leaseUntil, ct)).Should().BeFalse();
+
+        var leased = await store.WebhookDeliveries.GetByIdAsync(due.Id, ct);
+        leased!.NextAttemptAt.Should().BeCloseTo(leaseUntil, TimeSpan.FromSeconds(1));
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
