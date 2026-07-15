@@ -223,7 +223,12 @@ public class ApiErrorPathsTests
         // Preview: unknown env, then unknown key.
         (await c.PostAsJsonAsync("/api/admin/preview/flags/x" + BadEnv, new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await c.PostAsJsonAsync("/api/admin/preview/flags/nope", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await c.PostAsJsonAsync("/api/admin/preview/configs/x" + BadEnv, new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await c.PostAsJsonAsync("/api/admin/preview/configs/nope", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // API key minting against an unknown environment.
+        (await c.PostAsJsonAsync("/api/admin/apikeys", new { name = "k", scope = "SdkRead", environmentKey = "does-not-exist" }, ct))
+            .StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
 
         // Approval policies are addressed by environment key.
         (await c.GetAsync(new Uri("/api/admin/approval-policies/does-not-exist", UriKind.Relative), ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
