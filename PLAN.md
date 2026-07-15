@@ -231,18 +231,25 @@ Estimates assume one experienced .NET developer focused on the project. They are
 
 ---
 
+## Pulled forward — shipped ahead of the original plan
+
+These were listed as post-1.0 extensions but landed early, each behind its own ADR:
+
+- **Statistical significance for experiments** — `Featly.Server/Experiments/ExperimentAnalytics.cs`
+- **Approval scheduling / time-windowed releases** — [ADR-0028](docs/adr/0028-scheduled-releases.md), drained by `ScheduledApplyWorker`
+- **Flag prerequisites** (one flag depends on another) — [ADR-0027](docs/adr/0027-flag-prerequisites.md), resolved locally in the engine
+
 ## Post-1.0 extensions (not scheduled)
 
 These are designed in `ARCHITECTURE.md` but explicitly deferred until after the first release:
 
-- `Featly.Storage.SqlServer` and `Featly.Storage.Postgres` providers
+- `Featly.Storage.PostgreSQL` — **in progress** ([ADR-0026](docs/adr/0026-postgres-storage-provider.md)): entities, stores and migrations exist; the `PostgresFeatlyStore` facade + `AddFeatlyPostgresStore()` DI + LISTEN/NOTIFY notifier are tracked in [#179](https://github.com/Featly-net/Featly/issues/179), so it is not yet consumable and is not published to NuGet
+- `Featly.Storage.SqlServer` provider
 - `Featly.Storage.Redis` (cache + change pub/sub)
-- Statistical significance for experiments (Welch's t-test, chi-square, sequential analysis)
 - Email (SMTP) notification channel
 - Multi-tenant cloud-hosted mode (same binary, tenant flag)
-- Browser-side edge SDK (JavaScript/TypeScript)
-- Approval scheduling and time-windowed releases
-- Flag prerequisites (one flag depends on another)
+- Browser-side edge SDK (JavaScript/TypeScript) — [#215](https://github.com/Featly-net/Featly/issues/215)
+- First-class OIDC/SSO authentication + SCIM provisioning — [#210](https://github.com/Featly-net/Featly/issues/210)
 - Native Slack / Teams integrations (currently via generic webhook)
 
 ---

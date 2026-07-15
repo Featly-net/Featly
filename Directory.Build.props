@@ -88,9 +88,11 @@
     <PackageReference Include="MinVer" PrivateAssets="All" />
   </ItemGroup>
 
-  <ItemGroup Label="NuGet README — preview placeholder until M5"
-             Condition="'$(IsPackable)' == 'true'">
-    <None Include="$(MSBuildThisFileDirectory)docs\nuget-readme-preview.md"
+  <!-- The README every package shows on nuget.org. Kept separate from the repo
+       README so the package page leads with install + quickstart instead of
+       screenshots and contributor docs. -->
+  <ItemGroup Label="NuGet README" Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)docs\nuget-readme.md"
           Pack="true"
           PackagePath="\README.md" />
   </ItemGroup>
