@@ -48,7 +48,7 @@ internal static class AdminAuditEndpoints
             var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
             if (environment is null)
             {
-                return Results.NotFound(new { error = $"Environment '{env}' not found." });
+                return Problems.NotFound($"Environment '{env}' not found.");
             }
 
             environmentId = environment.Id;

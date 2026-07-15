@@ -61,7 +61,7 @@ internal static class AdminSettingsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (body.AuthPermitsPerMinute < 0 || body.AdminPermitsPerMinute < 0 || body.SdkPermitsPerMinute < 0)
         {
-            return Results.BadRequest(new { error = "permits-per-minute values must be 0 (unlimited) or positive." });
+            return Problems.BadRequest("permits-per-minute values must be 0 (unlimited) or positive.");
         }
 
         await PersistAsync(FeatlySettingsKeys.RateLimit, body, provider, store, events, principal, ct).ConfigureAwait(false);
@@ -82,7 +82,7 @@ internal static class AdminSettingsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if ((body.Prod ?? new()).MinApprovals < 1 || (body.NonProd ?? new()).MinApprovals < 1)
         {
-            return Results.BadRequest(new { error = "minApprovals must be at least 1 for each template." });
+            return Problems.Validation("minApprovals", "minApprovals must be at least 1 for each template.");
         }
 
         await PersistAsync(FeatlySettingsKeys.ApprovalDefaults, body, provider, store, events, principal, ct).ConfigureAwait(false);
@@ -103,7 +103,7 @@ internal static class AdminSettingsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (body.RetentionDays < 0)
         {
-            return Results.BadRequest(new { error = "retentionDays must be 0 (keep forever) or a positive number of days." });
+            return Problems.Validation("retentionDays", "retentionDays must be 0 (keep forever) or a positive number of days.");
         }
 
         await PersistAsync(FeatlySettingsKeys.Audit, body, provider, store, events, principal, ct).ConfigureAwait(false);
@@ -124,7 +124,7 @@ internal static class AdminSettingsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (!Enum.IsDefined(body.AutoProvisionMode))
         {
-            return Results.BadRequest(new { error = "autoProvisionMode must be 'Open' or 'Closed'." });
+            return Problems.Validation("autoProvisionMode", "autoProvisionMode must be 'Open' or 'Closed'.");
         }
 
         await PersistAsync(FeatlySettingsKeys.Authorization, body, provider, store, events, principal, ct).ConfigureAwait(false);
@@ -167,15 +167,15 @@ internal static class AdminSettingsEndpoints
 
         if (body.MaxAttempts < 1)
         {
-            return Results.BadRequest(new { error = "maxAttempts must be at least 1." });
+            return Problems.Validation("maxAttempts", "maxAttempts must be at least 1.");
         }
         if (body.BaseRetryDelaySeconds < 1)
         {
-            return Results.BadRequest(new { error = "baseRetryDelaySeconds must be at least 1." });
+            return Problems.Validation("baseRetryDelaySeconds", "baseRetryDelaySeconds must be at least 1.");
         }
         if (body.MaxRetryDelaySeconds < body.BaseRetryDelaySeconds)
         {
-            return Results.BadRequest(new { error = "maxRetryDelaySeconds must be greater than or equal to baseRetryDelaySeconds." });
+            return Problems.Validation("maxRetryDelaySeconds", "maxRetryDelaySeconds must be greater than or equal to baseRetryDelaySeconds.");
         }
 
         await PersistAsync(FeatlySettingsKeys.Webhook, body, provider, store, events, principal, ct).ConfigureAwait(false);

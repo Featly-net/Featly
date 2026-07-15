@@ -40,7 +40,7 @@ internal static class BootstrapEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Identifier))
         {
-            return Results.BadRequest(new { error = "identifier is required." });
+            return Problems.Validation("identifier", "identifier is required.");
         }
 
         // Guard: only available before any user exists. Once an admin (or any
@@ -48,7 +48,7 @@ internal static class BootstrapEndpoints
         var existingUsers = await store.Users.ListAsync(ct).ConfigureAwait(false);
         if (existingUsers.Count > 0)
         {
-            return Results.Conflict(new { error = "Bootstrap is unavailable: a user already exists. Use POST /api/admin/apikeys with an admin credential." });
+            return Problems.Conflict("Bootstrap is unavailable: a user already exists. Use POST /api/admin/apikeys with an admin credential.");
         }
 
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);

@@ -42,7 +42,7 @@ internal static class AdminExportEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = "No matching environment found." });
+            return Problems.NotFound("No matching environment found.");
         }
 
         var flags = await store.Flags.ListAsync(environment.Id, ct).ConfigureAwait(false);
@@ -65,7 +65,7 @@ internal static class AdminExportEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.BadRequest(new { error = "No matching environment found; create a project + environment first." });
+            return Problems.BadRequest("No matching environment found; create a project + environment first.");
         }
         // Import writes definitions directly; a ReadOnly freeze must reject it too
         // (issue #203). It still bypasses the approval gate by design (a backup

@@ -38,7 +38,7 @@ internal static class AdminConfigsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var configs = archived
@@ -56,11 +56,11 @@ internal static class AdminConfigsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var config = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        return config is null ? Results.NotFound(new { error = $"Config '{key}' not found." }) : Results.Ok(config);
+        return config is null ? Problems.NotFound($"Config '{key}' not found.") : Results.Ok(config);
     }
 
     private static async Task<IResult> CreateAsync(
@@ -80,7 +80,7 @@ internal static class AdminConfigsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -91,7 +91,7 @@ internal static class AdminConfigsEndpoints
         var existing = await store.Configs.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Config '{body.Key}' already exists in environment '{environment.Key}'." });
+            return Problems.Conflict($"Config '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
         var gated = await gate.InterceptAsync("Config", body.Key, environment, ChangeAction.Create,
@@ -128,7 +128,7 @@ internal static class AdminConfigsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -139,12 +139,12 @@ internal static class AdminConfigsEndpoints
         var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Config '{key}' not found." });
+            return Problems.NotFound($"Config '{key}' not found.");
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
-            return Results.BadRequest(new { error = "Cannot rename a config via PUT. Body key must match URL key." });
+            return Problems.BadRequest("Cannot rename a config via PUT. Body key must match URL key.");
         }
 
         var gated = await gate.InterceptAsync("Config", key, environment, ChangeAction.Update,
@@ -200,7 +200,7 @@ internal static class AdminConfigsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -211,7 +211,7 @@ internal static class AdminConfigsEndpoints
         var existing = await store.Configs.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Config '{key}' not found." });
+            return Problems.NotFound($"Config '{key}' not found.");
         }
 
         var actor = ResolveActor(user);

@@ -39,7 +39,7 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var segments = archived
@@ -57,11 +57,11 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         var segment = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
-        return segment is null ? Results.NotFound(new { error = $"Segment '{key}' not found." }) : Results.Ok(segment);
+        return segment is null ? Problems.NotFound($"Segment '{key}' not found.") : Results.Ok(segment);
     }
 
     private static async Task<IResult> CreateAsync(
@@ -81,7 +81,7 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -92,7 +92,7 @@ internal static class AdminSegmentsEndpoints
         var existing = await store.Segments.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Segment '{body.Key}' already exists in environment '{environment.Key}'." });
+            return Problems.Conflict($"Segment '{body.Key}' already exists in environment '{environment.Key}'.");
         }
 
         var gated = await gate.InterceptAsync("Segment", body.Key, environment, ChangeAction.Create,
@@ -129,7 +129,7 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -140,12 +140,12 @@ internal static class AdminSegmentsEndpoints
         var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Segment '{key}' not found." });
+            return Problems.NotFound($"Segment '{key}' not found.");
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
         {
-            return Results.BadRequest(new { error = "Cannot rename a segment via PUT. Body key must match URL key." });
+            return Problems.BadRequest("Cannot rename a segment via PUT. Body key must match URL key.");
         }
 
         var gated = await gate.InterceptAsync("Segment", key, environment, ChangeAction.Update,
@@ -179,7 +179,7 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -227,7 +227,7 @@ internal static class AdminSegmentsEndpoints
         var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            return Results.NotFound(new { error = $"Environment '{env}' not found." });
+            return Problems.NotFound($"Environment '{env}' not found.");
         }
 
         if (environment.ReadOnly)
@@ -238,7 +238,7 @@ internal static class AdminSegmentsEndpoints
         var existing = await store.Segments.GetAsync(environment.Id, key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Segment '{key}' not found." });
+            return Problems.NotFound($"Segment '{key}' not found.");
         }
 
         var actor = ResolveActor(user);

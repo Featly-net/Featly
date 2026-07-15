@@ -73,7 +73,7 @@ internal sealed class ChangeGate(StorageFacade store, ChangeApplicationService a
             }
             if (string.IsNullOrWhiteSpace(reason))
             {
-                return GateResult.Handled(Results.BadRequest(new { error = "reason is required for an emergency bypass (?emergency=true&reason=...)." }));
+                return GateResult.Handled(Problems.Validation("reason", "reason is required for an emergency bypass (?emergency=true&reason=...)."));
             }
 
             var actorUser = await ChangeActor.ResolveOrCreateAsync(store, principal, ct).ConfigureAwait(false);

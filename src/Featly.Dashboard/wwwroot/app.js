@@ -138,6 +138,28 @@
     // ============================================================
     // HTTP
     // ============================================================
+    // Extracts a human-readable message from an error response body. The API
+    // returns RFC 7807 problem+json ({ title, detail, errors }); validation
+    // problems carry per-field messages under `errors`. Falls back to the raw
+    // text for non-JSON bodies (and tolerates the older { error } shape).
+    function problemMessage(body) {
+        if (!body) { return ""; }
+        try {
+            var p = JSON.parse(body);
+            if (p && typeof p === "object") {
+                if (p.errors && typeof p.errors === "object") {
+                    var parts = [];
+                    Object.keys(p.errors).forEach(function (k) {
+                        parts.push([].concat(p.errors[k]).join(" "));
+                    });
+                    if (parts.length) { return parts.join(" "); }
+                }
+                return p.detail || p.title || p.error || body;
+            }
+        } catch (_) { /* not JSON — use the raw text */ }
+        return body;
+    }
+
     function api(method, path, body) {
         var url = path.startsWith("http") ? path : "/api" + path;
         var headers = {};
@@ -160,7 +182,7 @@
             }
             if (!res.ok) {
                 return res.text().then(function (b) {
-                    var err = new Error(b || ("Request failed (" + res.status + ")"));
+                    var err = new Error(problemMessage(b) || ("Request failed (" + res.status + ")"));
                     err.status = res.status;
                     throw err;
                 });

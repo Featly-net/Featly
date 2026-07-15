@@ -40,16 +40,12 @@ internal static class SdkEndpoints
         var environment = await Authentication.SdkEnvironmentScope.ResolveAsync(store, env, bound, ct).ConfigureAwait(false);
         if (environment is null)
         {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            await context.Response.WriteAsJsonAsync(
-                new { error = $"Environment '{env}' not found." }, ct).ConfigureAwait(false);
+            await Problems.NotFound($"Environment '{env}' not found.").ExecuteAsync(context).ConfigureAwait(false);
             return;
         }
         if (!Authentication.SdkEnvironmentScope.Allows(bound, environment.Id))
         {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(
-                new { error = "This API key is scoped to a different environment." }, ct).ConfigureAwait(false);
+            await Problems.Forbidden("This API key is scoped to a different environment.").ExecuteAsync(context).ConfigureAwait(false);
             return;
         }
 

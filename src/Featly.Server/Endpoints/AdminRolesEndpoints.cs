@@ -36,7 +36,7 @@ internal static class AdminRolesEndpoints
     private static async Task<IResult> GetAsync(string key, StorageFacade store, CancellationToken ct)
     {
         var role = await store.Roles.GetByKeyAsync(key, ct).ConfigureAwait(false);
-        return role is null ? Results.NotFound(new { error = $"Role '{key}' not found." }) : Results.Ok(role);
+        return role is null ? Problems.NotFound($"Role '{key}' not found.") : Results.Ok(role);
     }
 
     private static async Task<IResult> CreateAsync(RoleWriteRequest body, StorageFacade store, CancellationToken ct)
@@ -45,17 +45,17 @@ internal static class AdminRolesEndpoints
 
         if (string.IsNullOrWhiteSpace(body.Key))
         {
-            return Results.BadRequest(new { error = "key is required." });
+            return Problems.Validation("key", "key is required.");
         }
         if (SystemRoles.Template(body.Key) is not null)
         {
-            return Results.Conflict(new { error = $"'{body.Key}' is a reserved system role key." });
+            return Problems.Conflict($"'{body.Key}' is a reserved system role key.");
         }
 
         var existing = await store.Roles.GetByKeyAsync(body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Role '{body.Key}' already exists." });
+            return Problems.Conflict($"Role '{body.Key}' already exists.");
         }
 
         // Optional clone-of-system: seed the permission set from a system
@@ -85,7 +85,7 @@ internal static class AdminRolesEndpoints
         var existing = await store.Roles.GetByKeyAsync(key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Role '{key}' not found." });
+            return Problems.NotFound($"Role '{key}' not found.");
         }
         if (existing.IsSystem)
         {

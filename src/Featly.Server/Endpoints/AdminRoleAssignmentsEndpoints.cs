@@ -62,7 +62,7 @@ internal static class AdminRoleAssignmentsEndpoints
         var role = await store.Roles.GetByIdAsync(body.RoleId, ct).ConfigureAwait(false);
         if (role is null)
         {
-            return Results.BadRequest(new { error = $"Role '{body.RoleId}' not found." });
+            return Problems.BadRequest($"Role '{body.RoleId}' not found.");
         }
 
         // Validate the assignee exists (user or group).
@@ -70,14 +70,14 @@ internal static class AdminRoleAssignmentsEndpoints
         {
             if (await store.Users.GetByIdAsync(body.AssigneeId, ct).ConfigureAwait(false) is null)
             {
-                return Results.BadRequest(new { error = $"User '{body.AssigneeId}' not found." });
+                return Problems.BadRequest($"User '{body.AssigneeId}' not found.");
             }
         }
         else
         {
             if (await store.Groups.GetByIdAsync(body.AssigneeId, ct).ConfigureAwait(false) is null)
             {
-                return Results.BadRequest(new { error = $"Group '{body.AssigneeId}' not found." });
+                return Problems.BadRequest($"Group '{body.AssigneeId}' not found.");
             }
         }
 
@@ -88,7 +88,7 @@ internal static class AdminRoleAssignmentsEndpoints
             var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
             if (project is null)
             {
-                return Results.BadRequest(new { error = "No default project to scope the assignment to." });
+                return Problems.BadRequest("No default project to scope the assignment to.");
             }
             projectId = project.Id;
         }

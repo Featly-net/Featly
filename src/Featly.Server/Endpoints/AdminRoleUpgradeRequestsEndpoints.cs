@@ -61,7 +61,7 @@ internal static class AdminRoleUpgradeRequestsEndpoints
         var role = await store.Roles.GetByIdAsync(body.RequestedRoleId, ct).ConfigureAwait(false);
         if (role is null)
         {
-            return Results.BadRequest(new { error = $"Role '{body.RequestedRoleId}' not found." });
+            return Problems.BadRequest($"Role '{body.RequestedRoleId}' not found.");
         }
 
         var projectId = body.TargetProjectId;
@@ -70,7 +70,7 @@ internal static class AdminRoleUpgradeRequestsEndpoints
             var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
             if (project is null)
             {
-                return Results.BadRequest(new { error = "No default project to target." });
+                return Problems.BadRequest("No default project to target.");
             }
             projectId = project.Id;
         }
@@ -99,11 +99,11 @@ internal static class AdminRoleUpgradeRequestsEndpoints
         var request = await store.RoleUpgradeRequests.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (request is null)
         {
-            return Results.NotFound(new { error = $"Request '{id}' not found." });
+            return Problems.NotFound($"Request '{id}' not found.");
         }
         if (request.Status != RoleUpgradeStatus.Pending)
         {
-            return Results.Conflict(new { error = $"Request is already {request.Status}." });
+            return Problems.Conflict($"Request is already {request.Status}.");
         }
 
         var decider = await ResolveActorUserIdAsync(store, principal, ct).ConfigureAwait(false);
@@ -139,11 +139,11 @@ internal static class AdminRoleUpgradeRequestsEndpoints
         var request = await store.RoleUpgradeRequests.GetByIdAsync(id, ct).ConfigureAwait(false);
         if (request is null)
         {
-            return Results.NotFound(new { error = $"Request '{id}' not found." });
+            return Problems.NotFound($"Request '{id}' not found.");
         }
         if (request.Status != RoleUpgradeStatus.Pending)
         {
-            return Results.Conflict(new { error = $"Request is already {request.Status}." });
+            return Problems.Conflict($"Request is already {request.Status}.");
         }
 
         request.Status = RoleUpgradeStatus.Rejected;

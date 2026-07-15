@@ -35,7 +35,7 @@ internal static class AdminGroupsEndpoints
     private static async Task<IResult> GetAsync(string key, StorageFacade store, CancellationToken ct)
     {
         var group = await store.Groups.GetByKeyAsync(key, ct).ConfigureAwait(false);
-        return group is null ? Results.NotFound(new { error = $"Group '{key}' not found." }) : Results.Ok(group);
+        return group is null ? Problems.NotFound($"Group '{key}' not found.") : Results.Ok(group);
     }
 
     private static async Task<IResult> CreateAsync(GroupWriteRequest body, StorageFacade store, CancellationToken ct)
@@ -43,13 +43,13 @@ internal static class AdminGroupsEndpoints
         ArgumentNullException.ThrowIfNull(body);
         if (string.IsNullOrWhiteSpace(body.Key))
         {
-            return Results.BadRequest(new { error = "key is required." });
+            return Problems.Validation("key", "key is required.");
         }
 
         var existing = await store.Groups.GetByKeyAsync(body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return Results.Conflict(new { error = $"Group '{body.Key}' already exists." });
+            return Problems.Conflict($"Group '{body.Key}' already exists.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -74,7 +74,7 @@ internal static class AdminGroupsEndpoints
         var existing = await store.Groups.GetByKeyAsync(key, ct).ConfigureAwait(false);
         if (existing is null)
         {
-            return Results.NotFound(new { error = $"Group '{key}' not found." });
+            return Problems.NotFound($"Group '{key}' not found.");
         }
 
         existing.Name = string.IsNullOrWhiteSpace(body.Name) ? existing.Name : body.Name;
