@@ -335,21 +335,8 @@ internal static class AdminFlagsEndpoints
         return [.. active, .. archived];
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(
-        StorageFacade store,
-        string? envKey,
-        CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
+    private static Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
+        => EnvironmentResolver.ResolveAsync(store, envKey, ct);
 
     private static string ResolveActor(ClaimsPrincipal user)
     {
