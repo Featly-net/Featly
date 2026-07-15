@@ -39,7 +39,7 @@ internal static class AdminExportEndpoints
     // GET /admin/export?env=
     private static async Task<IResult> ExportAsync(string? env, StorageFacade store, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = "No matching environment found." });
@@ -62,7 +62,7 @@ internal static class AdminExportEndpoints
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.BadRequest(new { error = "No matching environment found; create a project + environment first." });
@@ -162,18 +162,6 @@ internal static class AdminExportEndpoints
         CreatedBy = string.IsNullOrEmpty(s.CreatedBy) ? "import" : s.CreatedBy,
     };
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 
     private static string ResolveActor(ClaimsPrincipal principal)
     {

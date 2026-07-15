@@ -36,7 +36,7 @@ internal static class AdminAuditEndpoints
         Guid? environmentId = null;
         if (!string.IsNullOrWhiteSpace(env))
         {
-            var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+            var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
             if (environment is null)
             {
                 return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -51,14 +51,4 @@ internal static class AdminAuditEndpoints
         return Results.Ok(entries);
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string envKey, CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 }

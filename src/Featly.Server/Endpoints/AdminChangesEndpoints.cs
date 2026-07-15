@@ -73,7 +73,7 @@ internal static class AdminChangesEndpoints
             return Results.Problem(detail: "Could not resolve the proposing user from the request identity.", statusCode: StatusCodes.Status400BadRequest);
         }
 
-        var environment = await ResolveEnvironmentAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, body.EnvironmentKey, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{body.EnvironmentKey}' not found." });
@@ -357,17 +357,6 @@ internal static class AdminChangesEndpoints
         return settings.ApprovalDefaults.TemplateFor(env?.Key).ToPolicy(environmentId);
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 
     // Loads a change for a write path (apply/bypass/schedule) and enforces the
     // shared preconditions: it must exist, and its environment must not be frozen

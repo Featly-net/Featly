@@ -38,7 +38,7 @@ internal static class AdminExperimentsEndpoints
 
     private static async Task<IResult> ListAsync(StorageFacade store, string? env, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -50,7 +50,7 @@ internal static class AdminExperimentsEndpoints
 
     private static async Task<IResult> GetAsync(string key, StorageFacade store, string? env, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -64,7 +64,7 @@ internal static class AdminExperimentsEndpoints
 
     private static async Task<IResult> AnalyticsAsync(string key, StorageFacade store, string? env, CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -103,7 +103,7 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -151,7 +151,7 @@ internal static class AdminExperimentsEndpoints
     {
         ArgumentNullException.ThrowIfNull(body);
 
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -195,7 +195,7 @@ internal static class AdminExperimentsEndpoints
         ClaimsPrincipal user,
         CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -230,7 +230,7 @@ internal static class AdminExperimentsEndpoints
         ClaimsPrincipal user,
         CancellationToken ct)
     {
-        var environment = await ResolveEnvironmentAsync(store, env, ct).ConfigureAwait(false);
+        var environment = await EnvironmentResolver.ResolveAsync(store, env, ct).ConfigureAwait(false);
         if (environment is null)
         {
             return Results.NotFound(new { error = $"Environment '{env}' not found." });
@@ -260,18 +260,6 @@ internal static class AdminExperimentsEndpoints
         return Results.Ok(experiment);
     }
 
-    private static async Task<Environment?> ResolveEnvironmentAsync(StorageFacade store, string? envKey, CancellationToken ct)
-    {
-        var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
-        if (project is null)
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(envKey)
-            ? await store.Environments.GetDefaultAsync(project.Id, ct).ConfigureAwait(false)
-            : await store.Environments.GetByKeyAsync(project.Id, envKey, ct).ConfigureAwait(false);
-    }
 
     private static ValueTask NotifyAsync(StorageFacade store, Guid environmentId, string experimentKey, CancellationToken ct)
         => store.Changes.NotifyAsync(
