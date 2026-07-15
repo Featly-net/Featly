@@ -40,6 +40,11 @@ public static class FeatlyServerEndpointRouteBuilderExtensions
 
         var apiGroup = group.MapGroup("/api");
 
+        // Version negotiation (issue #227): honour the client's Accept-Version
+        // pin, echo the served version, announce sunsets. First in the chain so
+        // an unsupported pin is refused before any work happens.
+        apiGroup.AddEndpointFilter(new FeatlyApiVersionFilter());
+
         // Request throttling (opt-in via Featly:RateLimiting / the settings API).
         // One filter at the /api root covers every Featly endpoint with no host
         // pipeline change; disabled it forwards straight through.

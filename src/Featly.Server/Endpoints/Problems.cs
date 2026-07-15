@@ -27,6 +27,10 @@ internal static class Problems
     public static IResult Forbidden(string detail) =>
         Results.Problem(detail: detail, statusCode: StatusCodes.Status403Forbidden, title: "Forbidden");
 
+    /// <summary>406 — the server cannot answer in the representation the caller pinned.</summary>
+    public static IResult NotAcceptable(string detail) =>
+        Results.Problem(detail: detail, statusCode: StatusCodes.Status406NotAcceptable, title: "Not Acceptable");
+
     /// <summary>
     /// 400 with a single field error — the common "X is required / must be Y"
     /// case, surfaced as an RFC 7807 <c>ValidationProblemDetails</c> so the
