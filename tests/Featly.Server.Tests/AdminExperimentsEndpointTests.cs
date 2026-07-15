@@ -28,7 +28,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task POST_creates_experiment_then_GET_returns_it()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
 
         await SeedFlagAsync(admin);
@@ -57,7 +57,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task POST_rejects_experiment_for_missing_flag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
 
         var create = await admin.PostAsJsonAsync("/api/admin/experiments", new
@@ -73,7 +73,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Start_then_stop_drives_the_window_and_active_flag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         await SeedFlagAsync(admin);
         await CreateExperimentAsync(admin);
@@ -97,7 +97,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Stop_before_start_conflicts()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         await SeedFlagAsync(admin);
         await CreateExperimentAsync(admin);
@@ -109,7 +109,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Active_experiment_ships_in_the_sdk_snapshot()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var sdk = SdkClient(host);
         await SeedFlagAsync(admin);
@@ -128,7 +128,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Events_ingest_then_analytics_reports_conversion_rates()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var sdk = SdkClient(host);
         await SeedFlagAsync(admin);
@@ -169,7 +169,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Analytics_baseline_resolves_to_the_flags_default_variant()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
         var sdk = SdkClient(host);
         await SeedFlagAsync(admin); // defaultVariantKey: "off", variants: on/off
@@ -203,7 +203,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task Events_ingest_rejects_admin_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var admin = AdminClient(host);
 
         var response = await admin.PostAsJsonAsync("/api/sdk/events", new
@@ -217,7 +217,7 @@ public class AdminExperimentsEndpointTests
     [Fact]
     public async Task POST_experiments_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = SdkClient(host);
 
         var response = await sdk.PostAsJsonAsync("/api/admin/experiments", new
@@ -274,33 +274,4 @@ public class AdminExperimentsEndpointTests
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

@@ -33,7 +33,7 @@ public class ScheduledApplyWorkerTests
     [Fact]
     public async Task Applies_a_due_approved_change_and_publishes_change_applied()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -71,7 +71,7 @@ public class ScheduledApplyWorkerTests
     [Fact]
     public async Task Ignores_an_approved_change_whose_schedule_is_in_the_future()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -104,7 +104,7 @@ public class ScheduledApplyWorkerTests
     [Fact]
     public async Task Skips_a_due_change_that_went_stale_since_approval_instead_of_forcing_it()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -262,31 +262,4 @@ public class ScheduledApplyWorkerTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

@@ -22,7 +22,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task POST_creates_a_segment_then_GET_returns_it()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -57,7 +57,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task PUT_overwrites_segment_conditions()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -96,7 +96,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task DELETE_removes_segment_then_GET_returns_404()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -117,7 +117,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task Archive_hides_segment_from_active_list_and_lists_it_under_archived()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -143,7 +143,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task Unarchive_restores_segment_to_active_list()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -167,7 +167,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task Archive_returns_404_for_unknown_segment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -178,7 +178,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task POST_rejects_unauthenticated_requests()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.PostAsJsonAsync("/api/admin/segments", new
@@ -194,7 +194,7 @@ public class AdminSegmentsEndpointTests
     [Fact]
     public async Task POST_rejects_when_using_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -208,33 +208,4 @@ public class AdminSegmentsEndpointTests
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

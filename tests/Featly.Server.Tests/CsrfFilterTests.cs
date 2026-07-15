@@ -41,7 +41,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Login_and_me_return_the_same_session_token()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var client = host.GetTestClient();
 
@@ -61,7 +61,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Cookie_mutation_without_the_header_is_forbidden()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var client = host.GetTestClient();
 
@@ -79,7 +79,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Cookie_mutation_with_the_header_succeeds_and_wrong_token_fails()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var client = host.GetTestClient();
 
@@ -101,7 +101,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Cookie_reads_do_not_need_the_header()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var client = host.GetTestClient();
 
@@ -116,7 +116,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Bearer_mutations_are_exempt()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var bearer = host.GetTestClient();
         bearer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
@@ -128,7 +128,7 @@ public class CsrfFilterTests
     [Fact]
     public async Task Logout_still_works_without_the_header()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var client = host.GetTestClient();
 
@@ -143,32 +143,4 @@ public class CsrfFilterTests
     private static string SessionCookie(HttpResponseMessage login)
         => login.Headers.GetValues("Set-Cookie").First().Split(';')[0];
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

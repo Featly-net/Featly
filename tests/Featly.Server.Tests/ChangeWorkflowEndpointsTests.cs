@@ -33,7 +33,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Propose_approve_apply_round_trips_and_mutates_the_flag()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -105,7 +105,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Schedule_sets_ScheduledApplyAt_on_an_approved_change()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -132,7 +132,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Schedule_rejects_a_change_that_is_not_yet_approved()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await DefaultProjectEnvAsync(store, ct);
@@ -151,7 +151,7 @@ public class ChangeWorkflowEndpointsTests
         // copy Prerequisites onto the existing entity like every other
         // field -- an earlier version silently dropped them on apply even
         // though the direct (non-gated) PUT path persisted them correctly.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -217,7 +217,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Reject_marks_change_rejected_and_blocks_apply()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -240,7 +240,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Emergency_bypass_applies_immediately_and_flags_the_change()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -266,7 +266,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Bypass_requires_a_reason()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await DefaultProjectEnvAsync(store, ct);
@@ -284,7 +284,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task ReadOnly_environment_rejects_apply_bypass_and_schedule()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -312,7 +312,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Comment_is_appended_to_the_change()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await DefaultProjectEnvAsync(store, ct);
@@ -329,7 +329,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Propose_with_legacy_api_key_is_rejected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await DefaultProjectEnvAsync(store, ct);
@@ -349,7 +349,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Approval_policy_crud_round_trips()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var admin = host.GetTestClient();
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -372,7 +372,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Explicit_propose_publishes_change_proposed()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await DefaultProjectEnvAsync(store, ct);
@@ -391,7 +391,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Gated_direct_write_publishes_change_proposed()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -414,7 +414,7 @@ public class ChangeWorkflowEndpointsTests
     [Fact]
     public async Task Gated_emergency_bypass_is_audited_and_webhooked()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var (_, env) = await DefaultProjectEnvAsync(store, ct);
@@ -550,31 +550,4 @@ public class ChangeWorkflowEndpointsTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

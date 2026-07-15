@@ -149,32 +149,9 @@ public class AuthBootstrapHostedServiceTests
         (await BootstrapKeyAdvisor.ShouldWarnAsync(store, "static-admin-key", ct)).Should().BeTrue();
     }
 
-    private static async Task<IHost> BuildHostAsync(string bootstrapAdmin)
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                    ["Featly:Authorization:BootstrapAdminIdentifier"] = bootstrapAdmin,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
+    private static Task<IHost> BuildHostAsync(string bootstrapAdmin)
+        => FeatlyTestHost.CreateAsync(new Dictionary<string, string?>
+        {
+            ["Featly:Authorization:BootstrapAdminIdentifier"] = bootstrapAdmin,
+        });
 }

@@ -27,7 +27,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task GET_webhook_rejects_unauthenticated()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var response = await host.GetTestClient().GetAsync("/api/admin/settings/webhook", TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -35,7 +35,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task GET_webhook_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
         var response = await client.GetAsync("/api/admin/settings/webhook", TestContext.Current.CancellationToken);
@@ -45,7 +45,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task GET_webhook_returns_effective_defaults_when_no_db_override()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
 
         var view = await client.GetFromJsonAsync<JsonElement>("/api/admin/settings/webhook", TestContext.Current.CancellationToken);
@@ -56,7 +56,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_webhook_persists_and_flips_source_to_database()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -82,7 +82,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_webhook_rejects_invalid_values()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -96,7 +96,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_webhook_records_an_audit_entry()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -110,7 +110,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task GET_authorization_returns_open_by_default()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var view = await AdminClient(host).GetFromJsonAsync<JsonElement>("/api/admin/settings/authorization", TestContext.Current.CancellationToken);
         view.GetProperty("value").GetProperty("autoProvisionMode").GetString().Should().Be("Open");
         view.GetProperty("source").GetString().Should().BeOneOf("HardcodedDefault", "AppSettings");
@@ -119,7 +119,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_authorization_persists_and_flips_source_to_database()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -137,7 +137,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_audit_persists_retention_and_rejects_negative()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -157,7 +157,7 @@ public class AdminSettingsEndpointTests
     [Fact]
     public async Task PUT_approval_defaults_persists_templates()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -187,32 +187,4 @@ public class AdminSettingsEndpointTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

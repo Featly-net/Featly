@@ -293,8 +293,6 @@ public class DefaultPermissionCheckerTests
     {
         var config = new Dictionary<string, string?>
         {
-            ["Featly:Server:AdminApiKey"] = AdminKey,
-            ["Featly:Server:SdkApiKey"] = SdkKey,
             ["Featly:Authorization:BootstrapAdminIdentifier"] = bootstrapAdmin,
         };
         if (autoProvisionMode is not null)
@@ -302,25 +300,6 @@ public class DefaultPermissionCheckerTests
             config["Featly:Authorization:AutoProvisionMode"] = autoProvisionMode;
         }
 
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(config));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
+        return await FeatlyTestHost.CreateAsync(config);
     }
 }

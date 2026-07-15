@@ -29,7 +29,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Unknown_environment_returns_404_on_reads()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -58,7 +58,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Unknown_environment_returns_404_on_writes()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
         var empty = new { };
@@ -78,7 +78,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Unknown_entity_key_returns_404()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
         var empty = new { };
@@ -102,7 +102,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Missing_required_fields_return_400_validation()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -117,7 +117,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Duplicate_rename_and_state_conflicts()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -151,7 +151,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Change_lifecycle_on_unknown_change_returns_404()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
         var id = Guid.NewGuid();
@@ -168,7 +168,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Webhook_create_and_update_with_unknown_environment_returns_404()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -186,7 +186,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Rbac_and_directory_endpoints_error_branches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
         var id = Guid.NewGuid();
@@ -216,7 +216,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Preview_and_approval_policy_and_settings_error_branches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -244,7 +244,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Environment_write_error_branches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -258,7 +258,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Config_and_segment_duplicate_and_rename_conflicts()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -276,7 +276,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Experiment_validation_and_state_conflicts()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -309,7 +309,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task Sdk_events_error_branches()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = host.GetTestClient();
         sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
         var ct = TestContext.Current.CancellationToken;
@@ -322,7 +322,7 @@ public class ApiErrorPathsTests
     [Fact]
     public async Task More_error_branches_webhooks_roles_settings()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var c = Admin(host);
         var ct = TestContext.Current.CancellationToken;
         var id = Guid.NewGuid();
@@ -356,32 +356,4 @@ public class ApiErrorPathsTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

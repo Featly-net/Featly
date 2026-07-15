@@ -33,7 +33,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Effective_access_reflects_direct_assignment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -62,7 +62,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Effective_access_reflects_group_assignment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -92,7 +92,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Effective_access_for_unknown_user_is_404()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var resp = await client.GetAsync(new Uri("/api/admin/users/ghost@example.com/effective-access", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -104,7 +104,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Approve_mints_assignment_and_marks_approved()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -139,7 +139,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Reject_marks_rejected_with_comment_and_mints_no_assignment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -172,7 +172,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Approve_already_decided_is_conflict()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -197,7 +197,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task List_filters_by_status()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -221,7 +221,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task File_request_via_cookie_identity_round_trips()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var hasher = host.Services.GetRequiredService<ApiKeyHasher>();
         using var client = host.GetTestClient();
@@ -271,7 +271,7 @@ public class RoleUpgradeAndEffectiveAccessTests
     [Fact]
     public async Task Filing_rejects_legacy_api_key_identity()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -322,31 +322,4 @@ public class RoleUpgradeAndEffectiveAccessTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

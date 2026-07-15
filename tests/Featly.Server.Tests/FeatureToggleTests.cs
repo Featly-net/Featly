@@ -87,31 +87,7 @@ public class FeatureToggleTests
         (await client.GetAsync("/api/admin/environments", ct)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private static async Task<IHost> BuildHostAsync(Action<FeatlyServerOptions>? configure = null)
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer(configure ?? (_ => { }));
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
+    private static Task<IHost> BuildHostAsync(Action<FeatlyServerOptions>? configure = null)
+        => FeatlyTestHost.CreateAsync(
+            configureServices: configure is null ? null : services => services.Configure(configure));
 }

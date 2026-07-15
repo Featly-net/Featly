@@ -31,7 +31,7 @@ public class AdminExportEndpointTests
     [Fact]
     public async Task Export_rejects_sdk_scope()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var sdk = host.GetTestClient();
         sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -42,7 +42,7 @@ public class AdminExportEndpointTests
     [Fact]
     public async Task Export_then_import_round_trips_definitions()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -95,7 +95,7 @@ public class AdminExportEndpointTests
     [Fact]
     public async Task Import_creates_a_new_flag_from_a_minimal_bundle()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -135,7 +135,7 @@ public class AdminExportEndpointTests
     [Fact]
     public async Task Import_is_rejected_when_the_environment_is_readonly()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var store = host.Services.GetRequiredService<StorageFacade>();
         var admin = AdminClient(host);
@@ -175,7 +175,7 @@ public class AdminExportEndpointTests
     [Fact]
     public async Task Export_and_import_require_the_dedicated_backup_permissions()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
         var admin = AdminClient(host);
 
@@ -203,32 +203,4 @@ public class AdminExportEndpointTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

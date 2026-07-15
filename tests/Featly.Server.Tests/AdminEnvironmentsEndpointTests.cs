@@ -25,7 +25,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task GET_admin_environments_rejects_unauthenticated_requests()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.GetAsync(new Uri("/api/admin/environments", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -36,7 +36,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task GET_admin_environments_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -48,7 +48,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task GET_admin_environments_returns_the_bootstrap_default()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -64,7 +64,7 @@ public class AdminEnvironmentsEndpointTests
     public async Task Errors_use_rfc7807_problem_json_shape()
     {
         // Issue #226: a not-found returns application/problem+json with a detail.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -82,7 +82,7 @@ public class AdminEnvironmentsEndpointTests
     {
         // Issue #230: a missing required field surfaces as a ValidationProblemDetails
         // with the offending field under `errors`.
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -98,7 +98,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Lock_then_unlock_toggles_readonly_and_gates_mutations()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
         var ct = TestContext.Current.CancellationToken;
@@ -155,7 +155,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Lock_returns_NotFound_for_unknown_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AdminKey);
 
@@ -166,7 +166,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Lock_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -177,7 +177,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Create_then_list_includes_the_new_environment()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -191,7 +191,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Create_with_duplicate_key_returns_Conflict()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -204,7 +204,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Rename_changes_the_name_and_keeps_the_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -221,7 +221,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Update_unknown_environment_returns_NotFound()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
 
         var resp = await client.PutAsJsonAsync("/api/admin/environments/ghost", new { key = "ghost", name = "Ghost" }, TestContext.Current.CancellationToken);
@@ -231,7 +231,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Delete_empty_env_succeeds_and_default_is_protected()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -252,7 +252,7 @@ public class AdminEnvironmentsEndpointTests
     [Fact]
     public async Task Delete_non_empty_env_returns_Conflict()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -280,33 +280,4 @@ public class AdminEnvironmentsEndpointTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        var host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        return host;
-    }
 }

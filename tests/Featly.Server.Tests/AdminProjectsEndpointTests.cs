@@ -24,7 +24,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task GET_admin_projects_rejects_unauthenticated_requests()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
 
         var response = await client.GetAsync(new Uri("/api/admin/projects", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -35,7 +35,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task GET_admin_projects_rejects_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -47,7 +47,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task GET_admin_projects_returns_the_bootstrap_default()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
 
         var response = await client.GetAsync(new Uri("/api/admin/projects", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -61,7 +61,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task Create_then_get_round_trips_a_new_project()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -86,7 +86,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task Create_with_duplicate_key_returns_Conflict()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -100,7 +100,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task Update_changes_name_and_description()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -124,7 +124,7 @@ public class AdminProjectsEndpointTests
     [Fact]
     public async Task Update_unknown_project_returns_NotFound()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var client = AdminClient(host);
 
         var resp = await client.PutAsJsonAsync("/api/admin/projects/ghost", new { key = "ghost", name = "Ghost" }, TestContext.Current.CancellationToken);
@@ -138,32 +138,4 @@ public class AdminProjectsEndpointTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

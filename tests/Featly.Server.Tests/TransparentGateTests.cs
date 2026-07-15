@@ -32,7 +32,7 @@ public class TransparentGateTests
     [Fact]
     public async Task Mutation_is_gated_to_202_when_policy_requires_approval()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var env = await RequireApprovalAsync(store, ct);
@@ -50,7 +50,7 @@ public class TransparentGateTests
     [Fact]
     public async Task DryRun_reports_without_mutating()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var env = await RequireApprovalAsync(store, ct);
@@ -68,7 +68,7 @@ public class TransparentGateTests
     [Fact]
     public async Task Emergency_bypass_applies_immediately_with_audit()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var env = await RequireApprovalAsync(store, ct);
@@ -88,7 +88,7 @@ public class TransparentGateTests
     [Fact]
     public async Task Emergency_without_reason_is_bad_request()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         await RequireApprovalAsync(store, ct);
@@ -103,7 +103,7 @@ public class TransparentGateTests
     [Fact]
     public async Task No_policy_applies_directly()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var project = await store.Projects.GetDefaultAsync(ct);
@@ -120,7 +120,7 @@ public class TransparentGateTests
     [Fact]
     public async Task Approved_change_goes_stale_when_entity_moves_underneath()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         var ct = TestContext.Current.CancellationToken;
         var project = await store.Projects.GetDefaultAsync(ct);
@@ -259,31 +259,4 @@ public class TransparentGateTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }

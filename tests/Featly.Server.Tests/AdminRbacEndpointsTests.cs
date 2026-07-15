@@ -32,7 +32,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Roles_list_includes_the_four_system_roles()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var roles = await client.GetFromJsonAsync<List<Role>>(
@@ -43,7 +43,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_custom_role_cloned_from_system_unions_permissions()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var body = new RoleWriteRequest(
@@ -67,7 +67,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_role_with_reserved_system_key_is_conflict()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var body = new RoleWriteRequest(Key: SystemRoles.AdminKey, Name: "Nope", Description: null);
@@ -78,7 +78,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Update_system_role_is_forbidden()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var body = new RoleWriteRequest(Key: SystemRoles.ViewerKey, Name: "Hacked", Description: null, Permissions: [Permission.FlagCreate]);
@@ -89,7 +89,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Custom_role_update_and_delete_round_trip()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -110,7 +110,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Delete_system_role_is_forbidden()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
 
         var resp = await client.DeleteAsync(new Uri($"/api/admin/roles/{SystemRoles.AdminKey}", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -122,7 +122,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_user_then_get_and_disable()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -146,7 +146,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_group_with_members_round_trips()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -165,7 +165,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_role_assignment_for_user_round_trips()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         var store = host.Services.GetRequiredService<StorageFacade>();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
@@ -194,7 +194,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Create_role_assignment_with_unknown_role_is_bad_request()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = Admin(host);
         var ct = TestContext.Current.CancellationToken;
 
@@ -208,7 +208,7 @@ public class AdminRbacEndpointsTests
     [Fact]
     public async Task Rbac_endpoints_reject_sdk_scope_key()
     {
-        using var host = await BuildHostAsync();
+        using var host = await FeatlyTestHost.CreateAsync();
         using var client = host.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
 
@@ -226,31 +226,4 @@ public class AdminRbacEndpointsTests
         return client;
     }
 
-    private static async Task<IHost> BuildHostAsync()
-    {
-        var builder = new HostBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Featly:Server:AdminApiKey"] = AdminKey,
-                    ["Featly:Server:SdkApiKey"] = SdkKey,
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddFeatlyInMemoryStore();
-                    services.AddFeatlyServer();
-                    services.AddRouting();
-                });
-                web.Configure(app =>
-                {
-                    app.UseRouting();
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.UseEndpoints(e => e.MapFeatlyApi());
-                });
-            });
-        return await builder.StartAsync(TestContext.Current.CancellationToken);
-    }
 }
