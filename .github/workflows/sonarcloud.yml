@@ -37,8 +37,11 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: featly
-          POSTGRES_PASSWORD: featly
           POSTGRES_DB: postgres
+          # The container lives for this job only and is reachable from nowhere
+          # else, so it takes no password at all — which also keeps a credential
+          # literal out of the workflow.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -126,7 +129,8 @@ jobs:
           FEATLY_POSTGRES_TEST_HOST: localhost
           FEATLY_POSTGRES_TEST_PORT: "5432"
           FEATLY_POSTGRES_TEST_USER: featly
-          FEATLY_POSTGRES_TEST_PASSWORD: featly
+          # No FEATLY_POSTGRES_TEST_PASSWORD: the container trusts every
+          # connection, so whatever the test host defaults to is accepted.
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
