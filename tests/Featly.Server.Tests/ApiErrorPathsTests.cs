@@ -268,6 +268,52 @@ public class ApiErrorPathsTests
         (await c.PutAsJsonAsync("/api/admin/segments/seg", new { key = "other", name = "Seg", conditions = Array.Empty<object>() }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Experiment_validation_and_state_conflicts()
+    {
+        using var host = await BuildHostAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await c.PostAsJsonAsync("/api/admin/experiments", new { }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await c.PostAsJsonAsync("/api/admin/experiments", new { key = "e", name = "E", flagKey = "ghost" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await c.PostAsJsonAsync("/api/admin/flags", new
+        {
+            key = "cf",
+            name = "CF",
+            type = "Boolean",
+            enabled = true,
+            defaultVariantKey = "off",
+            variants = new[] { new { key = "off", name = "Off", value = false } },
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        object exp = new { key = "exp", name = "Exp", flagKey = "cf" };
+        (await c.PostAsJsonAsync("/api/admin/experiments", exp, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await c.PostAsJsonAsync("/api/admin/experiments", exp, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PutAsJsonAsync("/api/admin/experiments/exp", new { key = "other", name = "Exp", flagKey = "cf" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Stop before start -> 409; start, start-again -> 409; stop, stop-again -> 409.
+        (await c.PostAsync(new Uri("/api/admin/experiments/exp/stop", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PostAsync(new Uri("/api/admin/experiments/exp/start", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await c.PostAsync(new Uri("/api/admin/experiments/exp/start", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await c.PostAsync(new Uri("/api/admin/experiments/exp/stop", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await c.PostAsync(new Uri("/api/admin/experiments/exp/stop", UriKind.Relative), null, ct)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Sdk_events_error_branches()
+    {
+        using var host = await BuildHostAsync();
+        var sdk = host.GetTestClient();
+        sdk.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", SdkKey);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await sdk.PostAsJsonAsync("/api/sdk/events" + BadEnv, new { events = Array.Empty<object>() }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var missingSubject = new { events = new[] { new { type = "Exposure", flagKey = "x", variantKey = "on" } } };
+        (await sdk.PostAsJsonAsync("/api/sdk/events", missingSubject, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static HttpClient Admin(IHost host)
     {
         var client = host.GetTestClient();
