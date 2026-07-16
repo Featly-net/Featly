@@ -32,14 +32,15 @@ public sealed record PostgresMigrationStatus(
 /// EF Core type directly.
 /// </para>
 /// <para>
-/// Every method opens its own short-lived context against the supplied
-/// connection string and disposes it before returning. These operations are
-/// destructive-by-nature in the case of <see cref="RollbackAsync"/> and
-/// <see cref="DropAsync"/>; the caller is responsible for confirming intent.
-/// Applying the schema out of band via this runner is also how a multi-replica
-/// deployment is expected to migrate: run it once as a deploy step with
-/// <c>AutoMigrate: false</c> on every replica, rather than letting each replica
-/// race to migrate the shared database on boot.
+/// Every method takes an Npgsql <c>connectionString</c> and an optional
+/// <c>cancellationToken</c>; it opens its own short-lived context against that
+/// connection string and disposes it before returning.
+/// <see cref="RollbackAsync"/> and <see cref="DropAsync"/> are destructive; the
+/// caller is responsible for confirming intent. Applying the schema out of band
+/// via this runner is also how a multi-replica deployment is expected to
+/// migrate: run it once as a deploy step with <c>AutoMigrate: false</c> on every
+/// replica, rather than letting each replica race to migrate the shared
+/// database on boot.
 /// </para>
 /// </remarks>
 public static class PostgresMigrationRunner
@@ -51,68 +52,30 @@ public static class PostgresMigrationRunner
     /// </summary>
     public const string InitialDatabaseTarget = EfMigrationRunner.InitialDatabaseTarget;
 
-    /// <summary>
-    /// Applies every pending migration so the database schema matches this build.
-    /// No-op when the schema is already up to date.
-    /// </summary>
-    /// <param name="connectionString">An Npgsql connection string.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    public static async Task MigrateAsync(
-        string connectionString,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = CreateContext(connectionString);
-        await EfMigrationRunner.MigrateAsync(db, cancellationToken).ConfigureAwait(false);
-    }
+    /// <summary>Applies every pending migration. No-op when already up to date.</summary>
+    public static Task MigrateAsync(string connectionString, CancellationToken cancellationToken = default) =>
+        EfMigrationRunner.MigrateAsync(() => CreateContext(connectionString), cancellationToken);
 
-    /// <summary>
-    /// Reads the applied and pending migration sets for the target database.
-    /// </summary>
-    /// <param name="connectionString">An Npgsql connection string.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The current <see cref="PostgresMigrationStatus"/>.</returns>
+    /// <summary>Reads the applied and pending migration sets for the target database.</summary>
     public static async Task<PostgresMigrationStatus> GetStatusAsync(
         string connectionString,
         CancellationToken cancellationToken = default)
     {
-        await using var db = CreateContext(connectionString);
-        var status = await EfMigrationRunner.GetStatusAsync(db, cancellationToken).ConfigureAwait(false);
+        var status = await EfMigrationRunner.GetStatusAsync(() => CreateContext(connectionString), cancellationToken).ConfigureAwait(false);
         return new PostgresMigrationStatus(status.Applied, status.Pending);
     }
 
     /// <summary>
-    /// Reverts the schema down to <paramref name="targetMigration"/>. Pass
-    /// <see cref="InitialDatabaseTarget"/> (<c>"0"</c>) to revert every migration.
+    /// Reverts the schema down to <paramref name="targetMigration"/> (or
+    /// <see cref="InitialDatabaseTarget"/> to undo every migration).
     /// </summary>
-    /// <param name="connectionString">An Npgsql connection string.</param>
-    /// <param name="targetMigration">
-    /// The migration identifier (or unambiguous name) to roll back to, or
-    /// <see cref="InitialDatabaseTarget"/> to undo all migrations.
-    /// </param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    public static async Task RollbackAsync(
-        string connectionString,
-        string targetMigration,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = CreateContext(connectionString);
-        await EfMigrationRunner.RollbackAsync(db, targetMigration, cancellationToken).ConfigureAwait(false);
-    }
+    public static Task RollbackAsync(string connectionString, string targetMigration, CancellationToken cancellationToken = default) =>
+        EfMigrationRunner.RollbackAsync(() => CreateContext(connectionString), targetMigration, cancellationToken);
 
-    /// <summary>
-    /// Deletes the target database entirely (drops all tables and the migration
-    /// history). Irreversible.
-    /// </summary>
-    /// <param name="connectionString">An Npgsql connection string.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <summary>Deletes the target database entirely. Irreversible.</summary>
     /// <returns><c>true</c> if a database existed and was deleted; otherwise <c>false</c>.</returns>
-    public static async Task<bool> DropAsync(
-        string connectionString,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = CreateContext(connectionString);
-        return await EfMigrationRunner.DropAsync(db, cancellationToken).ConfigureAwait(false);
-    }
+    public static Task<bool> DropAsync(string connectionString, CancellationToken cancellationToken = default) =>
+        EfMigrationRunner.DropAsync(() => CreateContext(connectionString), cancellationToken);
 
     private static FeatlyDbContext CreateContext(string connectionString)
     {
