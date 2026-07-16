@@ -27,20 +27,24 @@ scaled independently.
 
 #### Scaling out: one writable replica for now
 
-The server's live-update backbone (`IChangeNotifier`) is **in-process**: a
-mutation applied on one replica raises the SSE change notification only for the
-SDK clients connected to *that* replica. Running several centralized-server
-replicas behind a load balancer therefore weakens live updates — an SDK
-connected to replica A does not get the SSE nudge for a change written through
-replica B. It does **not** break correctness: every SDK also polls with an ETag
+The server's live-update backbone (`IChangeNotifier`) has two implementations.
+**SQLite and in-memory are in-process**: a mutation applied on one replica
+raises the SSE change notification only for the SDK clients connected to *that*
+replica — running several replicas behind a load balancer weakens live updates
+(replica A doesn't get the SSE nudge for a change written through replica B). It
+does **not** break correctness: every SDK also polls with an ETag
 (`FeatlyConfigSyncService`), so all clients converge within one polling
-interval; only the "instant" push is per-replica.
+interval regardless; only the "instant" push is per-replica.
 
-Until a distributed notifier ships (Postgres `LISTEN`/`NOTIFY`, tracked in
-[#179](https://github.com/Featly-net/Featly/issues/179)), run **one**
-centralized-server instance, or accept polling-interval freshness across
-replicas. If you do run several, use the PostgreSQL provider — SQLite's
-single-writer model does not fit multiple replicas sharing one database.
+**PostgreSQL is cross-replica**, backed by a persistent `LISTEN`/`NOTIFY`
+connection per replica (ADR-0026, issue #258): a change made through any replica
+reaches every replica's SSE clients, not just the one that made it. If you run
+several centralized-server replicas, use the PostgreSQL provider — its
+concurrent-writer model fits multiple replicas sharing one database anyway,
+unlike SQLite's single-writer one. If the listener's connection drops (a network
+blip, the database restarting) it reconnects with backoff automatically; while
+disconnected, clients still converge via the ETag poll, so a gap here is
+degraded push freshness, not a correctness failure.
 
 The background workers are safe to run on several replicas against a shared
 database: `WebhookDeliveryWorker` and `ScheduledApplyWorker` claim each due row
@@ -161,13 +165,11 @@ migrate the same database. Apply the schema once as a deploy step with
 ["Schema lifecycle with the CLI"](#schema-lifecycle-with-the-cli) below) and
 start the replicas with `AutoMigrate: false`.
 
-> **Change notifications are in-process for now.** An SSE client connected to
-> replica A is not pushed a change made through replica B — it catches up on its
-> next poll instead (see "Scaling out" above). The Postgres-native
-> `LISTEN`/`NOTIFY` notifier that closes this is tracked in
-> [#179](https://github.com/Featly-net/Featly/issues/179). Everything else —
-> including the background workers, which claim rows atomically — is safe across
-> replicas.
+> **Change notifications are cross-replica.** An SSE client connected to
+> replica A is pushed a change made through replica B via a persistent
+> Postgres `LISTEN`/`NOTIFY` connection per replica (ADR-0026, issue #258) —
+> see "Scaling out" above. The background workers are also safe across
+> replicas: they claim rows atomically (#237).
 
 ### Planned
 

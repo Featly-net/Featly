@@ -62,13 +62,14 @@ Rejected for consistency with ADR-0006 (EF Core for relational storage) — the 
 
 ## Implementation notes
 
-Sliced into PRs in [issue #157](https://github.com/Featly-net/Featly/issues/157):
+Sliced into PRs in [issue #157](https://github.com/Featly-net/Featly/issues/157) (entity porting) and [issue #179](https://github.com/Featly-net/Featly/issues/179) (making the provider usable):
 
-1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration.
-2. Remaining entities (configs, segments, experiments, RBAC, approvals, webhooks, audit, settings).
-3. `LISTEN`/`NOTIFY` `IChangeNotifier` implementation.
-4. `Featly.Cli` `db` command support + `docs/DEPLOYMENT.md` Postgres section + a docker-compose sample.
-5. Test suite mirroring `Featly.Storage.Sqlite.Tests`, running against a real Postgres in CI.
+1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration. **Shipped.**
+2. Remaining entities (configs, segments, experiments, RBAC, approvals, webhooks, audit, settings). **Shipped.**
+3. `IFeatlyStore` facade + `AddFeatlyPostgresStore()` DI. **Shipped** (#256).
+4. `Featly.Cli` `db --provider postgres` support. **Shipped** (#259).
+5. `LISTEN`/`NOTIFY` `IChangeNotifier` implementation, exactly as designed above: `PostgresChangeNotifier` (publish via `pg_notify`, local fan-out through the same `InProcessChangeNotifier` every provider uses) + `PostgresChangeListenerHostedService` (the dedicated `NpgsqlConnection`, reconnect with exponential backoff). **Shipped** (#258). One refinement over the original design: `NotifyAsync` does not fan out to local subscribers directly — delivery happens exclusively through the `LISTEN` round-trip, so the replica that raised a change hears it back the same symmetric way every other replica does, with nothing to deduplicate.
+6. Test suite mirroring `Featly.Storage.Sqlite.Tests`, running against a real Postgres in CI. **Shipped.**
 
 ## References
 

@@ -797,17 +797,17 @@ EF Core migrations live in `Featly.Storage.Sqlite/Migrations/` and ship compiled
 - **`AutoMigrate = true` (default for embedded).** At application boot, `Featly.Storage.Sqlite` calls `DbContext.Database.MigrateAsync()`. If already at the latest schema, it is a no-op. This is the zero-friction quickstart.
 - **`AutoMigrate = false` (recommended for serious production).** Featly does not touch the schema. A DBA runs `featly db migrate --connection "..."` via the CLI before deploying.
 
-When SQL Server and PostgreSQL providers ship, each has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — not a shared one. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz` vs. SQLite's raw-JSON-text and ticks converters); a shared context would force one provider to carry the other's mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md).
+The shipped PostgreSQL provider has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — not a shared one with SQLite's, and the same holds if a SQL Server provider follows. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz` vs. SQLite's raw-JSON-text and ticks converters); a shared context would force one provider to carry the other's mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md).
 
 ### Provider roadmap
 
-| Provider | Use case |
-|---|---|
-| `Featly.Storage.InMemory` | Tests, demos, ephemeral environments |
-| `Featly.Storage.Sqlite` | Single-node self-hosted (embedded pattern) |
-| `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node |
-| `Featly.Storage.Postgres` | Multi-node with LISTEN/NOTIFY for `IChangeNotifier` |
-| `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications |
+| Provider | Use case | Status |
+|---|---|---|
+| `Featly.Storage.InMemory` | Tests, demos, ephemeral environments | Shipped |
+| `Featly.Storage.Sqlite` | Single-node self-hosted (embedded pattern) | Shipped |
+| `Featly.Storage.Postgres` | Multi-node with `LISTEN`/`NOTIFY` for cross-replica `IChangeNotifier` | Shipped |
+| `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node | Planned |
+| `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications | Planned |
 
 ---
 

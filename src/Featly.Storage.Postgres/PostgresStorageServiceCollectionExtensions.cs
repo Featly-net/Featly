@@ -34,11 +34,11 @@ public static class PostgresStorageServiceCollectionExtensions
     /// <see cref="IFeatlyStore"/>.
     /// </para>
     /// <para>
-    /// <b>Change notifications are in-process for now.</b> This registration
-    /// reuses <see cref="InProcessChangeNotifier"/>, so an SSE client connected to
-    /// replica A will not be pushed a change made through replica B — it catches
-    /// up on its next poll instead. The Postgres-native <c>LISTEN</c>/<c>NOTIFY</c>
-    /// notifier ADR-0026 calls for is tracked separately in issue #179.
+    /// Change notifications use <see cref="PostgresChangeNotifier"/>, backed by
+    /// a persistent <c>LISTEN</c>/<c>NOTIFY</c> connection
+    /// (<see cref="PostgresChangeListenerHostedService"/>, ADR-0026, issue #258),
+    /// so an SSE client connected to one replica <em>is</em> pushed a change made
+    /// through another.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddFeatlyPostgresStore(
@@ -72,7 +72,8 @@ public static class PostgresStorageServiceCollectionExtensions
             builder.UseNpgsql(opts.ConnectionString);
         });
 
-        services.TryAddSingleton<IChangeNotifier, InProcessChangeNotifier>();
+        services.TryAddSingleton<PostgresChangeNotifier>();
+        services.TryAddSingleton<IChangeNotifier>(sp => sp.GetRequiredService<PostgresChangeNotifier>());
         services.TryAddSingleton<IFlagStore, PostgresFlagStore>();
         services.TryAddSingleton<IProjectStore, PostgresProjectStore>();
         services.TryAddSingleton<IEnvironmentStore, PostgresEnvironmentStore>();
@@ -99,6 +100,7 @@ public static class PostgresStorageServiceCollectionExtensions
         services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<EfFeatlyStore>());
 
         services.AddHostedService<PostgresAutoMigrationHostedService>();
+        services.AddHostedService<PostgresChangeListenerHostedService>();
 
         return services;
     }
