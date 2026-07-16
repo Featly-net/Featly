@@ -9,14 +9,23 @@ namespace Featly.Cli.Infrastructure;
 /// </summary>
 internal static class CliOptions
 {
-    /// <summary>The SQLite connection string / file path for offline commands.</summary>
+    /// <summary>The connection string (or, for SQLite, a bare file path) for offline commands.</summary>
     public static Option<string?> ConnectionString() =>
         new("--connection-string", "-c")
         {
-            Description = $"SQLite connection string or file path. " +
-                $"Falls back to the {ConnectionStringResolver.EnvVarName} environment variable, " +
-                $"then '{ConnectionStringResolver.Default}'.",
+            Description = "Connection string. For --provider sqlite, a bare value is a file path " +
+                $"(falls back to {SqliteConnectionStringResolver.EnvVarName}, then '{SqliteConnectionStringResolver.Default}'). " +
+                $"For --provider postgres, an Npgsql connection string is required " +
+                $"(falls back to {PostgresConnectionStringResolver.EnvVarName}; no default).",
         };
+
+    /// <summary>The storage provider the offline <c>db</c> commands operate on.</summary>
+    public static Option<string> Provider() =>
+        new Option<string>("--provider", "-p")
+        {
+            Description = "Storage provider to operate on.",
+            DefaultValueFactory = _ => MigrationRunnerFactory.Sqlite,
+        }.AcceptOnlyFromAmong(MigrationRunnerFactory.Sqlite, MigrationRunnerFactory.Postgres);
 
     /// <summary>Skips the interactive confirmation prompt on destructive commands.</summary>
     public static Option<bool> Yes() =>

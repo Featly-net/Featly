@@ -26,7 +26,7 @@ public static class CliApp
     public static RootCommand BuildRootCommand()
     {
         var root = new RootCommand(
-            "Featly CLI — operate the Featly SQLite store and server from the command line.");
+            "Featly CLI — operate the Featly store (SQLite or PostgreSQL) and server from the command line.");
         root.Subcommands.Add(DbCommand.Build());
         root.Subcommands.Add(ApiKeyCommand.Build());
         root.Subcommands.Add(BootstrapAdminCommand.Build());

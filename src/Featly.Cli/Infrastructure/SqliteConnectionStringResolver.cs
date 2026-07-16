@@ -6,7 +6,7 @@ namespace Featly.Cli.Infrastructure;
 /// <c>FEATLY_SQLITE</c> environment variable &gt; the built-in default
 /// (<c>Data Source=featly.db</c>, matching the server's storage default).
 /// </summary>
-internal static class ConnectionStringResolver
+internal static class SqliteConnectionStringResolver
 {
     /// <summary>Environment variable consulted when no explicit value is passed.</summary>
     public const string EnvVarName = "FEATLY_SQLITE";

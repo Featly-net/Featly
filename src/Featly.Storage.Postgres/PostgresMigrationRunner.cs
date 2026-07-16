@@ -1,11 +1,12 @@
 using Featly.Storage.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 
-namespace Featly.Storage.Sqlite;
+namespace Featly.Storage.Postgres;
 
 /// <summary>
-/// Snapshot of the SQLite schema migration state: which migrations the database
-/// already has, and which the current build defines but has not yet applied.
+/// Snapshot of the PostgreSQL schema migration state: which migrations the
+/// database already has, and which the current build defines but has not yet
+/// applied.
 /// </summary>
 /// <param name="Applied">
 /// Migration identifiers recorded in the database's history table, oldest first.
@@ -14,13 +15,14 @@ namespace Featly.Storage.Sqlite;
 /// Migration identifiers compiled into this build but not yet present in the
 /// database, in the order they would be applied.
 /// </param>
-public sealed record SqliteMigrationStatus(
+public sealed record PostgresMigrationStatus(
     IReadOnlyList<string> Applied,
     IReadOnlyList<string> Pending);
 
 /// <summary>
-/// Public, offline entry point for operating the Featly SQLite schema without a
-/// running host — the surface the <c>featly db</c> CLI commands sit on top of.
+/// Public, offline entry point for operating the Featly PostgreSQL schema
+/// without a running host — the surface the <c>featly db</c> CLI commands sit
+/// on top of. Mirrors <c>Featly.Storage.Sqlite.SqliteMigrationRunner</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,9 +36,13 @@ public sealed record SqliteMigrationStatus(
 /// connection string and disposes it before returning. These operations are
 /// destructive-by-nature in the case of <see cref="RollbackAsync"/> and
 /// <see cref="DropAsync"/>; the caller is responsible for confirming intent.
+/// Applying the schema out of band via this runner is also how a multi-replica
+/// deployment is expected to migrate: run it once as a deploy step with
+/// <c>AutoMigrate: false</c> on every replica, rather than letting each replica
+/// race to migrate the shared database on boot.
 /// </para>
 /// </remarks>
-public static class SqliteMigrationRunner
+public static class PostgresMigrationRunner
 {
     /// <summary>
     /// The reserved target passed to <see cref="RollbackAsync"/> to revert every
@@ -49,7 +55,7 @@ public static class SqliteMigrationRunner
     /// Applies every pending migration so the database schema matches this build.
     /// No-op when the schema is already up to date.
     /// </summary>
-    /// <param name="connectionString">A Microsoft.Data.Sqlite connection string.</param>
+    /// <param name="connectionString">An Npgsql connection string.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     public static async Task MigrateAsync(
         string connectionString,
@@ -62,23 +68,23 @@ public static class SqliteMigrationRunner
     /// <summary>
     /// Reads the applied and pending migration sets for the target database.
     /// </summary>
-    /// <param name="connectionString">A Microsoft.Data.Sqlite connection string.</param>
+    /// <param name="connectionString">An Npgsql connection string.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The current <see cref="SqliteMigrationStatus"/>.</returns>
-    public static async Task<SqliteMigrationStatus> GetStatusAsync(
+    /// <returns>The current <see cref="PostgresMigrationStatus"/>.</returns>
+    public static async Task<PostgresMigrationStatus> GetStatusAsync(
         string connectionString,
         CancellationToken cancellationToken = default)
     {
         await using var db = CreateContext(connectionString);
         var status = await EfMigrationRunner.GetStatusAsync(db, cancellationToken).ConfigureAwait(false);
-        return new SqliteMigrationStatus(status.Applied, status.Pending);
+        return new PostgresMigrationStatus(status.Applied, status.Pending);
     }
 
     /// <summary>
     /// Reverts the schema down to <paramref name="targetMigration"/>. Pass
     /// <see cref="InitialDatabaseTarget"/> (<c>"0"</c>) to revert every migration.
     /// </summary>
-    /// <param name="connectionString">A Microsoft.Data.Sqlite connection string.</param>
+    /// <param name="connectionString">An Npgsql connection string.</param>
     /// <param name="targetMigration">
     /// The migration identifier (or unambiguous name) to roll back to, or
     /// <see cref="InitialDatabaseTarget"/> to undo all migrations.
@@ -97,7 +103,7 @@ public static class SqliteMigrationRunner
     /// Deletes the target database entirely (drops all tables and the migration
     /// history). Irreversible.
     /// </summary>
-    /// <param name="connectionString">A Microsoft.Data.Sqlite connection string.</param>
+    /// <param name="connectionString">An Npgsql connection string.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> if a database existed and was deleted; otherwise <c>false</c>.</returns>
     public static async Task<bool> DropAsync(
@@ -112,7 +118,7 @@ public static class SqliteMigrationRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         var options = new DbContextOptionsBuilder<FeatlyDbContext>()
-            .UseSqlite(connectionString)
+            .UseNpgsql(connectionString)
             .Options;
         return new FeatlyDbContext(options);
     }
