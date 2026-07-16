@@ -1,11 +1,12 @@
 using Featly.Storage.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 
-namespace Featly.Storage.Sqlite;
+namespace Featly.Storage.Postgres;
 
 /// <summary>
-/// Snapshot of the SQLite schema migration state: which migrations the database
-/// already has, and which the current build defines but has not yet applied.
+/// Snapshot of the PostgreSQL schema migration state: which migrations the
+/// database already has, and which the current build defines but has not yet
+/// applied.
 /// </summary>
 /// <param name="Applied">
 /// Migration identifiers recorded in the database's history table, oldest first.
@@ -14,13 +15,14 @@ namespace Featly.Storage.Sqlite;
 /// Migration identifiers compiled into this build but not yet present in the
 /// database, in the order they would be applied.
 /// </param>
-public sealed record SqliteMigrationStatus(
+public sealed record PostgresMigrationStatus(
     IReadOnlyList<string> Applied,
     IReadOnlyList<string> Pending);
 
 /// <summary>
-/// Public, offline entry point for operating the Featly SQLite schema without a
-/// running host — the surface the <c>featly db</c> CLI commands sit on top of.
+/// Public, offline entry point for operating the Featly PostgreSQL schema
+/// without a running host — the surface the <c>featly db</c> CLI commands sit
+/// on top of. Mirrors <c>Featly.Storage.Sqlite.SqliteMigrationRunner</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,14 +32,18 @@ public sealed record SqliteMigrationStatus(
 /// EF Core type directly.
 /// </para>
 /// <para>
-/// Every method takes a Microsoft.Data.Sqlite <c>connectionString</c> and an
-/// optional <c>cancellationToken</c>; it opens its own short-lived context
-/// against that connection string and disposes it before returning.
+/// Every method takes an Npgsql <c>connectionString</c> and an optional
+/// <c>cancellationToken</c>; it opens its own short-lived context against that
+/// connection string and disposes it before returning.
 /// <see cref="RollbackAsync"/> and <see cref="DropAsync"/> are destructive; the
-/// caller is responsible for confirming intent.
+/// caller is responsible for confirming intent. Applying the schema out of band
+/// via this runner is also how a multi-replica deployment is expected to
+/// migrate: run it once as a deploy step with <c>AutoMigrate: false</c> on every
+/// replica, rather than letting each replica race to migrate the shared
+/// database on boot.
 /// </para>
 /// </remarks>
-public static class SqliteMigrationRunner
+public static class PostgresMigrationRunner
 {
     /// <summary>
     /// The reserved target passed to <see cref="RollbackAsync"/> to revert every
@@ -51,12 +57,12 @@ public static class SqliteMigrationRunner
         EfMigrationRunner.MigrateAsync(() => CreateContext(connectionString), cancellationToken);
 
     /// <summary>Reads the applied and pending migration sets for the target database.</summary>
-    public static async Task<SqliteMigrationStatus> GetStatusAsync(
+    public static async Task<PostgresMigrationStatus> GetStatusAsync(
         string connectionString,
         CancellationToken cancellationToken = default)
     {
         var status = await EfMigrationRunner.GetStatusAsync(() => CreateContext(connectionString), cancellationToken).ConfigureAwait(false);
-        return new SqliteMigrationStatus(status.Applied, status.Pending);
+        return new PostgresMigrationStatus(status.Applied, status.Pending);
     }
 
     /// <summary>
@@ -75,7 +81,7 @@ public static class SqliteMigrationRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         var options = new DbContextOptionsBuilder<FeatlyDbContext>()
-            .UseSqlite(connectionString)
+            .UseNpgsql(connectionString)
             .Options;
         return new FeatlyDbContext(options);
     }

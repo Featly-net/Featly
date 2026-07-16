@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Featly.Storage.Postgres\Featly.Storage.Postgres.csproj" />
+    <!-- Only for PostgresCliDispatchTests: drives the real "featly db" command
+         tree (provider postgres) against this project's throwaway database. -->
+    <ProjectReference Include="..\..\src\Featly.Cli\Featly.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

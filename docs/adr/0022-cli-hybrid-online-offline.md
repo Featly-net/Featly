@@ -14,7 +14,7 @@ The `featly` global tool exposes two kinds of operation: schema management (`db 
 
 The CLI is **hybrid**:
 
-- **`db` commands run OFFLINE** — directly against the SQLite database through a public `SqliteMigrationRunner` facade in `Featly.Storage.Sqlite`, keeping `FeatlyDbContext` internal ([ADR-0006](0006-ef-core-internal-dbcontext.md)). Connection string from `--connection-string` / `FEATLY_SQLITE` / default.
+- **`db` commands run OFFLINE** — directly against the database through a public per-provider migration runner (`SqliteMigrationRunner`, `PostgresMigrationRunner`) keeping each `FeatlyDbContext` internal ([ADR-0006](0006-ef-core-internal-dbcontext.md)). `--provider sqlite|postgres` (default `sqlite`) selects which; connection string from `--connection-string` / a per-provider environment variable (`FEATLY_SQLITE` / `FEATLY_POSTGRES`) / a default for SQLite only — Postgres has none and fails fast, mirroring `AddFeatlyPostgresStore()` (issue #257).
 - **All other admin commands run ONLINE** — against the server's admin HTTP API (`--server-url` / `FEATLY_SERVER_URL`, `--api-key` / `FEATLY_API_KEY`). They therefore reuse the server's permission checks, audit log, and webhook backbone. The one exception is `bootstrap-admin`, which hits an unauthenticated, self-guarded endpoint (it exists precisely to create the first credential).
 
 ## Alternatives considered

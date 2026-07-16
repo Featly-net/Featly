@@ -85,14 +85,22 @@ the hot path; last-known-good config is served if the server is unreachable.
 
 ## Schema lifecycle with the CLI
 
+`featly db *` operates directly on the database, offline — no running server
+needed (the server can't start before its schema exists). `--provider` selects
+`sqlite` (default) or `postgres`; each takes its own connection string.
+
 ```bash
 dotnet tool install -g Featly.Cli
 
-# Before deploying a new version (offline, against the DB file / connection string):
+# SQLite (offline, against the DB file):
 featly db status        --connection-string "Data Source=/var/lib/featly/featly.db"
 featly db migrate       --connection-string "Data Source=/var/lib/featly/featly.db"
 
-# Operational tasks against the running server (online):
+# PostgreSQL (offline; --connection-string is required, there's no default server):
+featly db status  --provider postgres --connection-string "Host=db;Database=featly;Username=featly;Password=..."
+featly db migrate --provider postgres --connection-string "Host=db;Database=featly;Username=featly;Password=..."
+
+# Operational tasks against the running server (online, same for either provider):
 featly env lock production    --server-url https://featly.internal --api-key "$FEATLY_API_KEY"
 featly export --environment production --output prod-backup.json --server-url https://featly.internal --api-key "$FEATLY_API_KEY"
 ```
@@ -148,8 +156,10 @@ message rather than at the first query.
 **Turn `AutoMigrate` off when you run more than one replica.** It defaults to
 `true` (each host applies pending migrations on boot), which is what you want for
 a single instance; with several replicas booting together they would each race to
-migrate the same database. Apply the schema once as a deploy step and start the
-replicas with `AutoMigrate: false`.
+migrate the same database. Apply the schema once as a deploy step with
+`featly db migrate --provider postgres --connection-string "..."` (see
+["Schema lifecycle with the CLI"](#schema-lifecycle-with-the-cli) below) and
+start the replicas with `AutoMigrate: false`.
 
 > **Change notifications are in-process for now.** An SSE client connected to
 > replica A is not pushed a change made through replica B — it catches up on its

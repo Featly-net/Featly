@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Featly.Abstractions\Featly.Abstractions.csproj" />
     <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" />
+    <ProjectReference Include="..\Featly.Storage.Postgres\Featly.Storage.Postgres.csproj" />
   </ItemGroup>
 
   <ItemGroup>
