@@ -111,23 +111,37 @@ internal sealed partial class PostgresChangeListenerHostedService(
 
     private void OnNotification(NpgsqlNotificationEventArgs e, ChannelWriter<ChangeNotification> writer)
     {
-        ChangeNotification? notification;
-        try
+        var notification = TryDecodePayload(e.Payload, out var error);
+        if (notification is not null)
         {
-            notification = JsonSerializer.Deserialize<ChangeNotification>(e.Payload);
+            writer.TryWrite(notification);
         }
-        catch (JsonException ex)
+        else if (error is not null)
         {
             // A malformed payload must not take down the listener -- log and
             // move on, same failure-isolation policy InProcessChangeNotifier
             // applies to a misbehaving subscriber.
-            LogMalformedPayload(logger, ex);
-            return;
+            LogMalformedPayload(logger, error);
         }
+    }
 
-        if (notification is not null)
+    /// <summary>
+    /// Decodes a NOTIFY payload back into the <see cref="ChangeNotification"/>
+    /// <see cref="PostgresChangeNotifier.NotifyAsync"/> encoded. Pure and
+    /// side-effect-free (no logging here) so the decode logic is testable on
+    /// its own, independent of a live connection.
+    /// </summary>
+    internal static ChangeNotification? TryDecodePayload(string payload, out JsonException? error)
+    {
+        try
         {
-            writer.TryWrite(notification);
+            error = null;
+            return JsonSerializer.Deserialize<ChangeNotification>(payload);
+        }
+        catch (JsonException ex)
+        {
+            error = ex;
+            return null;
         }
     }
 

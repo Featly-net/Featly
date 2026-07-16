@@ -92,6 +92,58 @@ public class PostgresChangeNotifierTests
         receivedC.Should().ContainSingle().Which.Should().Be(sent);
     }
 
+    [Fact]
+    public async Task Listener_reconnects_after_its_connection_is_terminated()
+    {
+        // Forces the reconnect/backoff path: kill the listener's own backend
+        // connection out from under it (a stand-in for a network blip or the
+        // database restarting) and prove it notices, reconnects, re-issues
+        // LISTEN, and resumes delivering notifications.
+        await using var host = await PostgresTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        await using var replicaA = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+        await using var replicaB = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+
+        var received = new List<ChangeNotification>();
+        using var subscription = replicaB.Notifier.Subscribe((n, _) =>
+        {
+            received.Add(n);
+            return ValueTask.CompletedTask;
+        });
+
+        await TerminateListenerConnectionAsync(host.ConnectionString, ct);
+
+        // The reconnect isn't independently observable from here, and the kill
+        // itself can race a NOTIFY sent right after it, so retry the publish
+        // until it lands rather than sending exactly once.
+        var sent = new ChangeNotification(Guid.NewGuid(), "Flag", "post-reconnect-flag", DateTimeOffset.UtcNow);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(20);
+        while (received.Count == 0 && DateTimeOffset.UtcNow < deadline)
+        {
+            await replicaA.Notifier.NotifyAsync(sent, ct);
+            await Task.Delay(500, ct);
+        }
+
+        received.Should().ContainSingle("the listener should have reconnected and resumed delivery")
+            .Which.Should().Be(sent);
+    }
+
+    /// <summary>
+    /// Terminates the backend connection currently executing <c>LISTEN</c>
+    /// against the test database — the only session that does, since nothing
+    /// else in this suite issues one.
+    /// </summary>
+    private static async Task TerminateListenerConnectionAsync(string connectionString, CancellationToken ct)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var terminate = new Npgsql.NpgsqlCommand(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE 'LISTEN %' AND pid <> pg_backend_pid()",
+            connection);
+        await terminate.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     private static async Task PollUntilAsync(Func<bool> condition, CancellationToken ct, int timeoutSeconds = 15)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(timeoutSeconds);
