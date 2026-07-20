@@ -39,12 +39,12 @@ jobs:
           fetch-depth: 0
 
       - name: Setup .NET 8 SDK (needed for net8.0 multi-target)
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
       - name: Setup .NET 10 SDK (primary)
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           # global.json pins 10.0.300; setup-dotnet honors the file when present.
           global-json-file: global.json
@@ -128,7 +128,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -177,12 +177,12 @@ jobs:
           fetch-depth: 0
 
       - name: Setup .NET 8 SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
