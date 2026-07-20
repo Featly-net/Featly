@@ -78,7 +78,7 @@
       migration is the package-id swap plus `using FluentAssertions;` ->
       `using AwesomeAssertions;` across the test projects. See ADR-0021.
     -->
-    <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.5.0" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
