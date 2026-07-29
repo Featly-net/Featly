@@ -40,6 +40,16 @@ internal sealed class SqlServerTestHost : IAsyncDisposable
 
     public Stores.SqlServerConfigStore ConfigStore => new(CreateFactory());
 
+    public Stores.SqlServerUserStore UserStore => new(CreateFactory());
+
+    public Stores.SqlServerRoleStore RoleStore => new(CreateFactory());
+
+    public Stores.SqlServerRoleAssignmentStore RoleAssignmentStore => new(CreateFactory());
+
+    public Stores.SqlServerUserGroupStore UserGroupStore => new(CreateFactory());
+
+    public Stores.SqlServerRoleUpgradeRequestStore RoleUpgradeRequestStore => new(CreateFactory());
+
     public static async Task<SqlServerTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new SqlConnectionStringBuilder
