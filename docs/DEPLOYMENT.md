@@ -30,17 +30,18 @@ scaled independently.
 
 #### Scaling out: one writable replica for now
 
-The server's live-update backbone (`IChangeNotifier`) has three implementations.
-**SQLite, in-memory, and SQL Server are in-process/polling-only**: a mutation
-applied on one replica raises the SSE change notification only for the SDK
-clients connected to *that* replica — running several replicas behind a load
-balancer weakens live updates (replica A doesn't get the SSE nudge for a change
-written through replica B). SQL Server's closest cross-replica primitive
-(Service Broker / `SqlDependency`) was deliberately not used for this — see
-ADR-0032 — so it sits in the same tier as SQLite here despite being a
-concurrent-writer store. None of this breaks correctness: every SDK also polls
-with an ETag (`FeatlyConfigSyncService`), so all clients converge within one
-polling interval regardless; only the "instant" push is per-replica.
+The server's live-update backbone (`IChangeNotifier`) has multiple implementations.
+**SQLite, in-memory, SQL Server, and MySQL are in-process/polling-only**: a
+mutation applied on one replica raises the SSE change notification only for
+the SDK clients connected to *that* replica — running several replicas behind
+a load balancer weakens live updates (replica A doesn't get the SSE nudge for
+a change written through replica B). SQL Server's closest cross-replica
+primitive (Service Broker / `SqlDependency`, ADR-0032) and MySQL's (binlog-based
+change data capture, ADR-0033) were both deliberately not used for this, so
+they sit in the same tier as SQLite here despite being concurrent-writer
+stores. None of this breaks correctness: every SDK also polls with an ETag
+(`FeatlyConfigSyncService`), so all clients converge within one polling
+interval regardless; only the "instant" push is per-replica.
 
 **PostgreSQL is cross-replica**, backed by a persistent `LISTEN`/`NOTIFY`
 connection per replica (ADR-0026, issue #258): a change made through any replica
@@ -58,9 +59,10 @@ with a single conditional `UPDATE` before acting on it
 ([issue #237](https://github.com/Featly-net/Featly/issues/237)), so only one
 instance wins each claim — a scheduled apply cannot race and a delivery is not
 sent twice by two instances. This matters for a concurrent-writer store such as
-the PostgreSQL or SQL Server providers; the bundled SQLite provider serializes
-writers anyway. (Freshness across replicas still depends on the distributed
-notifier above; that is a separate concern from worker correctness.)
+the PostgreSQL, SQL Server, or MySQL providers; the bundled SQLite provider
+serializes writers anyway. (Freshness across replicas still depends on the
+distributed notifier above; that is a separate concern from worker
+correctness.)
 
 ### 3. Consumer (SDK only)
 
@@ -114,6 +116,9 @@ featly db migrate --provider postgres --connection-string "Host=db;Database=feat
 # SQL Server (offline; --connection-string is required, there's no default server):
 featly db status  --provider sqlserver --connection-string "Server=db;Database=featly;User Id=featly;Password=..."
 featly db migrate --provider sqlserver --connection-string "Server=db;Database=featly;User Id=featly;Password=..."
+
+# MySQL has no --provider mysql here — see the "MySQL / MariaDB" section
+# below for why, and how to migrate a MySQL deployment instead.
 
 # Operational tasks against the running server (online, same for every provider):
 featly env lock production    --server-url https://featly.internal --api-key "$FEATLY_API_KEY"
@@ -226,10 +231,56 @@ you run more than one replica" guidance as PostgreSQL applies here too.
 > referencing this provider — there is no per-connection or per-provider way
 > around it, since it is a single build-time switch for the whole process.
 
+### MySQL / MariaDB
+
+`Featly.Storage.MySql` ([ADR-0033](adr/0033-mysql-storage-provider.md)) is the
+provider for self-hosted deployments already standardized on MySQL or MariaDB
+(wire-compatible for the driver's purposes).
+
+```csharp
+builder.Services.AddFeatlyMySqlStore(o =>
+    o.ConnectionString = "Server=db;Database=featly;User=featly;Password=...");
+```
+
+Or bind it from configuration instead:
+
+```json
+{
+  "Featly": {
+    "Storage": {
+      "MySql": {
+        "ConnectionString": "Server=db;Database=featly;User=featly;Password=...",
+        "AutoMigrate": true
+      }
+    }
+  }
+}
+```
+
+There is no default connection string — the host fails at startup with a clear
+message rather than at the first query. The same "turn `AutoMigrate` off when
+you run more than one replica" guidance as PostgreSQL applies here too.
+
+> **No cross-replica push.** Like SQL Server, MySQL's `IChangeNotifier` is
+> polling-only (ADR-0033 — binlog-based change data capture was rejected as
+> disproportionately heavy operational surface for a push-latency-only win).
+> An SSE client connected to replica A still converges on a change made
+> through replica B via the ETag poll, just not instantly; if instant
+> cross-replica push matters, choose PostgreSQL instead.
+
+> **No `featly db --provider mysql` support.** Unlike the other three
+> providers, this one cannot be wired into the `featly` CLI: Pomelo's current
+> release pins `Microsoft.EntityFrameworkCore`/`.Relational` to `<=9.0.999`,
+> which conflicts with the EF Core 10.0.9 the CLI's SQLite/Postgres/SQL Server
+> support already requires in the same executable (ADR-0033). Migrate a MySQL
+> deployment by calling `Featly.Storage.MySql.MySqlMigrationRunner` directly
+> from your own code (or a small standalone script) instead of the CLI, until
+> Pomelo ships an EF Core 10 build.
+
 ### Planned
 
-MySQL/MariaDB, MongoDB, and a Redis cache / change pub-sub provider are
-designed but not built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
+MongoDB and a Redis cache / change pub-sub provider are designed but not
+built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
 
 ## Health checks
 
