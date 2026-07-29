@@ -59,5 +59,6 @@ internal sealed class MongoTestHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _client.DropDatabaseAsync(_databaseName).ConfigureAwait(false);
+        _client.Dispose();
     }
 }

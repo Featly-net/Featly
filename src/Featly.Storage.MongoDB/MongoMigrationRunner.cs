@@ -28,7 +28,7 @@ public static class MongoMigrationRunner
     /// <summary>Applies every pending migration step. No-op when already up to date.</summary>
     public static async Task MigrateAsync(string connectionString, CancellationToken cancellationToken = default)
     {
-        var database = CreateDatabase(connectionString);
+        using var client = CreateClient(connectionString, out var database);
         var migrations = MigrationsCollection(database);
         var applied = await GetAppliedNamesAsync(migrations, cancellationToken).ConfigureAwait(false);
 
@@ -52,7 +52,7 @@ public static class MongoMigrationRunner
     /// <summary>Reads the applied and pending step sets for the target database.</summary>
     public static async Task<MongoMigrationStatus> GetStatusAsync(string connectionString, CancellationToken cancellationToken = default)
     {
-        var database = CreateDatabase(connectionString);
+        using var client = CreateClient(connectionString, out var database);
         var migrations = MigrationsCollection(database);
         var applied = await GetAppliedNamesAsync(migrations, cancellationToken).ConfigureAwait(false);
         var pending = MongoMigrationSteps.All
@@ -72,7 +72,14 @@ public static class MongoMigrationRunner
     private static IMongoCollection<BsonDocument> MigrationsCollection(IMongoDatabase database) =>
         database.GetCollection<BsonDocument>(MongoCollectionNames.Migrations);
 
-    private static IMongoDatabase CreateDatabase(string connectionString)
+    /// <summary>
+    /// Creates a short-lived client for a single runner call. The caller owns
+    /// disposal (<c>using var client = ...</c>) — <see cref="MongoClient"/>
+    /// holds a connection pool that must be torn down explicitly, unlike the
+    /// relational providers' <c>DbContext</c>, which EF Core's own
+    /// <c>await using</c> pattern already handles.
+    /// </summary>
+    private static MongoClient CreateClient(string connectionString, out IMongoDatabase database)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
@@ -87,6 +94,7 @@ public static class MongoMigrationRunner
         }
 
         var client = new MongoClient(mongoUrl);
-        return client.GetDatabase(mongoUrl.DatabaseName);
+        database = client.GetDatabase(mongoUrl.DatabaseName);
+        return client;
     }
 }
