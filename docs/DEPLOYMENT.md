@@ -30,14 +30,17 @@ scaled independently.
 
 #### Scaling out: one writable replica for now
 
-The server's live-update backbone (`IChangeNotifier`) has two implementations.
-**SQLite and in-memory are in-process**: a mutation applied on one replica
-raises the SSE change notification only for the SDK clients connected to *that*
-replica — running several replicas behind a load balancer weakens live updates
-(replica A doesn't get the SSE nudge for a change written through replica B). It
-does **not** break correctness: every SDK also polls with an ETag
-(`FeatlyConfigSyncService`), so all clients converge within one polling
-interval regardless; only the "instant" push is per-replica.
+The server's live-update backbone (`IChangeNotifier`) has three implementations.
+**SQLite, in-memory, and SQL Server are in-process/polling-only**: a mutation
+applied on one replica raises the SSE change notification only for the SDK
+clients connected to *that* replica — running several replicas behind a load
+balancer weakens live updates (replica A doesn't get the SSE nudge for a change
+written through replica B). SQL Server's closest cross-replica primitive
+(Service Broker / `SqlDependency`) was deliberately not used for this — see
+ADR-0032 — so it sits in the same tier as SQLite here despite being a
+concurrent-writer store. None of this breaks correctness: every SDK also polls
+with an ETag (`FeatlyConfigSyncService`), so all clients converge within one
+polling interval regardless; only the "instant" push is per-replica.
 
 **PostgreSQL is cross-replica**, backed by a persistent `LISTEN`/`NOTIFY`
 connection per replica (ADR-0026, issue #258): a change made through any replica
@@ -55,8 +58,9 @@ with a single conditional `UPDATE` before acting on it
 ([issue #237](https://github.com/Featly-net/Featly/issues/237)), so only one
 instance wins each claim — a scheduled apply cannot race and a delivery is not
 sent twice by two instances. This matters for a concurrent-writer store such as
-the PostgreSQL provider; the bundled SQLite provider serializes writers anyway. (Freshness across replicas still depends on the distributed notifier
-above; that is a separate concern from worker correctness.)
+the PostgreSQL or SQL Server providers; the bundled SQLite provider serializes
+writers anyway. (Freshness across replicas still depends on the distributed
+notifier above; that is a separate concern from worker correctness.)
 
 ### 3. Consumer (SDK only)
 
@@ -94,7 +98,7 @@ the hot path; last-known-good config is served if the server is unreachable.
 
 `featly db *` operates directly on the database, offline — no running server
 needed (the server can't start before its schema exists). `--provider` selects
-`sqlite` (default) or `postgres`; each takes its own connection string.
+`sqlite` (default), `postgres`, or `sqlserver`; each takes its own connection string.
 
 ```bash
 dotnet tool install -g Featly.Cli
@@ -107,7 +111,11 @@ featly db migrate       --connection-string "Data Source=/var/lib/featly/featly.
 featly db status  --provider postgres --connection-string "Host=db;Database=featly;Username=featly;Password=..."
 featly db migrate --provider postgres --connection-string "Host=db;Database=featly;Username=featly;Password=..."
 
-# Operational tasks against the running server (online, same for either provider):
+# SQL Server (offline; --connection-string is required, there's no default server):
+featly db status  --provider sqlserver --connection-string "Server=db;Database=featly;User Id=featly;Password=..."
+featly db migrate --provider sqlserver --connection-string "Server=db;Database=featly;User Id=featly;Password=..."
+
+# Operational tasks against the running server (online, same for every provider):
 featly env lock production    --server-url https://featly.internal --api-key "$FEATLY_API_KEY"
 featly export --environment production --output prod-backup.json --server-url https://featly.internal --api-key "$FEATLY_API_KEY"
 ```
@@ -174,10 +182,54 @@ start the replicas with `AutoMigrate: false`.
 > see "Scaling out" above. The background workers are also safe across
 > replicas: they claim rows atomically (#237).
 
+### SQL Server
+
+`Featly.Storage.SqlServer` ([ADR-0032](adr/0032-sqlserver-storage-provider.md))
+is the provider for enterprise self-hosted, multi-node deployments already
+standardized on SQL Server.
+
+```csharp
+builder.Services.AddFeatlySqlServerStore(o =>
+    o.ConnectionString = "Server=db;Database=featly;User Id=featly;Password=...");
+```
+
+Or bind it from configuration instead:
+
+```json
+{
+  "Featly": {
+    "Storage": {
+      "SqlServer": {
+        "ConnectionString": "Server=db;Database=featly;User Id=featly;Password=...",
+        "AutoMigrate": true
+      }
+    }
+  }
+}
+```
+
+There is no default connection string — the host fails at startup with a clear
+message rather than at the first query. The same "turn `AutoMigrate` off when
+you run more than one replica" guidance as PostgreSQL applies here too.
+
+> **No cross-replica push.** Unlike PostgreSQL, SQL Server's `IChangeNotifier`
+> is polling-only (ADR-0032 — the closest primitive, Service Broker /
+> `SqlDependency`, was rejected as disproportionately heavy operational surface
+> for a push-latency-only win). An SSE client connected to replica A still
+> converges on a change made through replica B via the ETag poll, just not
+> instantly; if instant cross-replica push matters, choose PostgreSQL instead.
+
+> **Requires disabling `InvariantGlobalization`.** `Microsoft.Data.SqlClient`
+> needs ICU and throws at connection time under .NET's invariant globalization
+> mode. If your host project sets `<InvariantGlobalization>true</InvariantGlobalization>`
+> (the .NET default for trimmed/smaller deployments), set it to `false` before
+> referencing this provider — there is no per-connection or per-provider way
+> around it, since it is a single build-time switch for the whole process.
+
 ### Planned
 
-SQL Server and a Redis cache / change pub-sub provider are designed but not
-built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
+MySQL/MariaDB, MongoDB, and a Redis cache / change pub-sub provider are
+designed but not built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
 
 ## Health checks
 

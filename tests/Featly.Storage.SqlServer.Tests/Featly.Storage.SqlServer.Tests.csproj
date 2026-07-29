@@ -14,6 +14,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Featly.Storage.SqlServer\Featly.Storage.SqlServer.csproj" />
+    <!-- Only for SqlServerCliDispatchTests: drives the real "featly db" command
+         tree (provider sqlserver) against this project's throwaway database. -->
+    <ProjectReference Include="..\..\src\Featly.Cli\Featly.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

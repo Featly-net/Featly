@@ -12,6 +12,15 @@
     <ToolCommandName>featly</ToolCommandName>
     <PackageId>Featly.Cli</PackageId>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Microsoft.Data.SqlClient (pulled in via Featly.Storage.SqlServer, needed
+         for "featly db" with the sqlserver provider) requires ICU and throws
+         under the repo-wide InvariantGlobalization=true default
+         (Directory.Build.props) — see ADR-0032's "Negative" consequences. This
+         is a whole-tool trade-off: every "featly" install now carries ICU data
+         and a slightly slower cold start, even for sqlite/postgres-only users,
+         because InvariantGlobalization is a single build-time switch for the
+         published tool, not something that can be toggled per invocation. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +28,7 @@
     <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
     <ProjectReference Include="..\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" />
     <ProjectReference Include="..\Featly.Storage.Postgres\Featly.Storage.Postgres.csproj" />
+    <ProjectReference Include="..\Featly.Storage.SqlServer\Featly.Storage.SqlServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
