@@ -149,6 +149,22 @@ magical") rules out.
   real behavioral difference from the other three providers, not just an
   implementation detail — worth revisiting if a deployment ever has an
   unusually large number of groups.
+- **Discovered while wiring the facade PR:** `Featly.Cli` cannot add a
+  `Featly.Storage.MySql` `ProjectReference` alongside its existing
+  SQLite/Postgres/SQL Server ones. All four providers' packages are
+  resolved into one shared `Microsoft.EntityFrameworkCore`/`.Relational`
+  version for the single `featly` executable, and Pomelo 9.0.0's
+  constraint (`<=9.0.999`) is incompatible with the EF Core 10.0.9 the
+  other three providers already require there — confirmed empirically as
+  a real NU1608 restore failure (`dotnet build` on `Featly.Cli.csproj`
+  with the reference added), not assumed. Unlike `Featly.Storage.MySql`
+  itself or its test project (leaf projects with no other consumer to
+  conflict with), `Featly.Cli` sits downstream of every provider at once,
+  so there is no `VersionOverride` that satisfies both constraints
+  simultaneously. **`featly db --provider mysql` is not available** — a
+  MySQL deployment migrates via `Featly.Storage.MySql.MySqlMigrationRunner`
+  directly (referenced from application code, or a small standalone
+  script) instead of the CLI, until Pomelo ships an EF Core 10 build.
 
 ### Neutral
 
@@ -161,11 +177,16 @@ Sliced into PRs mirroring issue #157 (Postgres) / #274 (SQL Server)'s slicing,
 tracked in [issue #276](https://github.com/Featly-net/Featly/issues/276):
 
 1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration. **Shipped.**
-2. Remaining entities (configs, segments, experiments, RBAC, approvals, webhooks, audit, settings).
-3. `MySqlFeatlyStore` facade + `AddFeatlyMySqlStore()` DI.
-4. `Featly.Cli` `db --provider mysql` support + `docs/DEPLOYMENT.md` section.
-5. Test suite mirroring `Featly.Storage.Postgres.Tests`, running against a real
-   MySQL in CI (`mysql-tests` service-container job).
+2. Segment + Config. **Shipped.**
+3. RBAC entities (User, Role, RoleAssignment, UserGroup, RoleUpgradeRequest). **Shipped.**
+4. Approval workflow (PendingChange, ApprovalPolicy) + ApiKey + SystemSettings. **Shipped.**
+5. Final entity batch (Experiment, Event, Assignment, Webhook, WebhookDelivery, Audit) — every entity `IFeatlyStore` needs. **Shipped.**
+6. `MySqlFeatlyStore` facade + `AddFeatlyMySqlStore()` DI. **Shipped.**
+7. `docs/DEPLOYMENT.md` section documenting the provider — **no `Featly.Cli` `db --provider mysql` support**, per the EF Core version conflict in the Negative consequences above.
+
+Test suite mirroring `Featly.Storage.Postgres.Tests` shipped incrementally
+alongside each entity PR, running against a real MySQL in CI (`mysql-tests`
+service-container job) from PR 1 onward — not held for a separate final PR.
 
 No push-based notifier PR — see Decision above.
 

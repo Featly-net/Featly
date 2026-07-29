@@ -797,7 +797,7 @@ EF Core migrations live in `Featly.Storage.Sqlite/Migrations/` and ship compiled
 - **`AutoMigrate = true` (default for embedded).** At application boot, `Featly.Storage.Sqlite` calls `DbContext.Database.MigrateAsync()`. If already at the latest schema, it is a no-op. This is the zero-friction quickstart.
 - **`AutoMigrate = false` (recommended for serious production).** Featly does not touch the schema. A DBA runs `featly db migrate --connection "..."` via the CLI before deploying.
 
-Each relational provider (PostgreSQL, and now SQL Server) has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — none shared with SQLite's or each other's. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz`, SQL Server `datetimeoffset`, vs. SQLite's raw-JSON-text and ticks converters); a shared context would force every provider to carry the others' mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md) and [ADR-0032](adr/0032-sqlserver-storage-provider.md).
+Each relational provider (PostgreSQL, SQL Server, and now MySQL) has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — none shared with SQLite's or each other's. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz`, SQL Server `datetimeoffset`, MySQL `json` and `datetime(6)`, vs. SQLite's raw-JSON-text and ticks converters); a shared context would force every provider to carry the others' mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md), [ADR-0032](adr/0032-sqlserver-storage-provider.md), and [ADR-0033](adr/0033-mysql-storage-provider.md).
 
 ### Provider roadmap
 
@@ -807,7 +807,7 @@ Each relational provider (PostgreSQL, and now SQL Server) has its own `Migration
 | `Featly.Storage.Sqlite` | Single-node self-hosted (embedded pattern) | Shipped |
 | `Featly.Storage.Postgres` | Multi-node with `LISTEN`/`NOTIFY` for cross-replica `IChangeNotifier` | Shipped |
 | `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node (polling-only `IChangeNotifier`, ADR-0032) | Shipped |
-| `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`, ADR-0033) | Planned |
+| `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`, ADR-0033) | Shipped |
 | `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` (ADR-0034, replica-set required) | Planned |
 | `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications | Planned |
 
