@@ -1,0 +1,8 @@
+# EF Core generates the .cs files in this directory. They follow EF's house
+# style (block-scoped namespaces, inline arrays, etc.) which sometimes clashes
+# with the repo-wide ruleset. Marking them as generated turns off the noisy
+# analyzers so we can keep `TreatWarningsAsErrors=true` everywhere else.
+
+[*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
