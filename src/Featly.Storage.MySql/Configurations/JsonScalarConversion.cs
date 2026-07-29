@@ -28,6 +28,17 @@ internal static class JsonScalarConversion
             static text => Parse(text));
     }
 
+    /// <summary>Configures this property as a JSON-column-backed nullable <see cref="JsonElement"/> scalar.</summary>
+    public static void AsJsonColumn(this PropertyBuilder<JsonElement?> property)
+    {
+        ArgumentNullException.ThrowIfNull(property);
+
+        property.HasColumnType("json");
+        property.HasConversion(
+            static value => value.HasValue ? value.Value.GetRawText() : null,
+            static text => text == null ? (JsonElement?)null : Parse(text));
+    }
+
     private static JsonElement Parse(string text)
     {
         if (string.IsNullOrWhiteSpace(text))

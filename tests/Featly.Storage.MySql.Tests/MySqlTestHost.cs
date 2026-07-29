@@ -50,6 +50,14 @@ internal sealed class MySqlTestHost : IAsyncDisposable
 
     public Stores.MySqlRoleUpgradeRequestStore RoleUpgradeRequestStore => new(CreateFactory());
 
+    public Stores.MySqlPendingChangeStore PendingChangeStore => new(CreateFactory());
+
+    public Stores.MySqlApprovalPolicyStore ApprovalPolicyStore => new(CreateFactory());
+
+    public Stores.MySqlApiKeyStore ApiKeyStore => new(CreateFactory());
+
+    public Stores.MySqlSystemSettingsStore SystemSettingsStore => new(CreateFactory());
+
     public static async Task<MySqlTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new MySqlConnectionStringBuilder
