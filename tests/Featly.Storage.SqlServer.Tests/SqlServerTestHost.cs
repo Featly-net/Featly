@@ -50,6 +50,14 @@ internal sealed class SqlServerTestHost : IAsyncDisposable
 
     public Stores.SqlServerRoleUpgradeRequestStore RoleUpgradeRequestStore => new(CreateFactory());
 
+    public Stores.SqlServerPendingChangeStore PendingChangeStore => new(CreateFactory());
+
+    public Stores.SqlServerApprovalPolicyStore ApprovalPolicyStore => new(CreateFactory());
+
+    public Stores.SqlServerApiKeyStore ApiKeyStore => new(CreateFactory());
+
+    public Stores.SqlServerSystemSettingsStore SystemSettingsStore => new(CreateFactory());
+
     public static async Task<SqlServerTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new SqlConnectionStringBuilder
