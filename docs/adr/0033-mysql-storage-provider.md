@@ -123,6 +123,19 @@ magical") rules out.
   access pattern (always load/replace the whole list with the parent row) but
   a materially different mapping mechanism than the other three providers,
   not just a different column-type string.
+- **Discovered during PR 2 implementation:** MySQL's native `json` column
+  type stores an internal optimized representation and always returns a
+  canonical text form on read (e.g. inserting a space after `:`/`,` in
+  objects and arrays) — confirmed empirically via a round-trip test on
+  `Config.DefaultValue` that failed only for the object-shaped `Json`
+  `ConfigType` case, never for scalar values (which have no delimiters to
+  reformat). Every other relational provider here maps `JsonElement`
+  scalars as plain text, so `GetRawText()` byte-for-byte equality holds
+  there; MySQL's tests instead assert structural equality
+  (`JsonElement.DeepEquals`). Not a correctness bug — the same input always
+  canonicalizes to the same output — but a real fidelity difference worth
+  knowing about if a future feature ever needs to preserve a config value's
+  exact original formatting (none does today).
 
 ### Neutral
 
