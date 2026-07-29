@@ -8,7 +8,7 @@
       "applicationUrl": "http://localhost:5086",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Featly__Storage__Postgres__ConnectionString": "Host=localhost;Database=featly;Username=featly;Password=featly",
+        "Featly__Storage__Postgres__ConnectionString": "Host=localhost;Database=featly;Username=featly",
         "Featly__Storage__Postgres__AutoMigrate": "true"
       }
     }
