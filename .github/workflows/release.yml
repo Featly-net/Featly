@@ -64,16 +64,17 @@ jobs:
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
-      # RequiresPostgres/RequiresSqlServer/RequiresMySql tests need a real
-      # database reachable, which this workflow doesn't provision (see
-      # ci.yml's dedicated postgres-tests/sqlserver-tests/mysql-tests jobs for
-      # those); excluding them here mirrors ci.yml's main build job.
+      # RequiresPostgres/RequiresSqlServer/RequiresMySql/RequiresMongoDB tests
+      # need a real database reachable, which this workflow doesn't provision
+      # (see ci.yml's dedicated postgres-tests/sqlserver-tests/mysql-tests/
+      # mongodb-tests jobs for those); excluding them here mirrors ci.yml's
+      # main build job.
       - name: Test
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
           --no-build
-          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer&Category!=RequiresMySql"
+          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer&Category!=RequiresMySql&Category!=RequiresMongoDB"
           --logger "console;verbosity=normal"
 
       - name: Pack
