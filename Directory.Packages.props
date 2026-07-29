@@ -34,6 +34,19 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- SQL Server provider (ADR-0032), same EF Core line as the other providers. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+    <!-- MySQL provider (ADR-0033). Pomelo has not yet released an EF Core 10
+         build at time of writing; 9.0.0 targets EF Core 9 and throws
+         MissingMethodException at runtime if forced onto EF Core 10.0.9
+         (confirmed empirically). Featly.Storage.MySql's own csproj pins its
+         EF Core packages down to 9.0.18 via VersionOverride to match; this
+         provider alone runs one EF Core minor line behind the others until
+         Pomelo ships an EF Core 10 build. -->
+    <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <!-- Matches the version Pomelo.EntityFrameworkCore.MySql 9.0.0 already
+         pulls in transitively, pinned explicitly because the test project's
+         MySqlTestHost opens a raw MySqlConnection for throwaway-database
+         setup/teardown (EF Core has no "create database by name" API). -->
+    <PackageVersion Include="MySqlConnector" Version="2.4.0" />
     <!-- Matches the version Microsoft.EntityFrameworkCore.SqlServer 10.0.9
          already pulls in transitively — pinned explicitly because the test
          project's SqlServerTestHost opens raw SqlConnection/SqlCommand for

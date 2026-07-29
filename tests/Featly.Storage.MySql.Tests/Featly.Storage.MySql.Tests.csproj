@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Storage.MySql.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Featly.Storage.MySql\Featly.Storage.MySql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Matches the EF Core 9.0.18 VersionOverride Featly.Storage.MySql.csproj
+         itself pins to (Pomelo has not released an EF Core 10 build). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" VersionOverride="9.0.18" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" VersionOverride="9.0.18" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+</Project>

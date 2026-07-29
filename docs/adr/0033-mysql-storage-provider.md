@@ -101,6 +101,28 @@ magical") rules out.
   only Postgres has it.
 - A fourth migrations history and a fourth `IEntityTypeConfiguration<T>` set
   per entity to keep in sync feature-for-feature with the other three.
+- **Discovered during PR 1 implementation, not anticipated at Decision time:**
+  `Pomelo.EntityFrameworkCore.MySql` 9.0.0 (the latest available) targets EF
+  Core 9 and throws `MissingMethodException` at runtime if forced onto this
+  repo's EF Core 10.0.9 (confirmed empirically via `dotnet ef migrations add`,
+  not assumed). `Featly.Storage.MySql`'s own `.csproj` pins its EF Core
+  packages down to `9.0.18` via `VersionOverride` — this provider alone runs
+  one EF Core minor line behind the other three until Pomelo ships an EF Core
+  10 build. This is a real, if contained, maintenance cost: a future EF Core
+  10.x security fix does not automatically reach this provider.
+- **Also discovered during PR 1:** Pomelo does not yet implement EF Core's
+  `OwnsMany(...).ToJson()` owned-entity JSON mapping that every other
+  relational provider here uses for `Flag.Variants`/`Rules`/`Tags`/`Prerequisites`
+  (tracked upstream as
+  [PomeloFoundation/Pomelo.EntityFrameworkCore.MySql#1752](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/issues/1752),
+  targeted at Pomelo's own next major version). The fallback,
+  `JsonCollectionConversion` (an internal helper in `Featly.Storage.MySql`),
+  maps each such property as a plain scalar `List<T>` serialized via
+  `System.Text.Json` into a native MySQL `json` column with a
+  `ValueComparer` for change tracking — semantically equivalent for Featly's
+  access pattern (always load/replace the whole list with the parent row) but
+  a materially different mapping mechanism than the other three providers,
+  not just a different column-type string.
 
 ### Neutral
 
@@ -110,9 +132,9 @@ magical") rules out.
 ## Implementation notes
 
 Sliced into PRs mirroring issue #157 (Postgres) / #274 (SQL Server)'s slicing,
-tracked in a new tracking issue:
+tracked in [issue #276](https://github.com/Featly-net/Featly/issues/276):
 
-1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration.
+1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration. **Shipped.**
 2. Remaining entities (configs, segments, experiments, RBAC, approvals, webhooks, audit, settings).
 3. `MySqlFeatlyStore` facade + `AddFeatlyMySqlStore()` DI.
 4. `Featly.Cli` `db --provider mysql` support + `docs/DEPLOYMENT.md` section.

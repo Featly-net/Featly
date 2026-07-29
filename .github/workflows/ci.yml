@@ -78,17 +78,17 @@ jobs:
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
-      # RequiresPostgres/RequiresSqlServer tests need a real database reachable,
-      # which the GitHub-hosted Windows runner can't provide (Actions service
-      # containers are Linux-only) — they run in the dedicated postgres-tests /
-      # sqlserver-tests jobs below instead, against real service containers on
-      # ubuntu-latest.
+      # RequiresPostgres/RequiresSqlServer/RequiresMySql tests need a real
+      # database reachable, which the GitHub-hosted Windows runner can't
+      # provide (Actions service containers are Linux-only) — they run in the
+      # dedicated postgres-tests/sqlserver-tests/mysql-tests jobs below
+      # instead, against real service containers on ubuntu-latest.
       - name: Test
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
           --no-build
-          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer"
+          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer&Category!=RequiresMySql"
           --logger "trx;LogFileName=test-results.trx"
           --logger "console;verbosity=normal"
           --collect:"XPlat Code Coverage"
@@ -227,6 +227,76 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results-sqlserver
+          path: TestResults/**/*
+          if-no-files-found: warn
+          retention-days: 14
+
+  mysql-tests:
+    name: mysql provider tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          # The container lives for this job only and is reachable from
+          # nowhere else, so it takes no root password at all -- same
+          # "throwaway container, no credential literal" precedent as
+          # Postgres's POSTGRES_HOST_AUTH_METHOD: trust.
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: featly
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore tests/Featly.Storage.MySql.Tests/Featly.Storage.MySql.Tests.csproj
+
+      - name: Test
+        env:
+          FEATLY_MYSQL_TEST_HOST: localhost
+          FEATLY_MYSQL_TEST_PORT: "3306"
+          FEATLY_MYSQL_TEST_USER: root
+          # Explicitly empty (not unset): MySqlTestHost falls back to a
+          # non-empty local-dev default when this variable is unset, which
+          # would be wrong for this container -- MYSQL_ALLOW_EMPTY_PASSWORD
+          # above means it only accepts an empty password for root.
+          FEATLY_MYSQL_TEST_PASSWORD: ""
+        run: >
+          dotnet test tests/Featly.Storage.MySql.Tests/Featly.Storage.MySql.Tests.csproj
+          --configuration ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-mysql
           path: TestResults/**/*
           if-no-files-found: warn
           retention-days: 14
