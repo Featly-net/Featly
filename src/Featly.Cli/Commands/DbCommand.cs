@@ -21,7 +21,7 @@ internal static class DbCommand
     {
         var db = new Command(
             "db",
-            "Manage the Featly schema offline (operates directly on the database; --provider selects sqlite or postgres).");
+            "Manage the Featly schema offline (operates directly on the database; --provider selects sqlite, postgres, or sqlserver).");
 
         db.Subcommands.Add(BuildMigrate());
         db.Subcommands.Add(BuildStatus());

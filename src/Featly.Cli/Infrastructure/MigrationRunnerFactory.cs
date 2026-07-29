@@ -1,5 +1,6 @@
 using Featly.Storage.Postgres;
 using Featly.Storage.Sqlite;
+using Featly.Storage.SqlServer;
 
 namespace Featly.Cli.Infrastructure;
 
@@ -35,6 +36,9 @@ internal static class MigrationRunnerFactory
     /// <summary>The <c>--provider</c> value selecting PostgreSQL.</summary>
     public const string Postgres = "postgres";
 
+    /// <summary>The <c>--provider</c> value selecting SQL Server.</summary>
+    public const string SqlServer = "sqlserver";
+
     /// <summary>
     /// The reserved <c>rollback</c> target that reverts every migration. Both
     /// providers' runners mirror the same EF Core sentinel, so this is provider-
@@ -51,7 +55,8 @@ internal static class MigrationRunnerFactory
     {
         Sqlite => new SqliteRunner(SqliteConnectionStringResolver.Resolve(connectionStringOption)),
         Postgres => new PostgresRunner(PostgresConnectionStringResolver.Resolve(connectionStringOption)),
-        _ => throw new InvalidOperationException($"Unknown --provider '{provider}'. Use '{Sqlite}' or '{Postgres}'."),
+        SqlServer => new SqlServerRunner(SqlServerConnectionStringResolver.Resolve(connectionStringOption)),
+        _ => throw new InvalidOperationException($"Unknown --provider '{provider}'. Use '{Sqlite}', '{Postgres}', or '{SqlServer}'."),
     };
 
     private sealed class SqliteRunner(string connectionString) : IMigrationRunner
@@ -84,5 +89,21 @@ internal static class MigrationRunnerFactory
             PostgresMigrationRunner.RollbackAsync(connectionString, targetMigration, ct);
 
         public Task<bool> DropAsync(CancellationToken ct) => PostgresMigrationRunner.DropAsync(connectionString, ct);
+    }
+
+    private sealed class SqlServerRunner(string connectionString) : IMigrationRunner
+    {
+        public async Task<MigrationStatusInfo> GetStatusAsync(CancellationToken ct)
+        {
+            var status = await SqlServerMigrationRunner.GetStatusAsync(connectionString, ct).ConfigureAwait(false);
+            return new MigrationStatusInfo(status.Applied, status.Pending);
+        }
+
+        public Task MigrateAsync(CancellationToken ct) => SqlServerMigrationRunner.MigrateAsync(connectionString, ct);
+
+        public Task RollbackAsync(string targetMigration, CancellationToken ct) =>
+            SqlServerMigrationRunner.RollbackAsync(connectionString, targetMigration, ct);
+
+        public Task<bool> DropAsync(CancellationToken ct) => SqlServerMigrationRunner.DropAsync(connectionString, ct);
     }
 }

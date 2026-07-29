@@ -140,6 +140,7 @@ The [`featly` CLI](#) reads these when an explicit option is not passed:
 |---|---|---|
 | `FEATLY_SQLITE` | `featly db *` (offline, `--provider sqlite`, the default) | `Data Source=featly.db` |
 | `FEATLY_POSTGRES` | `featly db * --provider postgres` (offline) | — (required, no default) |
+| `FEATLY_SQLSERVER` | `featly db * --provider sqlserver` (offline) | — (required, no default) |
 | `FEATLY_SERVER_URL` | `featly apikey` / `env` / `export` / `import` / `bootstrap-admin` | `http://localhost:5080` |
 | `FEATLY_API_KEY` | the online admin commands (not `bootstrap-admin`) | — (required) |
 
