@@ -797,7 +797,7 @@ EF Core migrations live in `Featly.Storage.Sqlite/Migrations/` and ship compiled
 - **`AutoMigrate = true` (default for embedded).** At application boot, `Featly.Storage.Sqlite` calls `DbContext.Database.MigrateAsync()`. If already at the latest schema, it is a no-op. This is the zero-friction quickstart.
 - **`AutoMigrate = false` (recommended for serious production).** Featly does not touch the schema. A DBA runs `featly db migrate --connection "..."` via the CLI before deploying.
 
-The shipped PostgreSQL provider has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — not a shared one with SQLite's, and the same holds if a SQL Server provider follows. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz` vs. SQLite's raw-JSON-text and ticks converters); a shared context would force one provider to carry the other's mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md).
+Each relational provider (PostgreSQL, and now SQL Server) has its own `Migrations/` folder **and its own internal `FeatlyDbContext`** — none shared with SQLite's or each other's. Each provider's entity configurations use provider-native column types (e.g. Postgres `jsonb` and `timestamptz`, SQL Server `datetimeoffset`, vs. SQLite's raw-JSON-text and ticks converters); a shared context would force every provider to carry the others' mapping compromises. See [ADR-0026](adr/0026-postgres-storage-provider.md) and [ADR-0032](adr/0032-sqlserver-storage-provider.md).
 
 ### Provider roadmap
 
@@ -806,7 +806,9 @@ The shipped PostgreSQL provider has its own `Migrations/` folder **and its own i
 | `Featly.Storage.InMemory` | Tests, demos, ephemeral environments | Shipped |
 | `Featly.Storage.Sqlite` | Single-node self-hosted (embedded pattern) | Shipped |
 | `Featly.Storage.Postgres` | Multi-node with `LISTEN`/`NOTIFY` for cross-replica `IChangeNotifier` | Shipped |
-| `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node | Planned |
+| `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node (polling-only `IChangeNotifier`, ADR-0032) | In progress |
+| `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`) | Planned |
+| `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` | Planned |
 | `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications | Planned |
 
 ---
@@ -1371,6 +1373,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-029](docs/adr/0029-webhook-circuit-breaker.md) | Webhook circuit breaker — per-endpoint open/half-open state persisted on the endpoint | Accepted |
 | [ADR-030](docs/adr/0030-audit-hash-chain.md) | Tamper-evident audit log — per-entry SHA-256 hash chain with a verify endpoint | Accepted |
 | [ADR-031](docs/adr/0031-problem-details-error-contract.md) | RFC 7807 ProblemDetails as the uniform API error contract | Accepted |
+| [ADR-032](docs/adr/0032-sqlserver-storage-provider.md) | SQL Server storage provider — own DbContext per provider, polling-only `IChangeNotifier` | Accepted |
 
 ---
 
