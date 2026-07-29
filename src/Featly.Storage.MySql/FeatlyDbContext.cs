@@ -13,13 +13,13 @@ namespace Featly.Storage.MySql;
 /// without compromise. See ADR-0033.
 /// </summary>
 /// <remarks>
-/// PR 3 of the MySQL provider (issue #276) adds the full RBAC surface
-/// (<see cref="User"/>, <see cref="Role"/>, <see cref="RoleAssignment"/>,
-/// <see cref="UserGroup"/>, <see cref="RoleUpgradeRequest"/>) to PR 1/2's
+/// PR 4 of the MySQL provider (issue #276) adds the approval workflow
+/// (<see cref="PendingChange"/>, <see cref="ApprovalPolicy"/>),
+/// <see cref="ApiKey"/>, and <see cref="SystemSetting"/> to PR 1/2/3's
 /// <see cref="Project"/>/<see cref="Environment"/>/<see cref="Flag"/>/
-/// <see cref="Segment"/>/<see cref="Config"/>. The remaining entities, the
-/// <c>MySqlFeatlyStore</c> facade, and <c>AddFeatlyMySqlStore()</c> DI wiring
-/// land in follow-up PRs.
+/// <see cref="Segment"/>/<see cref="Config"/>/RBAC surface. The remaining
+/// entities, the <c>MySqlFeatlyStore</c> facade, and
+/// <c>AddFeatlyMySqlStore()</c> DI wiring land in follow-up PRs.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -44,6 +44,14 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<RoleUpgradeRequest> RoleUpgradeRequests => Set<RoleUpgradeRequest>();
 
+    public DbSet<PendingChange> PendingChanges => Set<PendingChange>();
+
+    public DbSet<ApprovalPolicy> ApprovalPolicies => Set<ApprovalPolicy>();
+
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -59,5 +67,9 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
         modelBuilder.ApplyConfiguration(new UserGroupConfiguration());
         modelBuilder.ApplyConfiguration(new RoleUpgradeRequestConfiguration());
+        modelBuilder.ApplyConfiguration(new PendingChangeConfiguration());
+        modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
+        modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
+        modelBuilder.ApplyConfiguration(new SystemSettingConfiguration());
     }
 }
