@@ -807,8 +807,8 @@ Each relational provider (PostgreSQL, and now SQL Server) has its own `Migration
 | `Featly.Storage.Sqlite` | Single-node self-hosted (embedded pattern) | Shipped |
 | `Featly.Storage.Postgres` | Multi-node with `LISTEN`/`NOTIFY` for cross-replica `IChangeNotifier` | Shipped |
 | `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node (polling-only `IChangeNotifier`, ADR-0032) | In progress |
-| `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`) | Planned |
-| `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` | Planned |
+| `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`, ADR-0033) | Planned |
+| `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` (ADR-0034, replica-set required) | Planned |
 | `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications | Planned |
 
 ---
@@ -1374,6 +1374,8 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-030](docs/adr/0030-audit-hash-chain.md) | Tamper-evident audit log — per-entry SHA-256 hash chain with a verify endpoint | Accepted |
 | [ADR-031](docs/adr/0031-problem-details-error-contract.md) | RFC 7807 ProblemDetails as the uniform API error contract | Accepted |
 | [ADR-032](docs/adr/0032-sqlserver-storage-provider.md) | SQL Server storage provider — own DbContext per provider, polling-only `IChangeNotifier` | Accepted |
+| [ADR-033](docs/adr/0033-mysql-storage-provider.md) | MySQL storage provider — Pomelo EF Core provider, own DbContext, polling-only `IChangeNotifier` | Accepted |
+| [ADR-034](docs/adr/0034-mongodb-storage-provider.md) | MongoDB storage provider — MongoDB.Driver (not EF Core), replica-set requirement, Change Streams `IChangeNotifier` | Accepted |
 
 ---
 
