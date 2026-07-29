@@ -28,11 +28,12 @@ jobs:
     name: SonarCloud
     runs-on: ubuntu-latest
 
-    # The Postgres/SQL Server providers' tests are all
-    # [Trait("Category","RequiresPostgres"/"RequiresSqlServer")]. Without a
-    # database to talk to they were skipped here, so the whole provider
-    # reported as uncovered to SonarCloud even though ci.yml's dedicated jobs
-    # run them against a real server. Same service definitions as those jobs.
+    # The Postgres/SQL Server/MySQL providers' tests are all
+    # [Trait("Category","RequiresPostgres"/"RequiresSqlServer"/"RequiresMySql")].
+    # Without a database to talk to they were skipped here, so the whole
+    # provider reported as uncovered to SonarCloud even though ci.yml's
+    # dedicated jobs run them against a real server. Same service definitions
+    # as those jobs.
     services:
       postgres:
         image: postgres:16-alpine
@@ -62,6 +63,20 @@ jobs:
           - 1433:1433
         options: >-
           --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Featly_Ci_Test_Only_1 -Q 'SELECT 1' -b -o /dev/null"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      mysql:
+        image: mysql:8.0
+        env:
+          # Same "throwaway container, no credential literal" precedent as
+          # Postgres's POSTGRES_HOST_AUTH_METHOD: trust.
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: featly
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot --silent"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -126,8 +141,8 @@ jobs:
         # (AddFeatly*Store()), the migration runner, and the options class too,
         # since those also differ from their sibling provider only in type
         # names and the UseSqlite/UseNpgsql/UseSqlServer call. Without this
-        # exclusion, every new provider (Postgres, SQL Server, and future
-        # MySQL/MongoDB) fails the new-code duplication gate purely from
+        # exclusion, every new provider (Postgres, SQL Server, MySQL, and
+        # future MongoDB) fails the new-code duplication gate purely from
         # restating the same shape against a different DbContext type -- a
         # real trade-off the ADR already examined and accepted, not sloppy
         # copy-paste. Listed per-provider (not a Featly.Storage.* wildcard) so
@@ -143,18 +158,18 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
           /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,samples/**,**/Featly.Engine.Benchmarks/**,**/Featly.Dashboard/wwwroot/**"
-          /d:sonar.cpd.exclusions="src/Featly.Storage.Sqlite/**,src/Featly.Storage.Postgres/**,src/Featly.Storage.SqlServer/**"
+          /d:sonar.cpd.exclusions="src/Featly.Storage.Sqlite/**,src/Featly.Storage.Postgres/**,src/Featly.Storage.SqlServer/**,src/Featly.Storage.MySql/**"
 
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
       # Same test scope as ci.yml's main build job: RequiresPostgres/
-      # RequiresSqlServer tests run in dedicated jobs with real service
-      # containers, which this ubuntu-latest runner doesn't provision here.
-      # Coverlet's VSTest collector emits OpenCover format directly
+      # RequiresSqlServer/RequiresMySql tests run in dedicated jobs with real
+      # service containers, which this ubuntu-latest runner doesn't provision
+      # here. Coverlet's VSTest collector emits OpenCover format directly
       # (Format=opencover) — the scanner needs OpenCover, not the Cobertura
       # format ci.yml's own coverage collection uses for its artifact upload.
-      # Runs the whole suite, Postgres and SQL Server providers included,
+      # Runs the whole suite, Postgres/SQL Server/MySQL providers included,
       # against the service containers above — so coverage reflects every
       # provider rather than reporting them as dead code.
       - name: Test with coverage
@@ -168,6 +183,12 @@ jobs:
           FEATLY_SQLSERVER_TEST_PORT: "1433"
           FEATLY_SQLSERVER_TEST_USER: sa
           FEATLY_SQLSERVER_TEST_PASSWORD: "Featly_Ci_Test_Only_1"
+          FEATLY_MYSQL_TEST_HOST: localhost
+          FEATLY_MYSQL_TEST_PORT: "3306"
+          FEATLY_MYSQL_TEST_USER: root
+          # Explicitly empty (not unset) -- see mysql-tests' equivalent step
+          # in ci.yml for why.
+          FEATLY_MYSQL_TEST_PASSWORD: ""
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}

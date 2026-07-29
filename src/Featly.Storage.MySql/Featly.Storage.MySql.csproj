@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Storage.MySql</RootNamespace>
+    <AssemblyName>Featly.Storage.MySql</AssemblyName>
+    <Description>Featly — MySQL/MariaDB IFeatlyStore implementation via EF Core (Pomelo). DbContext is internal to this assembly; consumers depend only on IFeatlyStore.</Description>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Featly.Abstractions\Featly.Abstractions.csproj" />
+    <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared, provider-agnostic EF Core helpers (compiled into each relational
+         provider; ADR-0026/0032/0033 keep the DbContext per provider). -->
+    <Compile Include="..\Shared\Storage\EfEnvironmentStore.cs" Link="Stores\Shared\EfEnvironmentStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Pinned to EF Core 9.0.18 (VersionOverride), not the repo-wide 10.0.9,
+         because Pomelo.EntityFrameworkCore.MySql 9.0.0 throws
+         MissingMethodException at runtime against EF Core 10.0.9's
+         Microsoft.EntityFrameworkCore.Abstractions (an internal resource
+         string method it calls was removed/renamed), confirmed empirically
+         via `dotnet ef migrations add`, not assumed. See ADR-0033. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" VersionOverride="9.0.18" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" VersionOverride="9.0.18" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" VersionOverride="9.0.18" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>
