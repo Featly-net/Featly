@@ -13,13 +13,13 @@ namespace Featly.Storage.MySql;
 /// without compromise. See ADR-0033.
 /// </summary>
 /// <remarks>
-/// PR 4 of the MySQL provider (issue #276) adds the approval workflow
-/// (<see cref="PendingChange"/>, <see cref="ApprovalPolicy"/>),
-/// <see cref="ApiKey"/>, and <see cref="SystemSetting"/> to PR 1/2/3's
-/// <see cref="Project"/>/<see cref="Environment"/>/<see cref="Flag"/>/
-/// <see cref="Segment"/>/<see cref="Config"/>/RBAC surface. The remaining
-/// entities, the <c>MySqlFeatlyStore</c> facade, and
-/// <c>AddFeatlyMySqlStore()</c> DI wiring land in follow-up PRs.
+/// PR 5 of the MySQL provider (issue #276) — the final entity batch —
+/// adds <see cref="Experiment"/>, <see cref="Event"/>,
+/// <see cref="Assignment"/>, <see cref="WebhookEndpoint"/>,
+/// <see cref="WebhookDelivery"/>, and <see cref="AuditEntry"/>. Every
+/// entity <see cref="IFeatlyStore"/> needs is now mapped. The
+/// <c>MySqlFeatlyStore</c> facade and <c>AddFeatlyMySqlStore()</c> DI
+/// wiring land in a dedicated follow-up PR.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -52,6 +52,18 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
+    public DbSet<Experiment> Experiments => Set<Experiment>();
+
+    public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+
+    public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
+
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -71,5 +83,11 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
         modelBuilder.ApplyConfiguration(new SystemSettingConfiguration());
+        modelBuilder.ApplyConfiguration(new ExperimentConfiguration());
+        modelBuilder.ApplyConfiguration(new EventConfiguration());
+        modelBuilder.ApplyConfiguration(new AssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookEndpointConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookDeliveryConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
     }
 }

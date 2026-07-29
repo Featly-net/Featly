@@ -58,6 +58,18 @@ internal sealed class MySqlTestHost : IAsyncDisposable
 
     public Stores.MySqlSystemSettingsStore SystemSettingsStore => new(CreateFactory());
 
+    public Stores.MySqlExperimentStore ExperimentStore => new(CreateFactory());
+
+    public Stores.MySqlEventStore EventStore => new(CreateFactory());
+
+    public Stores.MySqlAssignmentStore AssignmentStore => new(CreateFactory());
+
+    public Stores.MySqlWebhookStore WebhookStore => new(CreateFactory());
+
+    public Stores.MySqlWebhookDeliveryStore WebhookDeliveryStore => new(CreateFactory());
+
+    public Stores.MySqlAuditStore AuditStore => new(CreateFactory());
+
     public static async Task<MySqlTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new MySqlConnectionStringBuilder
