@@ -1,0 +1,105 @@
+# Run TWO centralized Featly server replicas behind nginx, sharing one Postgres
+# database — the deployment shape ADR-0026's LISTEN/NOTIFY notifier exists for
+# (see docs/DEPLOYMENT.md's "Scaling out" note). Unlike Centralized.Sample
+# (SQLite, single writable replica), a change made through either replica is
+# pushed to every replica's SSE clients, not just the one that made it.
+#
+# From this directory:
+#
+#   docker compose up --build
+#
+# Then open the dashboard at http://localhost:5086/featly and the health probe
+# at http://localhost:5086/health/live — nginx round-robins across featly-a and
+# featly-b. Data persists in the named Postgres volume across `docker compose
+# down` / `up` (use `down -v` to wipe it).
+#
+# The build context is the repository root (two levels up) because the sample
+# references projects under src/.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: featly-postgres
+    environment:
+      POSTGRES_USER: featly
+      POSTGRES_PASSWORD: "${FEATLY_DB_PASSWORD:-featly}"
+      POSTGRES_DB: featly
+    volumes:
+      - featly-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U featly -d featly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot schema apply, run once before any replica starts — per
+  # docs/DEPLOYMENT.md's "Turn AutoMigrate off when you run more than one
+  # replica" guidance. Both featly-a and featly-b run with AutoMigrate=false.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: samples/Centralized.Postgres.Sample/Dockerfile
+    image: featly-centralized-postgres:latest
+    container_name: featly-postgres-migrate
+    entrypoint: ["dotnet", "cli/featly.dll"]
+    command:
+      - db
+      - migrate
+      - --provider
+      - postgres
+      - --connection-string
+      - "Host=postgres;Database=featly;Username=featly;Password=${FEATLY_DB_PASSWORD:-featly}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  featly-a:
+    image: featly-centralized-postgres:latest
+    container_name: featly-a
+    ports:
+      - "5087:8080"
+    environment:
+      REPLICA_NAME: "featly-a"
+      Featly__Storage__Postgres__ConnectionString: "Host=postgres;Database=featly;Username=featly;Password=${FEATLY_DB_PASSWORD:-featly}"
+      Featly__Storage__Postgres__AutoMigrate: "false"
+      Featly__Authorization__BootstrapAdminIdentifier: "${FEATLY_BOOTSTRAP_ADMIN:-admin@example.com}"
+      Featly__Server__AdminApiKey: "${FEATLY_ADMIN_API_KEY:-dev-admin-replace-me}"
+      Featly__Server__SdkApiKey: "${FEATLY_SDK_API_KEY:-dev-sdk-replace-me}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  featly-b:
+    image: featly-centralized-postgres:latest
+    container_name: featly-b
+    ports:
+      - "5088:8080"
+    environment:
+      REPLICA_NAME: "featly-b"
+      Featly__Storage__Postgres__ConnectionString: "Host=postgres;Database=featly;Username=featly;Password=${FEATLY_DB_PASSWORD:-featly}"
+      Featly__Storage__Postgres__AutoMigrate: "false"
+      Featly__Authorization__BootstrapAdminIdentifier: "${FEATLY_BOOTSTRAP_ADMIN:-admin@example.com}"
+      Featly__Server__AdminApiKey: "${FEATLY_ADMIN_API_KEY:-dev-admin-replace-me}"
+      Featly__Server__SdkApiKey: "${FEATLY_SDK_API_KEY:-dev-sdk-replace-me}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  lb:
+    image: nginx:1.27-alpine
+    container_name: featly-lb
+    ports:
+      - "5086:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - featly-a
+      - featly-b
+    restart: unless-stopped
+
+volumes:
+  featly-postgres-data:

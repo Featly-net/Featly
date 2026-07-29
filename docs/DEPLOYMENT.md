@@ -23,7 +23,10 @@ scaled independently.
 
 - Server process packages: `Featly.Server` + `Featly.Dashboard` + a storage provider (no SDK).
 - Consumer process packages: `Featly.Sdk` only, with `UseServer("https://featly.internal", "<sdk key>")`.
-- Samples: **`samples/Centralized.Sample`** (the server) + **`samples/WebApi.Sample`** (a consumer).
+- Samples: **`samples/Centralized.Sample`** (single SQLite-backed replica) +
+  **`samples/Centralized.Postgres.Sample`** (two Postgres-backed replicas
+  behind an nginx load balancer, demonstrating the cross-replica push described
+  below) + **`samples/WebApi.Sample`** (a consumer).
 
 #### Scaling out: one writable replica for now
 
@@ -219,3 +222,30 @@ need):
 ```bash
 docker build -f samples/Centralized.Sample/Dockerfile -t featly-centralized .
 ```
+
+## Run a multi-replica Postgres deployment with Docker
+
+`samples/Centralized.Postgres.Sample` demonstrates the "Scaling out" section
+above end to end: two server replicas, one Postgres database, and an nginx
+load balancer round-robining between them. From `samples/Centralized.Postgres.Sample/`:
+
+```bash
+docker compose up --build
+```
+
+This starts Postgres, applies the schema once via a one-shot `migrate` service
+(`featly db migrate --provider postgres`, per the "AutoMigrate off with several
+replicas" guidance above), then starts both replicas with `AutoMigrate=false`
+and nginx in front of them:
+
+- Dashboard (via the load balancer): `http://localhost:5086/featly`
+- Replica A directly: `http://localhost:5087`
+- Replica B directly: `http://localhost:5088`
+
+Open the dashboard in two tabs, flip a flag, and watch the change land in both —
+nginx may have routed the two tabs to different replicas, and the update still
+reaches both via the Postgres `LISTEN`/`NOTIFY` notifier (ADR-0026, issue #258),
+not just the replica that handled the write. As with the SQLite sample,
+configuration (bootstrap admin, API keys, DB password) is supplied via
+environment variables — override the `.env` placeholders before exposing this
+anywhere real.

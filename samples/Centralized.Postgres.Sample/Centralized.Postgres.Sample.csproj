@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Samples.CentralizedPostgres</RootNamespace>
+    <AssemblyName>Featly.Samples.CentralizedPostgres</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>featly-sample-centralized-postgres</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same centralized deployment pattern as Centralized.Sample, but backed by
+         Featly.Storage.Postgres so the docker-compose file can run several
+         replicas sharing one database — the shape ADR-0026's LISTEN/NOTIFY
+         notifier exists for. No SDK here — application processes (e.g.
+         WebApi.Sample) point their SDK at these replicas over HTTP. -->
+    <ProjectReference Include="..\..\src\Featly.Server\Featly.Server.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Dashboard\Featly.Dashboard.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Storage.Postgres\Featly.Storage.Postgres.csproj" />
+  </ItemGroup>
+
+</Project>
