@@ -76,8 +76,9 @@ Designed in `ARCHITECTURE.md`, explicitly out of scope until after `v0.1.0`:
   #157), facade/DI/CLI/`LISTEN`/`NOTIFY` notifier (issue #179), see
   [ADR-0026](adr/0026-postgres-storage-provider.md).
 - `Featly.Storage.SqlServer` provider — **in progress**, see
-  [ADR-0032](adr/0032-sqlserver-storage-provider.md).
-- `Featly.Storage.MySql` and `Featly.Storage.MongoDB` providers
+  [ADR-0032](adr/0032-sqlserver-storage-provider.md) and issue #274.
+- `Featly.Storage.MySql` provider, see [ADR-0033](adr/0033-mysql-storage-provider.md).
+- `Featly.Storage.MongoDB` provider, see [ADR-0034](adr/0034-mongodb-storage-provider.md).
 - `Featly.Storage.Redis` (cache + change pub/sub)
 - ~~Statistical significance for experiments (Welch's t-test, chi-square,
   sequential analysis)~~ **Shipped post-preview.2:** a two-proportion z-test
