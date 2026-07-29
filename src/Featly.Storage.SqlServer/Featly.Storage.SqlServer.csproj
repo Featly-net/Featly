@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Storage.SqlServer</RootNamespace>
+    <AssemblyName>Featly.Storage.SqlServer</AssemblyName>
+    <Description>Featly — SQL Server IFeatlyStore implementation via EF Core. DbContext is internal to this assembly; consumers depend only on IFeatlyStore.</Description>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Microsoft.Data.SqlClient requires ICU and throws
+         "Globalization Invariant Mode is not supported" under the repo-wide
+         InvariantGlobalization=true default (Directory.Build.props) — see
+         ADR-0032's "Negative" consequences. This override only affects builds
+         where this project is itself the runtime host (its own tests, and
+         `dotnet ef` tooling); a consuming app (Featly.Cli, a server host) must
+         set the same override itself, since InvariantGlobalization is a
+         final-executable runtimeconfig switch that does not flow transitively
+         through a ProjectReference. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Featly.Abstractions\Featly.Abstractions.csproj" />
+    <ProjectReference Include="..\Featly.Storage.Abstractions\Featly.Storage.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared, provider-agnostic EF Core helpers (compiled into each relational
+         provider; ADR-0026/ADR-0032 keep the DbContext per provider). -->
+    <Compile Include="..\Shared\Storage\EfEnvironmentStore.cs" Link="Stores\Shared\EfEnvironmentStore.cs" />
+    <Compile Include="..\Shared\Storage\EfFeatlyStore.cs" Link="Stores\Shared\EfFeatlyStore.cs" />
+    <Compile Include="..\Shared\Storage\EfMigrationRunner.cs" Link="Stores\Shared\EfMigrationRunner.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <!-- Design is a build-time-only dependency so `dotnet ef migrations`
+         works inside this project. PrivateAssets stops it from leaking to
+         consumers of the NuGet package. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>

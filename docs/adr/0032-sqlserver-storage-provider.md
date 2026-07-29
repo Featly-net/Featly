@@ -107,8 +107,10 @@ Rejected for the same reason ADR-0026 rejected it: consistency with ADR-0006.
 - `services.AddFeatlySqlServerStore(...)` is a drop-in replacement for
   `AddFeatlySqliteStore(...)`/`AddFeatlyPostgresStore(...)` — same `IFeatlyStore`
   contract, no application-code changes (ARCHITECTURE.md principle 4).
-- No new operational surface (Service Broker, queue objects) for operators to
-  provision, understand, or debug — the provider is as "boring" to run as SQLite.
+- No new *notifier* operational surface (Service Broker, queue objects) for
+  operators to provision, understand, or debug — pub/sub-wise the provider is
+  as "boring" to run as SQLite (see Negative below for a different, real
+  operational cost this provider does add).
 - Each provider's migrations, `DbContext`, and configurations continue to
   evolve independently, as established by ADR-0026.
 
@@ -120,6 +122,21 @@ Rejected for the same reason ADR-0026 rejected it: consistency with ADR-0006.
   operators who need instant push must choose Postgres.
 - A third migrations history and a third `IEntityTypeConfiguration<T>` set per
   entity to keep in sync feature-for-feature with the other two providers.
+- **Discovered during PR 1 implementation, not anticipated at Decision time:**
+  `Microsoft.Data.SqlClient` requires ICU and throws
+  `NotSupportedException: Globalization Invariant Mode is not supported` when
+  opening a connection under the repo-wide `InvariantGlobalization=true`
+  default (`Directory.Build.props`) — Postgres's Npgsql driver has no such
+  requirement, so this is genuinely new to this provider, not something
+  ADR-0026 already had to account for. `Featly.Storage.SqlServer.csproj` and
+  its test project override the setting back to `false`, but this is a
+  library-level override only; any consuming host (`Featly.Cli`, a server
+  deployment referencing this provider) must set the same override itself,
+  since `InvariantGlobalization` is a final-executable `runtimeconfig.json`
+  switch that does not flow transitively through a `ProjectReference`. In
+  practice this means choosing SQL Server costs a larger deployment (ICU data)
+  compared to Postgres/SQLite, which work fine invariant. Tracked for PR 4
+  (CLI + docs) to document prominently in `docs/DEPLOYMENT.md`.
 
 ### Neutral
 
@@ -129,10 +146,10 @@ Rejected for the same reason ADR-0026 rejected it: consistency with ADR-0006.
 
 ## Implementation notes
 
-Sliced into PRs mirroring issue #157/#179's Postgres slicing, tracked in a new
-tracking issue:
+Sliced into PRs mirroring issue #157/#179's Postgres slicing, tracked in
+[issue #274](https://github.com/Featly-net/Featly/issues/274):
 
-1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration.
+1. Project scaffold + core entities (`Project`, `Environment`, `Flag`) + initial migration. **Shipped.**
 2. Remaining entities (configs, segments, experiments, RBAC, approvals, webhooks, audit, settings).
 3. `SqlServerFeatlyStore` facade + `AddFeatlySqlServerStore()` DI.
 4. `Featly.Cli` `db --provider sqlserver` support + `docs/DEPLOYMENT.md` section.
