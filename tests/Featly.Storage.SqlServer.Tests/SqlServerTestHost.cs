@@ -113,6 +113,20 @@ internal sealed class SqlServerTestHost : IAsyncDisposable
     {
         await using var admin = new SqlConnection(_adminConnectionString);
         await admin.OpenAsync().ConfigureAwait(false);
+
+        // Some tests (e.g. the CLI "drop" command, SqlServerMigrationRunnerTests)
+        // drop the database themselves before disposal runs — skip the
+        // single-user/drop dance entirely rather than let ALTER DATABASE fail
+        // against a database that no longer exists.
+        await using (var exists = new SqlCommand("SELECT 1 FROM sys.databases WHERE name = @name", admin))
+        {
+            exists.Parameters.AddWithValue("name", _databaseName);
+            if (await exists.ExecuteScalarAsync().ConfigureAwait(false) is null)
+            {
+                return;
+            }
+        }
+
         // Force the test database into single-user mode with rollback to kill
         // any lingering pooled connections from the DbContext factory, then
         // drop it — SQL Server refuses DROP DATABASE while sessions are open.
