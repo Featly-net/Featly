@@ -116,6 +116,17 @@ jobs:
         # the secret's value into the runner's script text before it ever
         # executes (flagged by SonarCloud's own githubactions:S7636 rule).
         # Reading it from the process environment at runtime avoids that.
+        #
+        # sonar.cpd.exclusions: each relational storage provider's
+        # Configurations/ and Stores/ files are near-byte-identical across
+        # providers by design (ADR-0026's "own DbContext per provider" decision
+        # explicitly accepts this duplication as the cost of provider-native
+        # column types, rather than a shared context that would branch on
+        # Database.ProviderName). Without this exclusion, every new provider
+        # (Postgres, SQL Server, and future MySQL/MongoDB) fails the new-code
+        # duplication gate purely from restating the same store bodies against
+        # a different DbContext type -- a real trade-off the ADR already
+        # examined and accepted, not sloppy copy-paste.
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
@@ -127,6 +138,7 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
           /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,samples/**,**/Featly.Engine.Benchmarks/**,**/Featly.Dashboard/wwwroot/**"
+          /d:sonar.cpd.exclusions="src/Featly.Storage.*/Configurations/**,src/Featly.Storage.*/Stores/**"
 
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
