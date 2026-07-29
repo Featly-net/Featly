@@ -63,6 +63,10 @@
     <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
+  <ItemGroup Label="Storage — MongoDB (ADR-0034, not EF Core, net10.0)">
+    <PackageVersion Include="MongoDB.Driver" Version="3.10.0" />
+  </ItemGroup>
+
   <ItemGroup Label="OpenFeature provider">
     <PackageVersion Include="OpenFeature" Version="2.14.0" />
   </ItemGroup>

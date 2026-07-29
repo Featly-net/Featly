@@ -142,11 +142,11 @@ settling for polling anyway.
 
 ## Implementation notes
 
-Sliced into PRs, tracked in a new tracking issue:
+Sliced into PRs, tracked in [issue #277](https://github.com/Featly-net/Featly/issues/277):
 
 1. Project scaffold + `BsonClassMap` registration pattern + core entities
    (`Project`, `Environment`, `Flag`) + `MongoMigrationRunner` skeleton with
-   the first index-creation step.
+   the first index-creation step. **Shipped.**
 2. Remaining entities' class maps and stores (configs, segments, experiments,
    RBAC, approvals, webhooks, audit, settings), transactional writes for the
    approval/pending-change and audit hash-chain paths.
@@ -159,6 +159,18 @@ Sliced into PRs, tracked in a new tracking issue:
    `rs.initiate()`.
 6. Test suite mirroring `Featly.Storage.Postgres.Tests`, running against a
    real single-node Mongo replica set in CI.
+
+**Discovered during PR 1 implementation:** GitHub Actions' `services:` block
+has no `command:` key to pass extra CLI args to a service container — every
+other provider's service entry only needed environment variables and a health
+check, which `services:` supports directly, but this provider needs
+`mongod --replSet rs0` specifically. Confirmed by checking the documented
+service-container schema (image/credentials/env/ports/volumes/options only),
+not assumed. Worked around by starting and initiating MongoDB as a plain
+`docker run` + `docker exec ... rs.initiate(...)` job step instead of a
+`services:` entry, in both `ci.yml`'s `mongodb-tests` job and
+`sonarcloud.yml`'s coverage job — the only provider whose CI wiring deviates
+from the `services:` pattern the other four use.
 
 ## References
 

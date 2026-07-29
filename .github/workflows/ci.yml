@@ -78,17 +78,18 @@ jobs:
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
 
-      # RequiresPostgres/RequiresSqlServer/RequiresMySql tests need a real
-      # database reachable, which the GitHub-hosted Windows runner can't
-      # provide (Actions service containers are Linux-only) — they run in the
-      # dedicated postgres-tests/sqlserver-tests/mysql-tests jobs below
-      # instead, against real service containers on ubuntu-latest.
+      # RequiresPostgres/RequiresSqlServer/RequiresMySql/RequiresMongoDB tests
+      # need a real database reachable, which the GitHub-hosted Windows runner
+      # can't provide (Actions service containers are Linux-only) — they run
+      # in the dedicated postgres-tests/sqlserver-tests/mysql-tests/
+      # mongodb-tests jobs below instead, against real service containers on
+      # ubuntu-latest.
       - name: Test
         run: >
           dotnet test Featly.sln
           --configuration ${{ env.CONFIGURATION }}
           --no-build
-          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer&Category!=RequiresMySql"
+          --filter "Category!=RequiresPostgres&Category!=RequiresSqlServer&Category!=RequiresMySql&Category!=RequiresMongoDB"
           --logger "trx;LogFileName=test-results.trx"
           --logger "console;verbosity=normal"
           --collect:"XPlat Code Coverage"
@@ -300,6 +301,80 @@ jobs:
           path: TestResults/**/*
           if-no-files-found: warn
           retention-days: 14
+
+  mongodb-tests:
+    name: mongodb provider tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # This provider requires a replica set (ADR-0034), which needs
+      # `mongod --replSet rs0` — GitHub Actions' `services:` block has no
+      # `command:` key to express that (every other provider's service entry
+      # only needs env vars/health checks, which `services:` does support).
+      # Run and initiate it as a plain `docker run` job step instead of a
+      # service container.
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name featly-mongo -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+          for _ in $(seq 1 30); do
+            docker exec featly-mongo mongosh --quiet --eval "db.runCommand('ping')" >/dev/null 2>&1 && break
+            sleep 2
+          done
+          docker exec featly-mongo mongosh --quiet --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]})"
+          for _ in $(seq 1 30); do
+            state=$(docker exec featly-mongo mongosh --quiet --eval "rs.status().myState" 2>/dev/null || echo "")
+            if [ "$state" = "1" ]; then
+              echo "Replica set primary elected."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::MongoDB replica set never elected a primary." >&2
+          exit 1
+
+      - name: Restore
+        run: dotnet restore tests/Featly.Storage.MongoDB.Tests/Featly.Storage.MongoDB.Tests.csproj
+
+      - name: Test
+        env:
+          FEATLY_MONGODB_TEST_CONNECTION_STRING: "mongodb://localhost:27017/?replicaSet=rs0"
+        run: >
+          dotnet test tests/Featly.Storage.MongoDB.Tests/Featly.Storage.MongoDB.Tests.csproj
+          --configuration ${{ env.CONFIGURATION }}
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-mongodb
+          path: TestResults/**/*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop MongoDB
+        if: always()
+        run: docker rm -f featly-mongo || true
 
   pack:
     name: pack (preview)
