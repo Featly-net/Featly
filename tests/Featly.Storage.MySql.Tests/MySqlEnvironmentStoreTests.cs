@@ -56,10 +56,16 @@ public class MySqlEnvironmentStoreTests
         await using var host = await MySqlTestHost.CreateAsync(TestContext.Current.CancellationToken);
         var ct = TestContext.Current.CancellationToken;
         var store = host.EnvironmentStore;
+        var projectA = Guid.NewGuid();
+        var projectB = Guid.NewGuid();
 
-        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = Guid.NewGuid(), Key = "dev", Name = "Dev A", CreatedAt = DateTimeOffset.UtcNow }, ct);
-        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = Guid.NewGuid(), Key = "dev", Name = "Dev B", CreatedAt = DateTimeOffset.UtcNow }, ct);
-        // No exception -> the (ProjectId, Key) unique index scopes correctly.
+        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = projectA, Key = "dev", Name = "Dev A", CreatedAt = DateTimeOffset.UtcNow }, ct);
+        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = projectB, Key = "dev", Name = "Dev B", CreatedAt = DateTimeOffset.UtcNow }, ct);
+
+        // The (ProjectId, Key) unique index scopes correctly: both rows exist,
+        // one per project, under the same key.
+        (await store.GetByKeyAsync(projectA, "dev", ct))!.Name.Should().Be("Dev A");
+        (await store.GetByKeyAsync(projectB, "dev", ct))!.Name.Should().Be("Dev B");
     }
 
     [Fact]
