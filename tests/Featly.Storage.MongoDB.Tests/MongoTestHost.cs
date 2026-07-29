@@ -5,7 +5,7 @@ namespace Featly.Storage.MongoDB.Tests;
 /// <summary>
 /// Spins up a throwaway MongoDB database (unique name per test) against a
 /// shared replica-set instance, applies the migration steps, and exposes the
-/// three PR-1 stores directly (there is no public facade yet). Disposing
+/// stores shipped so far directly (there is no public facade yet). Disposing
 /// drops the database.
 /// </summary>
 /// <remarks>
@@ -41,6 +41,10 @@ internal sealed class MongoTestHost : IAsyncDisposable
     public Stores.MongoEnvironmentStore EnvironmentStore => new(Database);
 
     public Stores.MongoFlagStore FlagStore => new(Database);
+
+    public Stores.MongoSegmentStore SegmentStore => new(Database);
+
+    public Stores.MongoConfigStore ConfigStore => new(Database);
 
     public static async Task<MongoTestHost> CreateAsync(CancellationToken ct = default)
     {

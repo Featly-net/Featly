@@ -10,5 +10,6 @@ internal static class MongoMigrationSteps
     public static IReadOnlyList<IMongoMigrationStep> All { get; } =
     [
         new InitialIndexesStep(),
+        new SegmentConfigIndexesStep(),
     ];
 }

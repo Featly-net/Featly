@@ -144,21 +144,30 @@ settling for polling anyway.
 
 Sliced into PRs, tracked in [issue #277](https://github.com/Featly-net/Featly/issues/277):
 
+Sliced the same way as [ADR-0033](0033-mysql-storage-provider.md)'s MySQL
+provider, once the scope of "remaining entities" turned out too large for one
+PR:
+
 1. Project scaffold + `BsonClassMap` registration pattern + core entities
    (`Project`, `Environment`, `Flag`) + `MongoMigrationRunner` skeleton with
    the first index-creation step. **Shipped.**
-2. Remaining entities' class maps and stores (configs, segments, experiments,
-   RBAC, approvals, webhooks, audit, settings), transactional writes for the
-   approval/pending-change and audit hash-chain paths.
-3. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI.
-4. Change-Streams-backed `IChangeNotifier` + hosted listener service (shape
+2. `Segment` + `Config` class maps and stores. **Shipped.**
+3. RBAC entities (`User`, `UserGroup`, `Role`, `RoleAssignment`,
+   `RoleUpgradeRequest`).
+4. Approval workflow (`PendingChange`, `ApprovalPolicy`) + `ApiKey` +
+   `SystemSettings` — first use of `MongoDB.Driver`'s session/transaction API
+   (`IClientSessionHandle`), since the approval and audit hash-chain paths
+   need real multi-document atomicity.
+5. Final entity batch (`Experiment`, `Event`, `Assignment`, `Webhook`,
+   `WebhookDelivery`, `AuditEntry`).
+6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI.
+7. Change-Streams-backed `IChangeNotifier` + hosted listener service (shape
    mirrors `PostgresChangeListenerHostedService`, watching collections instead
    of a channel).
-5. `Featly.Cli` `db --provider mongodb` support + `docs/DEPLOYMENT.md` section
+8. `Featly.Cli` `db --provider mongodb` support + `docs/DEPLOYMENT.md` section
    (including the replica-set prerequisite) + docker-compose sample with
    `rs.initiate()`.
-6. Test suite mirroring `Featly.Storage.Postgres.Tests`, running against a
-   real single-node Mongo replica set in CI.
+9. Any remaining coverage/parity gaps against `Featly.Storage.Postgres.Tests`.
 
 **Discovered during PR 1 implementation:** GitHub Actions' `services:` block
 has no `command:` key to pass extra CLI args to a service container — every
