@@ -117,16 +117,21 @@ jobs:
         # executes (flagged by SonarCloud's own githubactions:S7636 rule).
         # Reading it from the process environment at runtime avoids that.
         #
-        # sonar.cpd.exclusions: each relational storage provider's
-        # Configurations/ and Stores/ files are near-byte-identical across
-        # providers by design (ADR-0026's "own DbContext per provider" decision
-        # explicitly accepts this duplication as the cost of provider-native
-        # column types, rather than a shared context that would branch on
-        # Database.ProviderName). Without this exclusion, every new provider
-        # (Postgres, SQL Server, and future MySQL/MongoDB) fails the new-code
-        # duplication gate purely from restating the same store bodies against
-        # a different DbContext type -- a real trade-off the ADR already
-        # examined and accepted, not sloppy copy-paste.
+        # sonar.cpd.exclusions: every relational storage provider's source is
+        # near-byte-identical across providers by design (ADR-0026's "own
+        # DbContext per provider" decision explicitly accepts this duplication
+        # as the cost of provider-native column types, rather than a shared
+        # context that would branch on Database.ProviderName) -- not just the
+        # per-entity Configurations/Stores, but the DI extension
+        # (AddFeatly*Store()), the migration runner, and the options class too,
+        # since those also differ from their sibling provider only in type
+        # names and the UseSqlite/UseNpgsql/UseSqlServer call. Without this
+        # exclusion, every new provider (Postgres, SQL Server, and future
+        # MySQL/MongoDB) fails the new-code duplication gate purely from
+        # restating the same shape against a different DbContext type -- a
+        # real trade-off the ADR already examined and accepted, not sloppy
+        # copy-paste. Listed per-provider (not a Featly.Storage.* wildcard) so
+        # Featly.Storage.Abstractions/InMemory keep full duplication scrutiny.
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
@@ -138,7 +143,7 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
           /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,samples/**,**/Featly.Engine.Benchmarks/**,**/Featly.Dashboard/wwwroot/**"
-          /d:sonar.cpd.exclusions="src/Featly.Storage.*/Configurations/**,src/Featly.Storage.*/Stores/**"
+          /d:sonar.cpd.exclusions="src/Featly.Storage.Sqlite/**,src/Featly.Storage.Postgres/**,src/Featly.Storage.SqlServer/**"
 
       - name: Build
         run: dotnet build Featly.sln --configuration ${{ env.CONFIGURATION }} --no-restore
