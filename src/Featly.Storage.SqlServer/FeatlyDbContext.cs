@@ -29,6 +29,10 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Flag> Flags => Set<Flag>();
 
+    public DbSet<Segment> Segments => Set<Segment>();
+
+    public DbSet<Config> Configs => Set<Config>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -37,5 +41,7 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
         modelBuilder.ApplyConfiguration(new EnvironmentConfiguration());
         modelBuilder.ApplyConfiguration(new FlagConfiguration());
+        modelBuilder.ApplyConfiguration(new SegmentConfiguration());
+        modelBuilder.ApplyConfiguration(new ConfigConfiguration());
     }
 }
