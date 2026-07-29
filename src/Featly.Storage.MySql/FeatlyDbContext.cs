@@ -13,10 +13,13 @@ namespace Featly.Storage.MySql;
 /// without compromise. See ADR-0033.
 /// </summary>
 /// <remarks>
-/// PR 2 of the MySQL provider (issue #276) adds <see cref="Segment"/> and
-/// <see cref="Config"/> to PR 1's <see cref="Project"/>/<see cref="Environment"/>/
-/// <see cref="Flag"/>. The remaining entities, the <c>MySqlFeatlyStore</c>
-/// facade, and <c>AddFeatlyMySqlStore()</c> DI wiring land in follow-up PRs.
+/// PR 3 of the MySQL provider (issue #276) adds the full RBAC surface
+/// (<see cref="User"/>, <see cref="Role"/>, <see cref="RoleAssignment"/>,
+/// <see cref="UserGroup"/>, <see cref="RoleUpgradeRequest"/>) to PR 1/2's
+/// <see cref="Project"/>/<see cref="Environment"/>/<see cref="Flag"/>/
+/// <see cref="Segment"/>/<see cref="Config"/>. The remaining entities, the
+/// <c>MySqlFeatlyStore</c> facade, and <c>AddFeatlyMySqlStore()</c> DI wiring
+/// land in follow-up PRs.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -31,6 +34,16 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<Config> Configs => Set<Config>();
 
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
+    public DbSet<UserGroup> UserGroups => Set<UserGroup>();
+
+    public DbSet<RoleUpgradeRequest> RoleUpgradeRequests => Set<RoleUpgradeRequest>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -41,5 +54,10 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new FlagConfiguration());
         modelBuilder.ApplyConfiguration(new SegmentConfiguration());
         modelBuilder.ApplyConfiguration(new ConfigConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new UserGroupConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleUpgradeRequestConfiguration());
     }
 }
