@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "featly",
+      "applicationUrl": "http://localhost:5086",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Featly__Storage__Postgres__ConnectionString": "Host=localhost;Database=featly;Username=featly",
+        "Featly__Storage__Postgres__AutoMigrate": "true"
+      }
+    }
+  }
+}
