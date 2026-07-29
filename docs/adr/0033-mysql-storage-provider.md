@@ -136,6 +136,19 @@ magical") rules out.
   canonicalizes to the same output — but a real fidelity difference worth
   knowing about if a future feature ever needs to preserve a config value's
   exact original formatting (none does today).
+- **Discovered during PR 3 implementation:** Pomelo does not translate
+  `.Contains()` against a JSON-column-backed `List<T>` property
+  server-side — every other relational provider here maps
+  `UserGroup.MemberUserIds` as an EF primitive collection (or native array,
+  for Postgres) and pushes `MemberUserIds.Contains(userId)` down as a
+  JSON/array containment query; MySQL's `JsonCollectionConversion`-based
+  mapping is an opaque scalar column to EF Core's query translator, so
+  `MySqlUserGroupStore.ListForMemberAsync` instead loads every
+  `UserGroup` row and filters in memory. Group counts are expected to
+  stay small enough that this is a non-issue in practice, but it is a
+  real behavioral difference from the other three providers, not just an
+  implementation detail — worth revisiting if a deployment ever has an
+  unusually large number of groups.
 
 ### Neutral
 
