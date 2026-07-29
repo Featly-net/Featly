@@ -13,12 +13,17 @@ namespace Featly.Storage.SqlServer;
 /// <c>nvarchar(max)</c>) without compromise. See ADR-0032.
 /// </summary>
 /// <remarks>
-/// This is PR 1 of the SQL Server provider (issue #274): <see cref="Project"/>,
-/// <see cref="Environment"/>, and <see cref="Flag"/> only, mirroring how the
-/// Postgres provider's PR 1 (issue #157) started. The remaining entities
-/// (configs, segments, experiments, RBAC, approvals, webhooks, audit,
-/// settings), the <c>SqlServerFeatlyStore</c> facade, and
-/// <c>AddFeatlySqlServerStore()</c> DI wiring land in follow-up PRs.
+/// This is PR 5 of the SQL Server provider (issue #274) — the last entity
+/// batch: <see cref="Experiment"/>, <see cref="Event"/>,
+/// <see cref="Assignment"/>, <see cref="WebhookEndpoint"/>,
+/// <see cref="WebhookDelivery"/>, and <see cref="AuditEntry"/> join the
+/// entities from PR 1-4 (<see cref="Project"/>, <see cref="Environment"/>,
+/// <see cref="Flag"/>, <see cref="Segment"/>, <see cref="Config"/>, RBAC,
+/// the approval workflow, <see cref="ApiKey"/>, <see cref="SystemSetting"/>) —
+/// every entity <c>IFeatlyStore</c> needs is now mapped. The
+/// <c>SqlServerFeatlyStore</c> facade and <c>AddFeatlySqlServerStore()</c> DI
+/// extension are a separate follow-up PR, same reasoning as the Postgres
+/// provider's own equivalent split.
 /// </remarks>
 internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
     : DbContext(options)
@@ -51,6 +56,18 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
+    public DbSet<Experiment> Experiments => Set<Experiment>();
+
+    public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+
+    public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
+
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -70,5 +87,11 @@ internal sealed class FeatlyDbContext(DbContextOptions<FeatlyDbContext> options)
         modelBuilder.ApplyConfiguration(new ApprovalPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new ApiKeyConfiguration());
         modelBuilder.ApplyConfiguration(new SystemSettingConfiguration());
+        modelBuilder.ApplyConfiguration(new ExperimentConfiguration());
+        modelBuilder.ApplyConfiguration(new EventConfiguration());
+        modelBuilder.ApplyConfiguration(new AssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookEndpointConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookDeliveryConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
     }
 }
