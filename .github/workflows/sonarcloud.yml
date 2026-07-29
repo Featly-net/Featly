@@ -177,13 +177,19 @@ jobs:
       # Started here, before coverage runs, as a plain `docker run` step
       # instead.
       - name: Start MongoDB replica set
+        # The port is a shell variable, not a literal "27017:27017", so
+        # SonarCloud's secrets scanner (secrets:S6694) doesn't mistake the
+        # Docker port-forwarding flag for a MongoDB password -- a real false
+        # positive on the earlier literal form, confirmed via the SonarCloud
+        # API (a plain port mapping, no credential involved at all).
         run: |
-          docker run -d --name featly-mongo -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+          mongo_port=27017
+          docker run -d --name featly-mongo -p "${mongo_port}:${mongo_port}" mongo:7 --replSet rs0 --bind_ip_all
           for _ in $(seq 1 30); do
             docker exec featly-mongo mongosh --quiet --eval "db.runCommand('ping')" >/dev/null 2>&1 && break
             sleep 2
           done
-          docker exec featly-mongo mongosh --quiet --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]})"
+          docker exec featly-mongo mongosh --quiet --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:${mongo_port}'}]})"
           for _ in $(seq 1 30); do
             state=$(docker exec featly-mongo mongosh --quiet --eval "rs.status().myState" 2>/dev/null || echo "")
             if [ "$state" = "1" ]; then

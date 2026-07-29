@@ -6,11 +6,6 @@ internal static class EnvironmentClassMap
 {
     public static void Register()
     {
-        if (BsonClassMap.IsClassMapRegistered(typeof(Environment)))
-        {
-            return;
-        }
-
         BsonClassMap.RegisterClassMap<Environment>(cm =>
         {
             cm.AutoMap();

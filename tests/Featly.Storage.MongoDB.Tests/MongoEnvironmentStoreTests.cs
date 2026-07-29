@@ -69,6 +69,25 @@ public class MongoEnvironmentStoreTests
     }
 
     [Fact]
+    public async Task UpdateAsync_changes_name_and_throws_when_environment_not_found()
+    {
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var store = host.EnvironmentStore;
+
+        var env = new Environment { Id = Guid.NewGuid(), ProjectId = Guid.NewGuid(), Key = "renameable", Name = "Before", CreatedAt = DateTimeOffset.UtcNow };
+        await store.CreateAsync(env, ct);
+
+        env.Name = "After";
+        await store.UpdateAsync(env, ct);
+        (await store.GetByIdAsync(env.Id, ct))!.Name.Should().Be("After");
+
+        var missing = new Environment { Id = Guid.NewGuid(), ProjectId = Guid.NewGuid(), Key = "ghost", Name = "Ghost", CreatedAt = DateTimeOffset.UtcNow };
+        var update = async () => await store.UpdateAsync(missing, ct);
+        await update.Should().ThrowAsync<InvalidOperationException>().WithMessage("*ghost*");
+    }
+
+    [Fact]
     public async Task SetReadOnlyAsync_flips_the_freeze_and_returns_null_for_missing_id()
     {
         await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
@@ -103,6 +122,24 @@ public class MongoEnvironmentStoreTests
 
         // Missing id does not throw.
         await store.BumpConfigVersionAsync(Guid.NewGuid(), ct);
+    }
+
+    [Fact]
+    public async Task ListAsync_returns_every_environment_in_project_ordered_by_key()
+    {
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var store = host.EnvironmentStore;
+        var projectA = Guid.NewGuid();
+        var projectB = Guid.NewGuid();
+
+        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = projectA, Key = "zeta", Name = "Zeta", CreatedAt = DateTimeOffset.UtcNow }, ct);
+        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = projectA, Key = "alpha", Name = "Alpha", CreatedAt = DateTimeOffset.UtcNow }, ct);
+        await store.CreateAsync(new Environment { Id = Guid.NewGuid(), ProjectId = projectB, Key = "other", Name = "Other", CreatedAt = DateTimeOffset.UtcNow }, ct);
+
+        var list = await store.ListAsync(projectA, ct);
+
+        list.Select(e => e.Key).Should().Equal("alpha", "zeta");
     }
 
     [Fact]

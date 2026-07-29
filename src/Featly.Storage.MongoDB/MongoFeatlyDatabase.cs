@@ -13,12 +13,19 @@ namespace Featly.Storage.MongoDB;
 /// how the relational providers' <c>IDbContextFactory</c> hands out short-lived
 /// contexts per operation.
 /// </summary>
-internal sealed class MongoFeatlyDatabase(IMongoDatabase database)
+internal sealed class MongoFeatlyDatabase
 {
     private static readonly Lock RegistrationLock = new();
     private static bool s_classMapsRegistered;
 
-    public IMongoDatabase Database { get; } = database ?? throw new ArgumentNullException(nameof(database));
+    public MongoFeatlyDatabase(IMongoDatabase database)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        EnsureClassMapsRegistered();
+        Database = database;
+    }
+
+    public IMongoDatabase Database { get; }
 
     public IMongoCollection<Project> Projects => Database.GetCollection<Project>(MongoCollectionNames.Projects);
 
@@ -29,9 +36,10 @@ internal sealed class MongoFeatlyDatabase(IMongoDatabase database)
     /// <summary>
     /// Registers every entity's <c>BsonClassMap</c> exactly once per process.
     /// The driver's registration APIs are static and throw on a duplicate
-    /// registration, so every store construction path must funnel through
-    /// this guard rather than calling <see cref="MongoClassMaps.RegisterAll"/>
-    /// directly.
+    /// registration, so this is also called from every other entry point that
+    /// builds a database handle without going through this constructor (e.g.
+    /// <see cref="MongoMigrationRunner"/>, which needs the maps registered
+    /// before it can even open a connection to apply migrations).
     /// </summary>
     public static void EnsureClassMapsRegistered()
     {

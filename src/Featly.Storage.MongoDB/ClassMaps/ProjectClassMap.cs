@@ -6,11 +6,6 @@ internal static class ProjectClassMap
 {
     public static void Register()
     {
-        if (BsonClassMap.IsClassMapRegistered(typeof(Project)))
-        {
-            return;
-        }
-
         BsonClassMap.RegisterClassMap<Project>(cm =>
         {
             cm.AutoMap();

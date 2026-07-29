@@ -46,15 +46,7 @@ internal sealed class MongoEnvironmentStore(MongoFeatlyDatabase database) : IEnv
                 $"An environment with key '{environment.Key}' already exists in project '{environment.ProjectId}'.");
         }
 
-        try
-        {
-            await database.Environments.InsertOneAsync(environment, cancellationToken: ct).ConfigureAwait(false);
-        }
-        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
-        {
-            throw new InvalidOperationException(
-                $"An environment with key '{environment.Key}' already exists in project '{environment.ProjectId}'.", ex);
-        }
+        await database.Environments.InsertOneAsync(environment, cancellationToken: ct).ConfigureAwait(false);
     }
 
     public async Task<Environment?> SetReadOnlyAsync(Guid id, bool readOnly, CancellationToken ct)

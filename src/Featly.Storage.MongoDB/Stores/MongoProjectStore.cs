@@ -42,16 +42,7 @@ internal sealed class MongoProjectStore(MongoFeatlyDatabase database) : IProject
             throw new InvalidOperationException($"A project with key '{project.Key}' already exists.");
         }
 
-        try
-        {
-            await database.Projects.InsertOneAsync(project, cancellationToken: ct).ConfigureAwait(false);
-        }
-        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
-        {
-            // A concurrent writer won the race against the unique index between
-            // the check above and this insert — same outcome as the check.
-            throw new InvalidOperationException($"A project with key '{project.Key}' already exists.", ex);
-        }
+        await database.Projects.InsertOneAsync(project, cancellationToken: ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Project project, CancellationToken ct)

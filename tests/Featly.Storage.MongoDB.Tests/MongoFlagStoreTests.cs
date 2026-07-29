@@ -13,6 +13,8 @@ namespace Featly.Storage.MongoDB.Tests;
 [Trait("Category", "RequiresMongoDB")]
 public class MongoFlagStoreTests
 {
+    private static readonly string[] Countries = ["US", "CA"];
+
     [Fact]
     public async Task Upsert_persists_flag_with_variants_and_tags()
     {
@@ -129,6 +131,52 @@ public class MongoFlagStoreTests
         var rule1 = loaded.Rules.Single(r => r.Order == 1);
         rule1.Outcome.Splits.Should().HaveCount(2);
         rule1.Outcome.Splits!.Single(s => s.VariantKey == "on").Weight.Should().Be(50);
+    }
+
+    /// <summary>
+    /// <c>JsonElementSerializer</c> maps every <see cref="JsonValueKind"/> to
+    /// a native BSON value, not just the string/bool kinds the other tests in
+    /// this class happen to use — this proves the array/number/object/null
+    /// round-trip holds too.
+    /// </summary>
+    [Fact]
+    public async Task Condition_value_round_trips_every_json_value_kind()
+    {
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var envId = Guid.NewGuid();
+        var store = host.FlagStore;
+
+        var flag = NewBooleanFlag(envId, "rich-values");
+        flag.Rules =
+        [
+            new Rule
+            {
+                Order = 0,
+                Conditions =
+                [
+                    new Condition { Attribute = "countries", Operator = ConditionOperator.In, Value = JsonSerializer.SerializeToElement(Countries) },
+                    new Condition { Attribute = "age", Operator = ConditionOperator.GreaterThan, Value = JsonSerializer.SerializeToElement(42) },
+                    new Condition { Attribute = "score", Operator = ConditionOperator.LessThan, Value = JsonSerializer.SerializeToElement(3.14) },
+                    new Condition { Attribute = "meta", Operator = ConditionOperator.Equals, Value = JsonSerializer.SerializeToElement(new { plan = "pro", seats = 5 }) },
+                ],
+                Outcome = new RuleOutcome { VariantKey = "on" },
+            },
+        ];
+
+        await store.UpsertAsync(envId, flag, actor: "test", ct);
+
+        var loaded = await store.GetAsync(envId, "rich-values", ct);
+        var conditions = loaded!.Rules.Single().Conditions;
+
+        conditions.Single(c => c.Attribute == "countries").Value.EnumerateArray().Select(e => e.GetString())
+            .Should().BeEquivalentTo(["US", "CA"]);
+        conditions.Single(c => c.Attribute == "age").Value.GetInt32().Should().Be(42);
+        conditions.Single(c => c.Attribute == "score").Value.GetDouble().Should().Be(3.14);
+
+        var meta = conditions.Single(c => c.Attribute == "meta").Value;
+        meta.GetProperty("plan").GetString().Should().Be("pro");
+        meta.GetProperty("seats").GetInt32().Should().Be(5);
     }
 
     [Fact]

@@ -90,6 +90,20 @@ public class MongoProjectStoreTests
     }
 
     [Fact]
+    public async Task UpdateAsync_throws_when_project_not_found()
+    {
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        var store = host.ProjectStore;
+
+        var missing = new Project { Id = Guid.NewGuid(), Key = "ghost", Name = "Ghost", CreatedAt = DateTimeOffset.UtcNow };
+
+        var update = async () => await store.UpdateAsync(missing, ct);
+
+        await update.Should().ThrowAsync<InvalidOperationException>().WithMessage("*ghost*");
+    }
+
+    [Fact]
     public async Task ListAsync_returns_every_project_ordered_by_key()
     {
         await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);

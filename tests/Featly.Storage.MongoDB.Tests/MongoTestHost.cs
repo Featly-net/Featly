@@ -24,12 +24,15 @@ internal sealed class MongoTestHost : IAsyncDisposable
     private readonly IMongoClient _client;
     private readonly string _databaseName;
 
-    private MongoTestHost(IMongoClient client, string databaseName, MongoFeatlyDatabase database)
+    private MongoTestHost(IMongoClient client, string databaseName, string connectionString, MongoFeatlyDatabase database)
     {
         _client = client;
         _databaseName = databaseName;
+        ConnectionString = connectionString;
         Database = database;
     }
+
+    public string ConnectionString { get; }
 
     public MongoFeatlyDatabase Database { get; }
 
@@ -50,7 +53,7 @@ internal sealed class MongoTestHost : IAsyncDisposable
         var client = new MongoClient(connectionString);
         var database = new MongoFeatlyDatabase(client.GetDatabase(databaseName));
 
-        return new MongoTestHost(client, databaseName, database);
+        return new MongoTestHost(client, databaseName, connectionString, database);
     }
 
     public async ValueTask DisposeAsync()
