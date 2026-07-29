@@ -72,7 +72,12 @@ Recorded by [SECURITY_AUDIT.md](SECURITY_AUDIT.md); none block `v0.1.0`:
 
 Designed in `ARCHITECTURE.md`, explicitly out of scope until after `v0.1.0`:
 
-- `Featly.Storage.SqlServer` and `Featly.Storage.Postgres` providers
+- ~~`Featly.Storage.Postgres` provider~~ **Shipped:** entity porting (issue
+  #157), facade/DI/CLI/`LISTEN`/`NOTIFY` notifier (issue #179), see
+  [ADR-0026](adr/0026-postgres-storage-provider.md).
+- `Featly.Storage.SqlServer` provider — **in progress**, see
+  [ADR-0032](adr/0032-sqlserver-storage-provider.md).
+- `Featly.Storage.MySql` and `Featly.Storage.MongoDB` providers
 - `Featly.Storage.Redis` (cache + change pub/sub)
 - ~~Statistical significance for experiments (Welch's t-test, chi-square,
   sequential analysis)~~ **Shipped post-preview.2:** a two-proportion z-test
