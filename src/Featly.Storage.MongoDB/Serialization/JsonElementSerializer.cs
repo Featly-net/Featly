@@ -83,9 +83,9 @@ internal sealed class JsonElementSerializer : SerializerBase<JsonElement>
                 writer.WriteBoolean(element.GetBoolean());
                 break;
 
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
             default:
+                // Covers JsonValueKind.Null/Undefined as well as any future
+                // JsonValueKind Featly's own callers don't currently produce.
                 writer.WriteNull();
                 break;
         }
