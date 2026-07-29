@@ -58,6 +58,18 @@ internal sealed class SqlServerTestHost : IAsyncDisposable
 
     public Stores.SqlServerSystemSettingsStore SystemSettingsStore => new(CreateFactory());
 
+    public Stores.SqlServerExperimentStore ExperimentStore => new(CreateFactory());
+
+    public Stores.SqlServerEventStore EventStore => new(CreateFactory());
+
+    public Stores.SqlServerAssignmentStore AssignmentStore => new(CreateFactory());
+
+    public Stores.SqlServerWebhookStore WebhookStore => new(CreateFactory());
+
+    public Stores.SqlServerWebhookDeliveryStore WebhookDeliveryStore => new(CreateFactory());
+
+    public Stores.SqlServerAuditStore AuditStore => new(CreateFactory());
+
     public static async Task<SqlServerTestHost> CreateAsync(CancellationToken ct = default)
     {
         var builder = new SqlConnectionStringBuilder
