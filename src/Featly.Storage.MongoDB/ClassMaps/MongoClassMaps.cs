@@ -25,6 +25,11 @@ internal static class MongoClassMaps
         FlagClassMap.Register();
         SegmentClassMap.Register();
         ConfigClassMap.Register();
+        UserClassMap.Register();
+        RoleClassMap.Register();
+        RoleAssignmentClassMap.Register();
+        UserGroupClassMap.Register();
+        RoleUpgradeRequestClassMap.Register();
     }
 
     /// <summary>
@@ -47,5 +52,15 @@ internal static class MongoClassMaps
         BsonSerializer.RegisterSerializer(new EnumSerializer<FlagType>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<ConditionOperator>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<ConfigType>(BsonType.String));
+
+        // Permission is documented as ordinal-stable on the enum itself
+        // ("new permissions land at the end"), but every relational
+        // provider overrides that with a by-name JSON/text conversion
+        // instead (PermissionListSerializer) — storing names, not ints,
+        // means a future reordering doesn't silently reshuffle a saved
+        // role's grants. Mirrored here for the same reason.
+        BsonSerializer.RegisterSerializer(new EnumSerializer<Permission>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<AssigneeType>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<RoleUpgradeStatus>(BsonType.String));
     }
 }

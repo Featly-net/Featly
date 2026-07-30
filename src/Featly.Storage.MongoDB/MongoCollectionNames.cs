@@ -11,6 +11,11 @@ internal static class MongoCollectionNames
     public const string Flags = "flags";
     public const string Segments = "segments";
     public const string Configs = "configs";
+    public const string Users = "users";
+    public const string Roles = "roles";
+    public const string RoleAssignments = "roleAssignments";
+    public const string UserGroups = "userGroups";
+    public const string RoleUpgradeRequests = "roleUpgradeRequests";
 
     /// <summary>Tracks which <see cref="MongoMigrationRunner"/> steps have been applied — this provider's stand-in for a schema.</summary>
     public const string Migrations = "__migrations";
