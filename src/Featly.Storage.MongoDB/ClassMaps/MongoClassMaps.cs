@@ -30,6 +30,10 @@ internal static class MongoClassMaps
         RoleAssignmentClassMap.Register();
         UserGroupClassMap.Register();
         RoleUpgradeRequestClassMap.Register();
+        PendingChangeClassMap.Register();
+        ApprovalPolicyClassMap.Register();
+        ApiKeyClassMap.Register();
+        SystemSettingClassMap.Register();
     }
 
     /// <summary>
@@ -62,5 +66,10 @@ internal static class MongoClassMaps
         BsonSerializer.RegisterSerializer(new EnumSerializer<Permission>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<AssigneeType>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<RoleUpgradeStatus>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ChangeAction>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ChangeStatus>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ApprovalDecision>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ApproverRuleType>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ApiKeyScope>(BsonType.String));
     }
 }

@@ -12,5 +12,6 @@ internal static class MongoMigrationSteps
         new InitialIndexesStep(),
         new SegmentConfigIndexesStep(),
         new RbacIndexesStep(),
+        new ApprovalApiKeysIndexesStep(),
     ];
 }

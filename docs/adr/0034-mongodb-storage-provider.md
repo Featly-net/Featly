@@ -142,11 +142,10 @@ settling for polling anyway.
 
 ## Implementation notes
 
-Sliced into PRs, tracked in [issue #277](https://github.com/Featly-net/Featly/issues/277):
-
-Sliced the same way as [ADR-0033](0033-mysql-storage-provider.md)'s MySQL
-provider, once the scope of "remaining entities" turned out too large for one
-PR:
+Sliced into PRs, tracked in [issue #277](https://github.com/Featly-net/Featly/issues/277) —
+the same finer-grained shape [ADR-0033](0033-mysql-storage-provider.md)'s
+MySQL provider ended up using, once the scope of "remaining entities" turned
+out too large for one PR:
 
 1. Project scaffold + `BsonClassMap` registration pattern + core entities
    (`Project`, `Environment`, `Flag`) + `MongoMigrationRunner` skeleton with
@@ -155,9 +154,9 @@ PR:
 3. RBAC entities (`User`, `UserGroup`, `Role`, `RoleAssignment`,
    `RoleUpgradeRequest`). **Shipped.**
 4. Approval workflow (`PendingChange`, `ApprovalPolicy`) + `ApiKey` +
-   `SystemSettings` — first use of `MongoDB.Driver`'s session/transaction API
-   (`IClientSessionHandle`), since the approval and audit hash-chain paths
-   need real multi-document atomicity.
+   `SystemSettings`. **Shipped** — turned out not to need
+   `MongoDB.Driver`'s session/transaction API after all; see the PR 4 finding
+   below.
 5. Final entity batch (`Experiment`, `Event`, `Assignment`, `Webhook`,
    `WebhookDelivery`, `AuditEntry`).
 6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI.
@@ -187,6 +186,22 @@ native BSON array, unlike the relational providers' JSON-column fallback
 into a server-side array-containment query, so this provider does not need
 the MySQL/SQL Server workaround of loading every group and filtering in
 memory.
+
+**Discovered during PR 4 implementation:** this ADR originally assumed PR 4
+would be the first to need `MongoDB.Driver`'s session/transaction API
+(`IClientSessionHandle`), since the approval and audit-hash-chain paths
+"need real multi-document atomicity." That assumption didn't hold once PR 4
+was actually built: checking every relational provider's own storage layer
+confirms none of them use a multi-statement transaction for this either —
+`PendingChange`'s atomic status transition (`TryClaimStatusAsync`, issue
+#237) is a single conditional `UPDATE ... WHERE status=@from` in EF Core,
+which maps directly to Mongo's own single-document
+`UpdateOneAsync(id == id && status == from, ...)` with no session needed.
+Cross-entity atomicity (applying a change to its target entity and writing
+an audit entry together) lives in `Featly.Server`'s application layer, not
+in any provider's storage layer, on every provider including this one. The
+first genuine multi-document transaction need, if any, remains open for a
+later PR to identify with evidence rather than assumed here.
 
 ## References
 
