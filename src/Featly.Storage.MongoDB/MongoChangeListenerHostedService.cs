@@ -30,6 +30,7 @@ internal sealed partial class MongoChangeListenerHostedService(
     private static readonly TimeSpan s_maxBackoff = TimeSpan.FromSeconds(30);
 
     private readonly TaskCompletionSource _listening = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TimeSpan _backoff = s_minBackoff;
 
     /// <summary>
     /// Completes once the Change Stream cursor is open and this instance is
@@ -43,40 +44,11 @@ internal sealed partial class MongoChangeListenerHostedService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var backoff = s_minBackoff;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var collection = database.Database.GetCollection<BsonDocument>(MongoCollectionNames.ChangeNotifications);
-                using var cursor = await collection.WatchAsync(cancellationToken: stoppingToken).ConfigureAwait(false);
-                LogListening(logger);
-                backoff = s_minBackoff;
-                _listening.TrySetResult();
-
-                while (await cursor.MoveNextAsync(stoppingToken).ConfigureAwait(false))
-                {
-                    foreach (var change in cursor.Current)
-                    {
-                        if (change.OperationType != ChangeStreamOperationType.Insert || change.FullDocument is null)
-                        {
-                            continue;
-                        }
-
-                        var notification = TryDecodeFullDocument(change.FullDocument, out var error);
-                        if (notification is not null)
-                        {
-                            await notifier.DispatchLocallyAsync(notification, stoppingToken).ConfigureAwait(false);
-                        }
-                        else if (error is not null)
-                        {
-                            // A malformed document must not take down the listener --
-                            // log and move on, same failure-isolation policy
-                            // InProcessChangeNotifier applies to a misbehaving subscriber.
-                            LogMalformedPayload(logger, error);
-                        }
-                    }
-                }
+                await WatchAndDispatchAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -89,14 +61,63 @@ internal sealed partial class MongoChangeListenerHostedService(
                 LogListenFailed(logger, ex);
                 try
                 {
-                    await Task.Delay(backoff, stoppingToken).ConfigureAwait(false);
+                    await Task.Delay(_backoff, stoppingToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
                     return;
                 }
-                backoff = TimeSpan.FromMilliseconds(Math.Min(backoff.TotalMilliseconds * 2, s_maxBackoff.TotalMilliseconds));
+                _backoff = TimeSpan.FromMilliseconds(Math.Min(_backoff.TotalMilliseconds * 2, s_maxBackoff.TotalMilliseconds));
             }
+        }
+    }
+
+    /// <summary>
+    /// Opens a fresh Change Stream cursor and dispatches every change it
+    /// observes until the cursor breaks or cancellation is requested. Split
+    /// out of <see cref="ExecuteAsync"/> purely to keep the retry/backoff
+    /// loop's own structure flat. Resets <see cref="_backoff"/> as soon as
+    /// the cursor opens — a long-lived successful connection must not leave
+    /// the next reconnect attempt paying for whatever backoff a much earlier
+    /// failure had grown to.
+    /// </summary>
+    private async Task WatchAndDispatchAsync(CancellationToken stoppingToken)
+    {
+        var collection = database.Database.GetCollection<BsonDocument>(MongoCollectionNames.ChangeNotifications);
+        using var cursor = await collection.WatchAsync(cancellationToken: stoppingToken).ConfigureAwait(false);
+        LogListening(logger);
+        _backoff = s_minBackoff;
+        _listening.TrySetResult();
+
+        while (await cursor.MoveNextAsync(stoppingToken).ConfigureAwait(false))
+        {
+            foreach (var change in cursor.Current)
+            {
+                await DispatchChangeAsync(change, stoppingToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task DispatchChangeAsync(ChangeStreamDocument<BsonDocument> change, CancellationToken ct)
+    {
+        if (change.OperationType != ChangeStreamOperationType.Insert || change.FullDocument is null)
+        {
+            return;
+        }
+
+        var notification = TryDecodeFullDocument(change.FullDocument, out var error);
+        if (notification is not null)
+        {
+            await notifier.DispatchLocallyAsync(notification, ct).ConfigureAwait(false);
+            return;
+        }
+
+        if (error is not null)
+        {
+            // A malformed document must not take down the listener -- log and
+            // move on, same failure-isolation policy InProcessChangeNotifier
+            // applies to a misbehaving subscriber.
+            LogMalformedPayload(logger, error);
         }
     }
 
