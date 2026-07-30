@@ -174,9 +174,8 @@ public class MongoChangeNotifierTests
         var result = await admin.RunCommandAsync<BsonDocument>(new BsonDocument { { "currentOp", 1 } }, cancellationToken: ct)
             .ConfigureAwait(false);
 
-        foreach (var op in result["inprog"].AsBsonArray)
+        foreach (var document in result["inprog"].AsBsonArray.Select(op => op.AsBsonDocument))
         {
-            var document = op.AsBsonDocument;
             var isGetMore = document.TryGetValue("op", out var opType) && opType.AsString == "getmore";
             var targetsChangeNotifications = document.TryGetValue("ns", out var ns)
                 && ns.AsString.EndsWith(MongoCollectionNames.ChangeNotifications, StringComparison.Ordinal);
