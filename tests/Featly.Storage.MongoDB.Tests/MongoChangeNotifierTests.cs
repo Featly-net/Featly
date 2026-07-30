@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Xunit;
 
@@ -91,6 +92,103 @@ public class MongoChangeNotifierTests
         receivedC.Should().ContainSingle().Which.Should().Be(sent);
     }
 
+    [Fact]
+    public async Task Malformed_document_on_the_stream_is_skipped_without_stopping_later_delivery()
+    {
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        await using var replicaA = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+        await using var replicaB = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+
+        var received = new List<ChangeNotification>();
+        using var subscription = replicaB.Notifier.Subscribe((n, _) =>
+        {
+            received.Add(n);
+            return ValueTask.CompletedTask;
+        });
+
+        // Insert a document with no "payload" field directly, bypassing
+        // MongoChangeNotifier -- simulates a foreign/corrupt write landing on
+        // the signal collection.
+        await replicaA.ChangeNotifications.InsertOneAsync(new BsonDocument { { "not_payload", "oops" } }, cancellationToken: ct);
+
+        var sent = new ChangeNotification(Guid.NewGuid(), "Flag", "after-malformed", DateTimeOffset.UtcNow);
+        await replicaA.Notifier.NotifyAsync(sent, ct);
+
+        await PollUntilAsync(() => received.Count > 0, ct);
+
+        // Only the valid notification arrived -- the malformed document was
+        // skipped, not delivered, and did not crash the listener.
+        received.Should().ContainSingle().Which.Should().Be(sent);
+    }
+
+    [Fact]
+    public async Task Listener_reconnects_after_its_change_stream_operation_is_killed()
+    {
+        // Forces the reconnect/backoff path: kill the listener's own
+        // getMore operation server-side (a stand-in for a network blip or
+        // the replica set stepping down) and prove it notices, reconnects,
+        // and resumes delivering notifications. The Mongo equivalent of the
+        // Postgres provider's own pg_terminate_backend-based reconnect test.
+        await using var host = await MongoTestHost.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        await using var replicaA = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+        await using var replicaB = await SimulatedReplica.StartAsync(host.ConnectionString, ct);
+
+        var received = new List<ChangeNotification>();
+        using var subscription = replicaB.Notifier.Subscribe((n, _) =>
+        {
+            received.Add(n);
+            return ValueTask.CompletedTask;
+        });
+
+        await KillChangeStreamOperationsAsync(host.ConnectionString, ct);
+
+        // The reconnect isn't independently observable from here, and the
+        // kill itself can race a notification sent right after it, so retry
+        // the publish until it lands rather than sending exactly once.
+        var sent = new ChangeNotification(Guid.NewGuid(), "Flag", "post-reconnect-flag", DateTimeOffset.UtcNow);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(25);
+        while (received.Count == 0 && DateTimeOffset.UtcNow < deadline)
+        {
+            await replicaA.Notifier.NotifyAsync(sent, ct);
+            await Task.Delay(500, ct);
+        }
+
+        received.Should().ContainSingle("the listener should have reconnected and resumed delivery")
+            .Which.Should().Be(sent);
+    }
+
+    /// <summary>
+    /// Finds every in-progress <c>getMore</c> operation against the
+    /// <c>changeNotifications</c> collection (there are two: one per
+    /// replica's Change Stream cursor) and kills them server-side.
+    /// </summary>
+    private static async Task KillChangeStreamOperationsAsync(string connectionString, CancellationToken ct)
+    {
+        using var client = new MongoClient(connectionString);
+        var admin = client.GetDatabase("admin");
+
+        var result = await admin.RunCommandAsync<BsonDocument>(new BsonDocument { { "currentOp", 1 } }, cancellationToken: ct)
+            .ConfigureAwait(false);
+
+        foreach (var op in result["inprog"].AsBsonArray)
+        {
+            var document = op.AsBsonDocument;
+            var isGetMore = document.TryGetValue("op", out var opType) && opType.AsString == "getmore";
+            var targetsChangeNotifications = document.TryGetValue("ns", out var ns)
+                && ns.AsString.EndsWith(MongoCollectionNames.ChangeNotifications, StringComparison.Ordinal);
+
+            if (isGetMore && targetsChangeNotifications && document.TryGetValue("opid", out var opId))
+            {
+                await admin.RunCommandAsync<BsonDocument>(
+                    new BsonDocument { { "killOp", 1 }, { "op", opId } }, cancellationToken: ct).ConfigureAwait(false);
+            }
+        }
+    }
+
     private static async Task PollUntilAsync(Func<bool> condition, CancellationToken ct, int timeoutSeconds = 20)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(timeoutSeconds);
@@ -113,24 +211,29 @@ public class MongoChangeNotifierTests
         private readonly IMongoClient _client;
         private readonly MongoChangeListenerHostedService _listener;
 
-        private SimulatedReplica(IMongoClient client, MongoChangeNotifier notifier, MongoChangeListenerHostedService listener)
+        private SimulatedReplica(IMongoClient client, MongoChangeNotifier notifier, MongoChangeListenerHostedService listener, IMongoCollection<BsonDocument> changeNotifications)
         {
             _client = client;
             Notifier = notifier;
             _listener = listener;
+            ChangeNotifications = changeNotifications;
         }
 
         public MongoChangeNotifier Notifier { get; }
+
+        public IMongoCollection<BsonDocument> ChangeNotifications { get; }
 
         public static async Task<SimulatedReplica> StartAsync(string connectionString, CancellationToken ct)
         {
             MongoFeatlyDatabase.EnsureClassMapsRegistered();
             var mongoUrl = MongoUrl.Create(connectionString);
             var client = new MongoClient(connectionString);
-            var database = new MongoFeatlyDatabase(client.GetDatabase(mongoUrl.DatabaseName));
+            var mongoDatabase = client.GetDatabase(mongoUrl.DatabaseName);
+            var database = new MongoFeatlyDatabase(mongoDatabase);
 
             var notifier = new MongoChangeNotifier(database);
             var listener = new MongoChangeListenerHostedService(database, notifier, NullLogger<MongoChangeListenerHostedService>.Instance);
+            var changeNotifications = mongoDatabase.GetCollection<BsonDocument>(MongoCollectionNames.ChangeNotifications);
 
             await listener.StartAsync(ct).ConfigureAwait(false);
             // StartAsync returns once the loop is scheduled, not once the
@@ -138,7 +241,7 @@ public class MongoChangeNotifierTests
             // before that point could be missed, so every test must wait for
             // this before publishing.
             await listener.ListeningAsync.WaitAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
-            return new SimulatedReplica(client, notifier, listener);
+            return new SimulatedReplica(client, notifier, listener, changeNotifications);
         }
 
         public async ValueTask DisposeAsync()
