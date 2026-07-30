@@ -28,10 +28,11 @@ public static class MongoStorageServiceCollectionExtensions
     /// Mirrors <c>AddFeatlyPostgresStore()</c>/<c>AddFeatlySqlServerStore()</c>/
     /// <c>AddFeatlyMySqlStore()</c>: swapping providers is a one-line change,
     /// because everything above the storage layer depends only on
-    /// <see cref="IFeatlyStore"/>. Change notifications use the same
-    /// in-process <see cref="InProcessChangeNotifier"/> the SQLite/SQL
-    /// Server/MySQL providers use — the Change-Streams-backed notifier
-    /// (ADR-0034) lands in a dedicated follow-up PR.
+    /// <see cref="IFeatlyStore"/>. Change notifications use
+    /// <see cref="MongoChangeNotifier"/>, backed by a Change Stream
+    /// (<see cref="MongoChangeListenerHostedService"/>, ADR-0034) — the
+    /// second provider, after Postgres, to give real cross-replica push
+    /// instead of the SQL Server/MySQL providers' polling-only fallback.
     /// </remarks>
     public static IServiceCollection AddFeatlyMongoStore(
         this IServiceCollection services,
@@ -71,7 +72,8 @@ public static class MongoStorageServiceCollectionExtensions
             return new MongoFeatlyDatabase(client.GetDatabase(mongoUrl.DatabaseName));
         });
 
-        services.TryAddSingleton<IChangeNotifier, InProcessChangeNotifier>();
+        services.TryAddSingleton<MongoChangeNotifier>();
+        services.TryAddSingleton<IChangeNotifier>(sp => sp.GetRequiredService<MongoChangeNotifier>());
         services.TryAddSingleton<IFlagStore, MongoFlagStore>();
         services.TryAddSingleton<IProjectStore, MongoProjectStore>();
         services.TryAddSingleton<IEnvironmentStore, MongoEnvironmentStore>();
@@ -98,6 +100,7 @@ public static class MongoStorageServiceCollectionExtensions
         services.TryAddSingleton<AbstractionsMarker>(sp => sp.GetRequiredService<MongoFeatlyStore>());
 
         services.AddHostedService<MongoAutoMigrationHostedService>();
+        services.AddHostedService<MongoChangeListenerHostedService>();
 
         return services;
     }

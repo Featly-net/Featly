@@ -163,7 +163,7 @@ out too large for one PR:
 6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI. **Shipped.**
 7. Change-Streams-backed `IChangeNotifier` + hosted listener service (shape
    mirrors `PostgresChangeListenerHostedService`, watching collections instead
-   of a channel).
+   of a channel). **Shipped.**
 8. `Featly.Cli` `db --provider mongodb` support + `docs/DEPLOYMENT.md` section
    (including the replica-set prerequisite) + docker-compose sample with
    `rs.initiate()`.
