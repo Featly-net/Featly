@@ -27,6 +27,15 @@ internal static class MongoCollectionNames
     public const string WebhookDeliveries = "webhookDeliveries";
     public const string AuditEntries = "auditEntries";
 
+    /// <summary>
+    /// A capped collection used purely as a Change Streams signal board for
+    /// <see cref="MongoChangeNotifier"/> — analogous to the Postgres
+    /// provider's <c>pg_notify</c> channel, except Mongo's pub/sub primitive
+    /// needs a real (bounded) collection to watch. Documents are never read
+    /// back by key; the capped size bound keeps it from growing unbounded.
+    /// </summary>
+    public const string ChangeNotifications = "changeNotifications";
+
     /// <summary>Tracks which <see cref="MongoMigrationRunner"/> steps have been applied — this provider's stand-in for a schema.</summary>
     public const string Migrations = "__migrations";
 }
