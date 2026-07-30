@@ -55,6 +55,18 @@ internal sealed class MongoFeatlyDatabase
 
     public IMongoCollection<SystemSetting> SystemSettings => Database.GetCollection<SystemSetting>(MongoCollectionNames.SystemSettings);
 
+    public IMongoCollection<Experiment> Experiments => Database.GetCollection<Experiment>(MongoCollectionNames.Experiments);
+
+    public IMongoCollection<Event> Events => Database.GetCollection<Event>(MongoCollectionNames.Events);
+
+    public IMongoCollection<Assignment> Assignments => Database.GetCollection<Assignment>(MongoCollectionNames.Assignments);
+
+    public IMongoCollection<WebhookEndpoint> WebhookEndpoints => Database.GetCollection<WebhookEndpoint>(MongoCollectionNames.WebhookEndpoints);
+
+    public IMongoCollection<WebhookDelivery> WebhookDeliveries => Database.GetCollection<WebhookDelivery>(MongoCollectionNames.WebhookDeliveries);
+
+    public IMongoCollection<AuditEntry> AuditEntries => Database.GetCollection<AuditEntry>(MongoCollectionNames.AuditEntries);
+
     /// <summary>
     /// Registers every entity's <c>BsonClassMap</c> exactly once per process.
     /// The driver's registration APIs are static and throw on a duplicate

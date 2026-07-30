@@ -20,6 +20,12 @@ internal static class MongoCollectionNames
     public const string ApprovalPolicies = "approvalPolicies";
     public const string ApiKeys = "apiKeys";
     public const string SystemSettings = "systemSettings";
+    public const string Experiments = "experiments";
+    public const string Events = "events";
+    public const string Assignments = "assignments";
+    public const string WebhookEndpoints = "webhookEndpoints";
+    public const string WebhookDeliveries = "webhookDeliveries";
+    public const string AuditEntries = "auditEntries";
 
     /// <summary>Tracks which <see cref="MongoMigrationRunner"/> steps have been applied — this provider's stand-in for a schema.</summary>
     public const string Migrations = "__migrations";

@@ -158,7 +158,8 @@ out too large for one PR:
    `MongoDB.Driver`'s session/transaction API after all; see the PR 4 finding
    below.
 5. Final entity batch (`Experiment`, `Event`, `Assignment`, `Webhook`,
-   `WebhookDelivery`, `AuditEntry`).
+   `WebhookDelivery`, `AuditEntry`). **Shipped** — see the PR 5 finding below
+   about the audit hash chain and BSON's Date precision.
 6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI.
 7. Change-Streams-backed `IChangeNotifier` + hosted listener service (shape
    mirrors `PostgresChangeListenerHostedService`, watching collections instead
@@ -202,6 +203,25 @@ an audit entry together) lives in `Featly.Server`'s application layer, not
 in any provider's storage layer, on every provider including this one. The
 first genuine multi-document transaction need, if any, remains open for a
 later PR to identify with evidence rather than assumed here.
+
+**Discovered during PR 5 implementation:** `MongoAuditStore`'s first
+end-to-end test of the tamper-evident hash chain (issue #208) — append two
+entries, then call `VerifyChainAsync` — failed on every run, not
+intermittently. Root cause: `AuditHash.Compute` folds `AuditEntry.At.UtcTicks`
+(.NET's full 100ns-tick resolution) into the SHA-256 digest, but BSON's
+native `Date` type is hard-capped at millisecond precision (a BSON-spec
+limit, not a driver choice) — every relational provider's timestamp column
+has finer resolution (Postgres `timestamptz` and MySQL `datetime(6)` are
+both microsecond), so this had never surfaced there. The result: the hash
+computed in `AppendAsync` (against the caller's full-precision `At`) never
+matched the hash `VerifyChainAsync` recomputed after reading the
+driver-truncated `At` back — the chain would appear tampered from the very
+first entry, on every deployment. No relational provider's test suite
+exercises `VerifyChainAsync` against a real round-tripped append either, so
+nothing caught the equivalent latent gap there. Fixed by truncating `At` to
+millisecond precision in `MongoAuditStore.AppendAsync` before computing and
+storing the hash, so the value that gets hashed is the same value that
+survives the round trip.
 
 ## References
 

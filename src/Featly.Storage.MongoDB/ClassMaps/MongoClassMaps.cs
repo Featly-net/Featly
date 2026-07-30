@@ -34,6 +34,12 @@ internal static class MongoClassMaps
         ApprovalPolicyClassMap.Register();
         ApiKeyClassMap.Register();
         SystemSettingClassMap.Register();
+        ExperimentClassMap.Register();
+        EventClassMap.Register();
+        AssignmentClassMap.Register();
+        WebhookEndpointClassMap.Register();
+        WebhookDeliveryClassMap.Register();
+        AuditEntryClassMap.Register();
     }
 
     /// <summary>
@@ -71,5 +77,7 @@ internal static class MongoClassMaps
         BsonSerializer.RegisterSerializer(new EnumSerializer<ApprovalDecision>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<ApproverRuleType>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<ApiKeyScope>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<EventType>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<WebhookDeliveryStatus>(BsonType.String));
     }
 }
