@@ -64,6 +64,18 @@ internal sealed class MongoTestHost : IAsyncDisposable
 
     public Stores.MongoSystemSettingsStore SystemSettingsStore => new(Database);
 
+    public Stores.MongoExperimentStore ExperimentStore => new(Database);
+
+    public Stores.MongoEventStore EventStore => new(Database);
+
+    public Stores.MongoAssignmentStore AssignmentStore => new(Database);
+
+    public Stores.MongoWebhookStore WebhookStore => new(Database);
+
+    public Stores.MongoWebhookDeliveryStore WebhookDeliveryStore => new(Database);
+
+    public Stores.MongoAuditStore AuditStore => new(Database);
+
     public static async Task<MongoTestHost> CreateAsync(CancellationToken ct = default)
     {
         var baseConnectionString = System.Environment.GetEnvironmentVariable("FEATLY_MONGODB_TEST_CONNECTION_STRING") ?? DefaultConnectionString;
