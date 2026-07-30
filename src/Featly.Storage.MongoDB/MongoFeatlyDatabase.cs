@@ -37,6 +37,16 @@ internal sealed class MongoFeatlyDatabase
 
     public IMongoCollection<Config> Configs => Database.GetCollection<Config>(MongoCollectionNames.Configs);
 
+    public IMongoCollection<User> Users => Database.GetCollection<User>(MongoCollectionNames.Users);
+
+    public IMongoCollection<Role> Roles => Database.GetCollection<Role>(MongoCollectionNames.Roles);
+
+    public IMongoCollection<RoleAssignment> RoleAssignments => Database.GetCollection<RoleAssignment>(MongoCollectionNames.RoleAssignments);
+
+    public IMongoCollection<UserGroup> UserGroups => Database.GetCollection<UserGroup>(MongoCollectionNames.UserGroups);
+
+    public IMongoCollection<RoleUpgradeRequest> RoleUpgradeRequests => Database.GetCollection<RoleUpgradeRequest>(MongoCollectionNames.RoleUpgradeRequests);
+
     /// <summary>
     /// Registers every entity's <c>BsonClassMap</c> exactly once per process.
     /// The driver's registration APIs are static and throw on a duplicate

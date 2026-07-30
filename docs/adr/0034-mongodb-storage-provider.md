@@ -153,7 +153,7 @@ PR:
    the first index-creation step. **Shipped.**
 2. `Segment` + `Config` class maps and stores. **Shipped.**
 3. RBAC entities (`User`, `UserGroup`, `Role`, `RoleAssignment`,
-   `RoleUpgradeRequest`).
+   `RoleUpgradeRequest`). **Shipped.**
 4. Approval workflow (`PendingChange`, `ApprovalPolicy`) + `ApiKey` +
    `SystemSettings` — first use of `MongoDB.Driver`'s session/transaction API
    (`IClientSessionHandle`), since the approval and audit hash-chain paths
@@ -180,6 +180,13 @@ not assumed. Worked around by starting and initiating MongoDB as a plain
 `services:` entry, in both `ci.yml`'s `mongodb-tests` job and
 `sonarcloud.yml`'s coverage job — the only provider whose CI wiring deviates
 from the `services:` pattern the other four use.
+
+**Discovered during PR 3 implementation:** `UserGroup.MemberUserIds` is a
+native BSON array, unlike the relational providers' JSON-column fallback
+(ADR-0033) — `Builders<UserGroup>.Filter.AnyEq` translates `ListForMemberAsync`
+into a server-side array-containment query, so this provider does not need
+the MySQL/SQL Server workaround of loading every group and filtering in
+memory.
 
 ## References
 
