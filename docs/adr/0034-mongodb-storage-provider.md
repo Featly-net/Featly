@@ -160,7 +160,7 @@ out too large for one PR:
 5. Final entity batch (`Experiment`, `Event`, `Assignment`, `Webhook`,
    `WebhookDelivery`, `AuditEntry`). **Shipped** — see the PR 5 finding below
    about the audit hash chain and BSON's Date precision.
-6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI.
+6. `MongoFeatlyStore` facade + `AddFeatlyMongoStore()` DI. **Shipped.**
 7. Change-Streams-backed `IChangeNotifier` + hosted listener service (shape
    mirrors `PostgresChangeListenerHostedService`, watching collections instead
    of a channel).
