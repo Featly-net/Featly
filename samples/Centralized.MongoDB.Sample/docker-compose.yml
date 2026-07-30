@@ -1,0 +1,137 @@
+# Run TWO centralized Featly server replicas behind nginx, sharing one MongoDB
+# replica set — the deployment shape ADR-0034's Change Streams notifier exists
+# for (see docs/DEPLOYMENT.md's "Scaling out" note). Unlike Centralized.Sample
+# (SQLite, single writable replica), a change made through either replica is
+# pushed to every replica's SSE clients, not just the one that made it.
+#
+# From this directory:
+#
+#   docker compose up --build
+#
+# Then open the dashboard at http://localhost:5089/featly and the health probe
+# at http://localhost:5089/health/live — nginx round-robins across featly-a and
+# featly-b. Data persists in the named MongoDB volume across `docker compose
+# down` / `up` (use `down -v` to wipe it).
+#
+# The build context is the repository root (two levels up) because the sample
+# references projects under src/.
+#
+# This provider REQUIRES a replica set (ADR-0034) — a standalone `mongod` does
+# not support Change Streams or multi-document transactions. The mongodb-init
+# service below runs `rs.initiate()` exactly once on first boot and waits for a
+# primary to be elected before the one-shot migrate service (and, in turn, the
+# server replicas) are allowed to start.
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: featly-mongodb
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - featly-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Initiates the single-node replica set on first boot (idempotent: does
+  # nothing if it's already initiated from a prior `docker compose up`) and
+  # waits for a primary to be elected before exiting — the signal the
+  # dependent "migrate" service waits on, since rs.initiate() itself returns
+  # before an election completes.
+  mongodb-init:
+    image: mongo:7
+    container_name: featly-mongodb-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        mongosh --host mongodb:27017 --quiet --eval "
+          try { rs.status(); } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongodb:27017'}]}); }
+        "
+        for i in $(seq 1 30); do
+          state=$(mongosh --host mongodb:27017 --quiet --eval "rs.status().myState" 2>/dev/null || echo "")
+          if [ "$state" = "1" ]; then
+            echo "Replica set primary elected."
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Replica set never elected a primary." >&2
+        exit 1
+    restart: "no"
+
+  # One-shot migration apply, run once before any replica starts — per
+  # docs/DEPLOYMENT.md's "Turn AutoMigrate off when you run more than one
+  # replica" guidance. Both featly-a and featly-b run with AutoMigrate=false.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: samples/Centralized.MongoDB.Sample/Dockerfile
+    image: featly-centralized-mongodb:latest
+    container_name: featly-mongodb-migrate
+    entrypoint: ["dotnet", "cli/featly.dll"]
+    command:
+      - db
+      - migrate
+      - --provider
+      - mongodb
+      - --connection-string
+      - "mongodb://mongodb:27017/featly?replicaSet=rs0"
+    depends_on:
+      mongodb-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+  featly-a:
+    image: featly-centralized-mongodb:latest
+    container_name: featly-a
+    ports:
+      - "5090:8080"
+    environment:
+      REPLICA_NAME: "featly-a"
+      Featly__Storage__MongoDB__ConnectionString: "mongodb://mongodb:27017/featly?replicaSet=rs0"
+      Featly__Storage__MongoDB__AutoMigrate: "false"
+      Featly__Authorization__BootstrapAdminIdentifier: "${FEATLY_BOOTSTRAP_ADMIN:-admin@example.com}"
+      Featly__Server__AdminApiKey: "${FEATLY_ADMIN_API_KEY:-dev-admin-replace-me}"
+      Featly__Server__SdkApiKey: "${FEATLY_SDK_API_KEY:-dev-sdk-replace-me}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  featly-b:
+    image: featly-centralized-mongodb:latest
+    container_name: featly-b
+    ports:
+      - "5091:8080"
+    environment:
+      REPLICA_NAME: "featly-b"
+      Featly__Storage__MongoDB__ConnectionString: "mongodb://mongodb:27017/featly?replicaSet=rs0"
+      Featly__Storage__MongoDB__AutoMigrate: "false"
+      Featly__Authorization__BootstrapAdminIdentifier: "${FEATLY_BOOTSTRAP_ADMIN:-admin@example.com}"
+      Featly__Server__AdminApiKey: "${FEATLY_ADMIN_API_KEY:-dev-admin-replace-me}"
+      Featly__Server__SdkApiKey: "${FEATLY_SDK_API_KEY:-dev-sdk-replace-me}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  lb:
+    image: nginx:1.27-alpine
+    container_name: featly-mongodb-lb
+    ports:
+      - "5089:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - featly-a
+      - featly-b
+    restart: unless-stopped
+
+volumes:
+  featly-mongodb-data:

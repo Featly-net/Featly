@@ -277,10 +277,65 @@ you run more than one replica" guidance as PostgreSQL applies here too.
 > from your own code (or a small standalone script) instead of the CLI, until
 > Pomelo ships an EF Core 10 build.
 
+### MongoDB
+
+`Featly.Storage.MongoDB` ([ADR-0034](adr/0034-mongodb-storage-provider.md)) is
+the provider for self-hosted deployments already standardized on MongoDB, and
+the second provider (after PostgreSQL) with real cross-replica push instead of
+polling.
+
+```csharp
+builder.Services.AddFeatlyMongoStore(o =>
+    o.ConnectionString = "mongodb://db/featly?replicaSet=rs0");
+```
+
+Or bind it from configuration instead:
+
+```json
+{
+  "Featly": {
+    "Storage": {
+      "MongoDB": {
+        "ConnectionString": "mongodb://db/featly?replicaSet=rs0",
+        "AutoMigrate": true
+      }
+    }
+  }
+}
+```
+
+There is no default connection string — the host fails at startup with a clear
+message rather than at the first query. The same "turn `AutoMigrate` off when
+you run more than one replica" guidance as PostgreSQL applies here too.
+
+> **Requires a replica set.** Unlike the other four providers, this one has no
+> standalone-instance tier at all — ADR-0034's decision to support only a
+> replica-set deployment (a single-node replica set is enough for local dev)
+> buys both multi-document transactions and Change Streams at once, since
+> neither is available on a plain `mongod`. Every real MongoDB deployment guide
+> already recommends a replica set regardless of Featly's needs; `docker
+> compose up` in the sample below runs `rs.initiate()` on first boot.
+
+> **Real cross-replica push, via Change Streams.** Like PostgreSQL's
+> `LISTEN`/`NOTIFY`, `MongoChangeNotifier` gives an instant SSE update on every
+> replica, not just the one that made the change (ADR-0034, issue #277) — the
+> replica-set requirement above is what makes this possible without any extra
+> enablement step. This is the opposite trade-off from SQL Server and MySQL,
+> which stay polling-only specifically to avoid a heavier operational ask.
+
+`featly db --provider mongodb` is fully supported, with one exception:
+**`featly db rollback` is not available for this provider.** MongoDB's
+migration steps are idempotent index/collection creation, not schema changes
+EF Core can derive a reverse operation for — there is no framework-generated
+"down" migration to run, and hand-writing one (dropping an index or a
+collection) would be a real, destructive operation on live data rather than a
+safe reversal. Use `featly db drop` to reset the database entirely, or restore
+from a backup.
+
 ### Planned
 
-MongoDB and a Redis cache / change pub-sub provider are designed but not
-built; see [DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
+A Redis cache / change pub-sub provider is designed but not built; see
+[DEFERRED.md](DEFERRED.md) and [PLAN.md](../PLAN.md).
 
 ## Health checks
 
@@ -350,5 +405,36 @@ nginx may have routed the two tabs to different replicas, and the update still
 reaches both via the Postgres `LISTEN`/`NOTIFY` notifier (ADR-0026, issue #258),
 not just the replica that handled the write. As with the SQLite sample,
 configuration (bootstrap admin, API keys, DB password) is supplied via
+environment variables — override the `.env` placeholders before exposing this
+anywhere real.
+
+## Run a multi-replica MongoDB deployment with Docker
+
+`samples/Centralized.MongoDB.Sample` demonstrates the same "Scaling out"
+shape as the Postgres sample above, on MongoDB instead: two server replicas,
+one MongoDB replica set, and an nginx load balancer round-robining between
+them. From `samples/Centralized.MongoDB.Sample/`:
+
+```bash
+docker compose up --build
+```
+
+This starts a single-node MongoDB replica set, runs `rs.initiate()` on first
+boot (idempotent — a `mongodb-init` one-shot service that does nothing on a
+later `docker compose up` once the replica set already exists) and waits for
+a primary to be elected, applies the migration steps once via a one-shot
+`migrate` service (`featly db migrate --provider mongodb`, per the
+"AutoMigrate off with several replicas" guidance above), then starts both
+replicas with `AutoMigrate=false` and nginx in front of them:
+
+- Dashboard (via the load balancer): `http://localhost:5089/featly`
+- Replica A directly: `http://localhost:5090`
+- Replica B directly: `http://localhost:5091`
+
+Open the dashboard in two tabs, flip a flag, and watch the change land in both
+— nginx may have routed the two tabs to different replicas, and the update
+still reaches both via the MongoDB Change Stream notifier (ADR-0034, issue
+#277), not just the replica that handled the write. As with the SQLite and
+Postgres samples, configuration (bootstrap admin, API keys) is supplied via
 environment variables — override the `.env` placeholders before exposing this
 anywhere real.

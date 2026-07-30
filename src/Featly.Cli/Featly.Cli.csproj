@@ -29,6 +29,7 @@
     <ProjectReference Include="..\Featly.Storage.Sqlite\Featly.Storage.Sqlite.csproj" />
     <ProjectReference Include="..\Featly.Storage.Postgres\Featly.Storage.Postgres.csproj" />
     <ProjectReference Include="..\Featly.Storage.SqlServer\Featly.Storage.SqlServer.csproj" />
+    <ProjectReference Include="..\Featly.Storage.MongoDB\Featly.Storage.MongoDB.csproj" />
   </ItemGroup>
 
   <ItemGroup>
