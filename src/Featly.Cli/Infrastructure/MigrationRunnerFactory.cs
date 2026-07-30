@@ -1,3 +1,4 @@
+using Featly.Storage.MongoDB;
 using Featly.Storage.Postgres;
 using Featly.Storage.Sqlite;
 using Featly.Storage.SqlServer;
@@ -39,6 +40,9 @@ internal static class MigrationRunnerFactory
     /// <summary>The <c>--provider</c> value selecting SQL Server.</summary>
     public const string SqlServer = "sqlserver";
 
+    /// <summary>The <c>--provider</c> value selecting MongoDB.</summary>
+    public const string MongoDb = "mongodb";
+
     /// <summary>
     /// The reserved <c>rollback</c> target that reverts every migration. Both
     /// providers' runners mirror the same EF Core sentinel, so this is provider-
@@ -56,7 +60,9 @@ internal static class MigrationRunnerFactory
         Sqlite => new SqliteRunner(SqliteConnectionStringResolver.Resolve(connectionStringOption)),
         Postgres => new PostgresRunner(PostgresConnectionStringResolver.Resolve(connectionStringOption)),
         SqlServer => new SqlServerRunner(SqlServerConnectionStringResolver.Resolve(connectionStringOption)),
-        _ => throw new InvalidOperationException($"Unknown --provider '{provider}'. Use '{Sqlite}', '{Postgres}', or '{SqlServer}'."),
+        MongoDb => new MongoRunner(MongoConnectionStringResolver.Resolve(connectionStringOption)),
+        _ => throw new InvalidOperationException(
+            $"Unknown --provider '{provider}'. Use '{Sqlite}', '{Postgres}', '{SqlServer}', or '{MongoDb}'."),
     };
 
     private sealed class SqliteRunner(string connectionString) : IMigrationRunner
@@ -105,5 +111,21 @@ internal static class MigrationRunnerFactory
             SqlServerMigrationRunner.RollbackAsync(connectionString, targetMigration, ct);
 
         public Task<bool> DropAsync(CancellationToken ct) => SqlServerMigrationRunner.DropAsync(connectionString, ct);
+    }
+
+    private sealed class MongoRunner(string connectionString) : IMigrationRunner
+    {
+        public async Task<MigrationStatusInfo> GetStatusAsync(CancellationToken ct)
+        {
+            var status = await MongoMigrationRunner.GetStatusAsync(connectionString, ct).ConfigureAwait(false);
+            return new MigrationStatusInfo(status.Applied, status.Pending);
+        }
+
+        public Task MigrateAsync(CancellationToken ct) => MongoMigrationRunner.MigrateAsync(connectionString, ct);
+
+        public Task RollbackAsync(string targetMigration, CancellationToken ct) =>
+            MongoMigrationRunner.RollbackAsync(connectionString, targetMigration, ct);
+
+        public Task<bool> DropAsync(CancellationToken ct) => MongoMigrationRunner.DropAsync(connectionString, ct);
     }
 }

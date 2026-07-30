@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "featly",
+      "applicationUrl": "http://localhost:5089",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Featly__Storage__MongoDB__ConnectionString": "mongodb://localhost:27017/featly?replicaSet=rs0",
+        "Featly__Storage__MongoDB__AutoMigrate": "true"
+      }
+    }
+  }
+}

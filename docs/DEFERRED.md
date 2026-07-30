@@ -77,8 +77,12 @@ Designed in `ARCHITECTURE.md`, explicitly out of scope until after `v0.1.0`:
   [ADR-0026](adr/0026-postgres-storage-provider.md).
 - ~~`Featly.Storage.SqlServer` provider~~ **Shipped:** entity porting, facade/DI/CLI
   (issue #274), see [ADR-0032](adr/0032-sqlserver-storage-provider.md).
-- `Featly.Storage.MySql` provider, see [ADR-0033](adr/0033-mysql-storage-provider.md).
-- `Featly.Storage.MongoDB` provider, see [ADR-0034](adr/0034-mongodb-storage-provider.md).
+- ~~`Featly.Storage.MySql` provider~~ **Shipped:** entity porting, facade/DI
+  (issue #276), see [ADR-0033](adr/0033-mysql-storage-provider.md). No `featly db`
+  CLI support — a Pomelo/EF Core 10 version conflict, documented in the ADR.
+- ~~`Featly.Storage.MongoDB` provider~~ **Shipped:** entity porting,
+  facade/DI/CLI, Change Streams notifier (issue #277), see
+  [ADR-0034](adr/0034-mongodb-storage-provider.md).
 - `Featly.Storage.Redis` (cache + change pub/sub)
 - ~~Statistical significance for experiments (Welch's t-test, chi-square,
   sequential analysis)~~ **Shipped post-preview.2:** a two-proportion z-test

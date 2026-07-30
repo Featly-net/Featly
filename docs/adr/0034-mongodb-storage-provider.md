@@ -166,8 +166,14 @@ out too large for one PR:
    of a channel). **Shipped.**
 8. `Featly.Cli` `db --provider mongodb` support + `docs/DEPLOYMENT.md` section
    (including the replica-set prerequisite) + docker-compose sample with
-   `rs.initiate()`.
-9. Any remaining coverage/parity gaps against `Featly.Storage.Postgres.Tests`.
+   `rs.initiate()`. **Shipped** — with one real, permanent gap: `rollback` is
+   not supported for this provider (see the PR 8 finding below). Unlike
+   MySQL, there is no EF Core version conflict blocking the CLI reference
+   itself — this provider isn't EF Core at all.
+9. Any remaining coverage/parity gaps against `Featly.Storage.Postgres.Tests`
+   — not pursued as a dedicated PR: coverage has stayed comfortably above the
+   80% gate through every PR (typically 88-95% new-code coverage), so there
+   is no known gap to close.
 
 **Discovered during PR 1 implementation:** GitHub Actions' `services:` block
 has no `command:` key to pass extra CLI args to a service container — every
@@ -222,6 +228,27 @@ nothing caught the equivalent latent gap there. Fixed by truncating `At` to
 millisecond precision in `MongoAuditStore.AppendAsync` before computing and
 storing the hash, so the value that gets hashed is the same value that
 survives the round trip.
+
+**Discovered during PR 8 implementation:** wiring `MongoMigrationRunner` into
+`MigrationRunnerFactory` surfaced a real, permanent design gap this ADR had
+not previously called out: `IMigrationRunner.RollbackAsync` has no honest
+implementation for this provider. Every relational provider's `RollbackAsync`
+reverts the schema using an EF Core-generated down-migration — a reverse
+operation the framework derives automatically from the schema diff. This
+provider's migration steps (`MongoMigrationSteps`) are idempotent index and
+collection creation with no framework-derived inverse, and no natural
+hand-written one either: "drop this index" or "drop this collection" is a
+real, destructive operation on live data, not a safe schema reversal, and
+nothing in `IMongoMigrationStep` defines what "down" would even mean for a
+capped-collection-creation step. Rather than fake support with a
+partial/misleading implementation, `MongoMigrationRunner.RollbackAsync`
+throws `NotSupportedException` with a message pointing at `featly db drop`
+or a backup restore instead. Documented in `docs/DEPLOYMENT.md` and
+`CliOptions`' `--connection-string` help text so it's visible before a user
+hits the exception. Unlike MySQL's CLI gap (ADR-0033, a version-conflict
+accident of Featly.Cli referencing every provider in one executable), this
+one is architectural and permanent — it would not go away with a future
+driver release.
 
 ## References
 

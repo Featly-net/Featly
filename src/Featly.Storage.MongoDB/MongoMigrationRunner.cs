@@ -63,6 +63,40 @@ public static class MongoMigrationRunner
         return new MongoMigrationStatus([.. MongoMigrationSteps.All.Select(s => s.Name).Where(applied.Contains)], pending);
     }
 
+    /// <summary>
+    /// Not supported for this provider. Every relational provider's
+    /// <c>RollbackAsync</c> reverts the schema using EF Core's generated
+    /// down-migrations — a reverse operation the framework derives
+    /// automatically from the schema diff. Mongo's migration steps
+    /// (<see cref="MongoMigrationSteps"/>) are idempotent index/collection
+    /// creation with no framework-derived inverse, and no natural one to
+    /// hand-write either: "remove this index" or "drop this collection" is a
+    /// real, destructive operation on live data, not a safe schema reversal.
+    /// </summary>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public static Task RollbackAsync(string connectionString, string targetMigration, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException(
+            "Rollback is not supported for --provider mongodb: migration steps here are idempotent index/collection " +
+            "creation, not reversible schema changes, so there is no 'down' action to run. " +
+            "Use 'featly db drop' to reset the database entirely, or restore from a backup.");
+
+    /// <summary>Deletes the target database entirely. Irreversible.</summary>
+    /// <returns><c>true</c> if a database existed and was deleted; otherwise <c>false</c>.</returns>
+    public static async Task<bool> DropAsync(string connectionString, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient(connectionString, out var database);
+        var existed = await DatabaseExistsAsync(client, database.DatabaseNamespace.DatabaseName, cancellationToken).ConfigureAwait(false);
+        await client.DropDatabaseAsync(database.DatabaseNamespace.DatabaseName, cancellationToken).ConfigureAwait(false);
+        return existed;
+    }
+
+    private static async Task<bool> DatabaseExistsAsync(MongoClient client, string databaseName, CancellationToken ct)
+    {
+        using var cursor = await client.ListDatabaseNamesAsync(ct).ConfigureAwait(false);
+        var names = await cursor.ToListAsync(ct).ConfigureAwait(false);
+        return names.Contains(databaseName, StringComparer.Ordinal);
+    }
+
     private static async Task<HashSet<string>> GetAppliedNamesAsync(IMongoCollection<BsonDocument> migrations, CancellationToken ct)
     {
         var docs = await migrations.Find(FilterDefinition<BsonDocument>.Empty).ToListAsync(ct).ConfigureAwait(false);

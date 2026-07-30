@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Featly.Samples.CentralizedMongoDB</RootNamespace>
+    <AssemblyName>Featly.Samples.CentralizedMongoDB</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>featly-sample-centralized-mongodb</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same centralized deployment pattern as Centralized.Postgres.Sample, but
+         backed by Featly.Storage.MongoDB so the docker-compose file can run
+         several replicas sharing one replica set — the shape ADR-0034's Change
+         Streams notifier exists for. No SDK here — application processes (e.g.
+         WebApi.Sample) point their SDK at these replicas over HTTP. -->
+    <ProjectReference Include="..\..\src\Featly.Server\Featly.Server.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Dashboard\Featly.Dashboard.csproj" />
+    <ProjectReference Include="..\..\src\Featly.Storage.MongoDB\Featly.Storage.MongoDB.csproj" />
+  </ItemGroup>
+
+</Project>

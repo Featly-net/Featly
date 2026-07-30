@@ -808,7 +808,7 @@ Each relational provider (PostgreSQL, SQL Server, and now MySQL) has its own `Mi
 | `Featly.Storage.Postgres` | Multi-node with `LISTEN`/`NOTIFY` for cross-replica `IChangeNotifier` | Shipped |
 | `Featly.Storage.SqlServer` | Enterprise self-hosted, multi-node (polling-only `IChangeNotifier`, ADR-0032) | Shipped |
 | `Featly.Storage.MySql` | Self-hosted / managed MySQL or MariaDB, multi-node (polling-only `IChangeNotifier`, ADR-0033) | Shipped |
-| `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` (ADR-0034, replica-set required) | Planned |
+| `Featly.Storage.MongoDB` | Document-store deployments; Change Streams for cross-replica `IChangeNotifier` (ADR-0034, replica-set required) | Shipped |
 | `Featly.Storage.Redis` | Cache layer in front of a primary store; pub/sub for change notifications | Planned |
 
 ---

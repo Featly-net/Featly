@@ -18,7 +18,10 @@ internal static class CliOptions
                 $"For --provider postgres, an Npgsql connection string is required " +
                 $"(falls back to {PostgresConnectionStringResolver.EnvVarName}; no default). " +
                 $"For --provider sqlserver, a SQL Server connection string is required " +
-                $"(falls back to {SqlServerConnectionStringResolver.EnvVarName}; no default).",
+                $"(falls back to {SqlServerConnectionStringResolver.EnvVarName}; no default). " +
+                $"For --provider mongodb, a MongoDB connection string including the database name is required " +
+                $"(falls back to {MongoConnectionStringResolver.EnvVarName}; no default). Note: 'rollback' is not " +
+                $"supported for mongodb.",
         };
 
     /// <summary>The storage provider the offline <c>db</c> commands operate on.</summary>
@@ -27,7 +30,11 @@ internal static class CliOptions
         {
             Description = "Storage provider to operate on.",
             DefaultValueFactory = _ => MigrationRunnerFactory.Sqlite,
-        }.AcceptOnlyFromAmong(MigrationRunnerFactory.Sqlite, MigrationRunnerFactory.Postgres, MigrationRunnerFactory.SqlServer);
+        }.AcceptOnlyFromAmong(
+            MigrationRunnerFactory.Sqlite,
+            MigrationRunnerFactory.Postgres,
+            MigrationRunnerFactory.SqlServer,
+            MigrationRunnerFactory.MongoDb);
 
     /// <summary>Skips the interactive confirmation prompt on destructive commands.</summary>
     public static Option<bool> Yes() =>
