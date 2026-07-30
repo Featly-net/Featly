@@ -33,6 +33,10 @@ internal sealed class MongoFeatlyDatabase
 
     public IMongoCollection<Flag> Flags => Database.GetCollection<Flag>(MongoCollectionNames.Flags);
 
+    public IMongoCollection<Segment> Segments => Database.GetCollection<Segment>(MongoCollectionNames.Segments);
+
+    public IMongoCollection<Config> Configs => Database.GetCollection<Config>(MongoCollectionNames.Configs);
+
     /// <summary>
     /// Registers every entity's <c>BsonClassMap</c> exactly once per process.
     /// The driver's registration APIs are static and throw on a duplicate

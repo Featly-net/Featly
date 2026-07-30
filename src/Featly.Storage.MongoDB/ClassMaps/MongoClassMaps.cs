@@ -23,6 +23,8 @@ internal static class MongoClassMaps
         ProjectClassMap.Register();
         EnvironmentClassMap.Register();
         FlagClassMap.Register();
+        SegmentClassMap.Register();
+        ConfigClassMap.Register();
     }
 
     /// <summary>
@@ -44,5 +46,6 @@ internal static class MongoClassMaps
         BsonSerializer.RegisterSerializer(new JsonElementSerializer());
         BsonSerializer.RegisterSerializer(new EnumSerializer<FlagType>(BsonType.String));
         BsonSerializer.RegisterSerializer(new EnumSerializer<ConditionOperator>(BsonType.String));
+        BsonSerializer.RegisterSerializer(new EnumSerializer<ConfigType>(BsonType.String));
     }
 }
