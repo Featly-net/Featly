@@ -18,16 +18,22 @@ internal sealed class MongoAssignmentStore(MongoFeatlyDatabase database) : IAssi
         ArgumentNullException.ThrowIfNull(assignment);
 
         // First write wins — a subject's assignment never changes once
-        // recorded. The unique (ExperimentId, SubjectKey) index rejects a
-        // concurrent writer's duplicate; the already-persisted assignment
-        // stands.
-        try
-        {
-            await database.Assignments.InsertOneAsync(assignment, cancellationToken: ct).ConfigureAwait(false);
-        }
-        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
-        {
-        }
+        // recorded. $setOnInsert + upsert is atomic: a concurrent duplicate
+        // call is a no-op against the already-persisted row rather than a
+        // race to catch, unlike a plain InsertOneAsync against the unique
+        // (ExperimentId, SubjectKey) index.
+        var filter = Builders<Assignment>.Filter.Where(a =>
+            a.ExperimentId == assignment.ExperimentId && a.SubjectKey == assignment.SubjectKey);
+        var update = Builders<Assignment>.Update
+            .SetOnInsert(a => a.Id, assignment.Id)
+            .SetOnInsert(a => a.ExperimentId, assignment.ExperimentId)
+            .SetOnInsert(a => a.SubjectKey, assignment.SubjectKey)
+            .SetOnInsert(a => a.VariantKey, assignment.VariantKey)
+            .SetOnInsert(a => a.AssignedAt, assignment.AssignedAt);
+
+        await database.Assignments
+            .UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct)
+            .ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<Assignment>> ListByExperimentAsync(Guid experimentId, CancellationToken ct) =>
