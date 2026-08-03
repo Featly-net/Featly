@@ -47,7 +47,7 @@
          pulls in transitively, pinned explicitly because the test project's
          MySqlTestHost opens a raw MySqlConnection for throwaway-database
          setup/teardown (EF Core has no "create database by name" API). -->
-    <PackageVersion Include="MySqlConnector" Version="2.4.0" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.1" />
     <!-- Matches the version Microsoft.EntityFrameworkCore.SqlServer 10.0.9
          already pulls in transitively — pinned explicitly because the test
          project's SqlServerTestHost opens raw SqlConnection/SqlCommand for
