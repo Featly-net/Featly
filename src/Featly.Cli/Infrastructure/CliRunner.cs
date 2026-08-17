@@ -22,13 +22,13 @@ internal static class CliRunner
         }
         catch (OperationCanceledException)
         {
-            Console.Error.WriteLine("featly: operation canceled.");
+            await Console.Error.WriteLineAsync("featly: operation canceled.").ConfigureAwait(false);
             return 130;
         }
 #pragma warning disable CA1031 // CLI boundary: any failure is surfaced as a friendly one-line error, never a stack trace.
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"featly: {ex.Message}");
+            await Console.Error.WriteLineAsync($"featly: {ex.Message}").ConfigureAwait(false);
             return 1;
         }
 #pragma warning restore CA1031
