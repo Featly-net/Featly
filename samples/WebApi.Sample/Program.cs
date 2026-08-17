@@ -118,7 +118,4 @@ app.MapGet("/checkout/timeout", async (HttpContext http, IFeatlyClient featly, C
     });
 });
 
-app.Run();
-
-/// <summary>Marker type so test factories can find this entry point.</summary>
-public partial class Program;
+await app.RunAsync();
