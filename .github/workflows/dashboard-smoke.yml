@@ -49,6 +49,22 @@ jobs:
         with:
           node-version: 20
 
+      # Lint the dashboard BEFORE spending a build + browser on the smoke run:
+      # a raw-data innerHTML sink (the XSS surface issue #229 calls out) fails
+      # here in seconds via eslint-plugin-no-unsanitized. Kept in this workflow
+      # rather than ci.yml because it is the one job that already sets up Node,
+      # and it is a dashboard-only concern.
+      - name: Install smoke + lint dependencies
+        working-directory: tests/dashboard-smoke
+        # --ignore-scripts: neither playwright nor eslint needs an install-time
+        # lifecycle script -- the browser binary comes from the explicit
+        # "Install Chromium" step below.
+        run: npm ci --ignore-scripts
+
+      - name: Lint dashboard (ESLint + no-unsanitized)
+        working-directory: tests/dashboard-smoke
+        run: npm run lint
+
       - name: Build sample
         run: dotnet build samples/SelfHosted.Sample/SelfHosted.Sample.csproj -c Release
 
@@ -69,13 +85,6 @@ jobs:
           echo "Sample did not become healthy in time." >&2
           cat sample.log || true
           exit 1
-
-      - name: Install smoke dependencies
-        working-directory: tests/dashboard-smoke
-        # --ignore-scripts: our one dependency (playwright) needs no install-time
-        # lifecycle script to fetch itself -- the browser binary comes from the
-        # explicit "Install Chromium" step below.
-        run: npm ci --ignore-scripts
 
       - name: Install Chromium
         working-directory: tests/dashboard-smoke

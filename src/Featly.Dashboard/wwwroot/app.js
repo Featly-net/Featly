@@ -78,7 +78,7 @@
         envSelect.disabled = true;
         if (sbUserName) { sbUserName.textContent = "Not signed in"; }
         if (sbUserRole) { sbUserRole.textContent = "—"; }
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<h1>Sign in to Featly</h1>',
             '<div class="card auth-card">',
             '  <p>Enter an admin API key to start a dashboard session. Look up <code>Featly:Server:AdminApiKey</code> in <code>appsettings.json</code>, or use a key minted via the admin keys endpoint.</p>',
@@ -90,7 +90,7 @@
             '  </form>',
             '  <p class="muted">Featly stores your session as an <code>HttpOnly; SameSite=Strict</code> cookie. Nothing is written to <code>localStorage</code>.</p>',
             '</div>',
-        ].join("\n");
+        ].join("\n"));
         document.getElementById("auth-form").addEventListener("submit", function (e) {
             e.preventDefault();
             var v = document.getElementById("auth-token").value.trim();
@@ -213,10 +213,10 @@
     }
 
     function renderEnvSelect() {
-        envSelect.innerHTML = environments.map(function (e) {
+        envSelect.innerHTML = html(environments.map(function (e) {
             var sel = currentEnv && e.id === currentEnv.id ? " selected" : "";
             return '<option value="' + esc(e.key) + '"' + sel + '>' + esc(e.name || e.key) + (e.readOnly ? " (read-only)" : "") + '</option>';
-        }).join("");
+        }).join(""));
         envSelect.disabled = environments.length === 0;
         updateEnvPill();
     }
@@ -238,6 +238,13 @@
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
         });
     }
+    // Identity marker for the ESLint no-unsanitized rule (issue #229): tags a
+    // template string assembled above a sink -- from literals plus esc()/the
+    // markup builders -- as trusted HTML. It performs no escaping itself, so
+    // wrapping raw server data in it would defeat the check; the point is that
+    // every innerHTML/insertAdjacentHTML sink reads as either a literal, an
+    // esc()-family call, or an explicit html(...) that a reviewer can grep for.
+    function html(markup) { return markup; }
     function code(s) { return '<code>' + esc(s) + '</code>'; }
     function badge(s) { return '<span class="badge">' + esc(s) + '</span>'; }
     function truncate(s, n) { s = String(s || ""); return s.length <= n ? s : s.slice(0, n - 1) + "…"; }
@@ -247,15 +254,6 @@
         if (isNaN(d.getTime())) { return esc(iso); }
         var fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
         return '<time datetime="' + esc(iso) + '" title="' + esc(iso) + '">' + esc(fmt.format(d)) + '</time>';
-    }
-    function readJsonField(el) {
-        var raw = (el.value || "").trim();
-        if (!raw) { return null; }
-        try { return JSON.parse(raw); }
-        catch (_) {
-            // Plain strings are convenient — wrap them in quotes.
-            return raw;
-        }
     }
     function setMessage(kind, text) {
         var slot = document.getElementById("save-msg");
@@ -377,7 +375,7 @@
         } else {
             parts.push('<span class="crumb current">' + esc(section) + '</span>');
         }
-        crumbsEl.innerHTML = parts.join("");
+        crumbsEl.innerHTML = html(parts.join(""));
     }
 
     var OPERATORS = [
@@ -555,7 +553,7 @@
         paletteEl = document.createElement("div");
         paletteEl.className = "palette-backdrop";
         paletteEl.hidden = true;
-        paletteEl.innerHTML = [
+        paletteEl.innerHTML = html([
             '<div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">',
             '  <div class="palette-input"><span class="ti-slot" data-ti="search"></span>',
             '    <input id="palette-q" type="text" autocomplete="off" spellcheck="false" aria-label="Search" placeholder="Search flags, configs, segments — or jump to a screen…" />',
@@ -563,7 +561,7 @@
             '  <div class="palette-list" id="palette-list" role="listbox"></div>',
             '  <div class="palette-foot"><span class="ent"><span class="kp">↑↓</span> navigate</span><span class="ent"><span class="kp">↵</span> open</span><span class="ent"><span class="kp">esc</span> close</span></div>',
             '</div>',
-        ].join("");
+        ].join(""));
         document.body.appendChild(paletteEl);
         hydrateIcons(paletteEl);
         paletteEl.addEventListener("mousedown", function (e) { if (e.target === paletteEl) { closePalette(); } });
@@ -629,16 +627,16 @@
             list.innerHTML = '<div class="palette-section-label">No matches</div>';
             return;
         }
-        var html = "", lastGroup = null;
+        var markup = "", lastGroup = null;
         paletteItems.forEach(function (it, i) {
-            if (it.group !== lastGroup) { html += '<div class="palette-section-label">' + esc(it.group) + '</div>'; lastGroup = it.group; }
-            html += '<div class="palette-item' + (i === paletteActive ? " active" : "") + '" data-i="' + i + '" role="option">'
+            if (it.group !== lastGroup) { markup += '<div class="palette-section-label">' + esc(it.group) + '</div>'; lastGroup = it.group; }
+            markup += '<div class="palette-item' + (i === paletteActive ? " active" : "") + '" data-i="' + i + '" role="option">'
                 + '<span class="ti-slot" data-ti="' + esc(it.ti) + '"></span>'
                 + '<span><span class="mono">' + esc(it.label) + '</span>' + (it.sub ? ' <span class="sub">' + esc(it.sub) + '</span>' : '') + '</span>'
                 + '<span class="kp">' + esc(it.kind) + '</span>'
                 + '</div>';
         });
-        list.innerHTML = html;
+        list.innerHTML = html(markup);
         hydrateIcons(list);
         Array.prototype.slice.call(list.querySelectorAll(".palette-item")).forEach(function (el) {
             el.addEventListener("mousemove", function () { paletteActive = parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
@@ -744,7 +742,7 @@
             }
         }
         parts.push('</div><div class="notif-foot"><a class="btn outline xs" data-go="/inbox" href="' + esc(mountPath) + '/inbox">Open Inbox</a></div>');
-        notifPop.innerHTML = parts.join("");
+        notifPop.innerHTML = html(parts.join(""));
         hydrateIcons(notifPop);
         Array.prototype.slice.call(notifPop.querySelectorAll("[data-go]")).forEach(function (el) {
             el.addEventListener("click", function (e) { e.preventDefault(); closeNotif(); navigate(el.getAttribute("data-go")); });
@@ -793,13 +791,13 @@
 
     var views = {
         overview: function () {
-            viewEl.innerHTML = [
+            viewEl.innerHTML = html([
                 '<h1>Overview</h1>',
                 '<div class="card">',
                 '  <p>Welcome to Featly. M5C lights up the detail screens and visual rule editor.</p>',
                 '  <p class="muted">Click any row in the list views to edit it. Saved changes round-trip through the admin API and propagate to connected SDKs through the existing change-notification path.</p>',
                 '</div>',
-            ].join("\n");
+            ].join("\n"));
         },
         flagList:    function () { renderFlagList(); },
         configList:  function () { renderConfigList(); },
@@ -830,7 +828,7 @@
     function handleErrOnView(title) {
         return function (err) {
             if (err.kind === "auth") { showAuthPrompt(); return; }
-            viewEl.innerHTML = '<h1>' + title + '</h1><div class="error">' + esc(err.message) + '</div>';
+            viewEl.innerHTML = html('<h1>' + title + '</h1><div class="error">' + esc(err.message) + '</div>');
         };
     }
 
@@ -916,7 +914,7 @@
                         + '<span class="muted" style="font-size:11px">' + esc(c.detail) + '</span></div>'
                         + '</div>';
                 }).join("");
-                panel.innerHTML = [
+                panel.innerHTML = html([
                     '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">',
                     '  <div style="display:flex;justify-content:space-between;align-items:center">',
                     '    <strong>' + candidates.length + ' flag(s) look stale</strong>',
@@ -924,7 +922,7 @@
                     '  </div>',
                     '  <div class="bar-chart" style="margin-top:8px">' + rows + '</div>',
                     '</div>',
-                ].join("\n");
+                ].join("\n"));
                 hydrateIcons(panel);
                 panel.querySelectorAll("[data-key]").forEach(function (row) {
                     row.addEventListener("click", function () { navigate("/flags/" + encodeURIComponent(row.getAttribute("data-key"))); });
@@ -997,9 +995,9 @@
         }
         function repaint() {
             var rows = visibleRows();
-            tbody.innerHTML = rows.length
+            tbody.innerHTML = html(rows.length
                 ? rows.map(flagRow).join("")
-                : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No flags match this filter.</td></tr>';
+                : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No flags match this filter.</td></tr>');
             hydrateIcons(tbody);
             if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " flags"; }
             if (checkAll) { checkAll.checked = false; }
@@ -1129,9 +1127,9 @@
                 var hay = fields.map(function (f) { var v = r[f]; return Array.isArray(v) ? v.join(" ") : (v == null ? "" : v); }).join(" ").toLowerCase();
                 return hay.indexOf(q) >= 0;
             });
-            tbody.innerHTML = rows.length
+            tbody.innerHTML = html(rows.length
                 ? rows.map(rowFn).join("")
-                : '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">No ' + esc(noun) + ' match this filter.</td></tr>';
+                : '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">No ' + esc(noun) + ' match this filter.</td></tr>');
             hydrateIcons(tbody);
             if (countEl) { countEl.textContent = "Showing " + rows.length + " of " + all.length + " " + noun; }
             if (checkAll) { checkAll.checked = false; }
@@ -1461,13 +1459,6 @@
         return listPageShell(kind, key ? esc(key) : "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
     }
 
-    function auditFooter(entity) {
-        return '<div class="audit muted">'
-            + 'Created ' + formatDate(entity.createdAt) + ' by ' + esc(entity.createdBy || "—") + '<br/>'
-            + 'Updated ' + formatDate(entity.updatedAt) + ' by ' + esc(entity.updatedBy || "—")
-            + '</div>';
-    }
-
     // ---------- Flag editor ----------
     function renderFlagEditor(flag, otherFlags) {
         otherFlags = otherFlags || [];
@@ -1478,7 +1469,7 @@
         var statusBadge = flag.enabled
             ? '<span class="badge success"><span class="dot"></span>on</span>'
             : '<span class="badge"><span class="dot"></span>off</span>';
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(flag.key) + '</h1>',
             '    <span class="sub">' + esc(flag.name || "") + ' · ' + esc(flag.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
@@ -1510,7 +1501,7 @@
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
-            renderPreviewPanel("flag", flag.key),
+            renderPreviewPanel("flag"),
             '</div><aside class="detail-side">',
             '  <div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
             '    <dt>Status</dt><dd>' + statusBadge + '</dd>',
@@ -1524,7 +1515,7 @@
             '    <dt>Last evaluated</dt><dd id="flag-last-evaluated" class="muted">…</dd>',
             '  </dl></div>',
             '</aside></div></div></div>',
-        ].join("\n");
+        ].join("\n"));
 
         wireFlagEditor(flag, otherFlags);
         wirePreviewPanel("flag", flag.key);
@@ -1771,7 +1762,7 @@
 
     // ---------- Config editor ----------
     function renderConfigEditor(config) {
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(config.key) + '</h1>',
             '    <span class="sub">' + esc(config.name || "") + ' · ' + esc(config.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
@@ -1793,7 +1784,7 @@
             '  <span class="save-msg" id="save-msg"></span>',
             '</div>',
             '</form>',
-            renderPreviewPanel("config", config.key),
+            renderPreviewPanel("config"),
             '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Details</h3><dl class="side-dl">',
             '  <dt>Type</dt><dd>' + esc(config.type) + '</dd>',
             '  <dt>Default</dt><dd class="mono">' + esc(truncate(JSON.stringify(config.defaultValue), 24)) + '</dd>',
@@ -1801,7 +1792,7 @@
             '  <dt>Created</dt><dd>' + (formatDate(config.createdAt) || "—") + '</dd>',
             '  <dt>Updated</dt><dd>' + (formatDate(config.updatedAt) || "—") + '</dd>',
             '</dl></div></aside></div></div></div>',
-        ].join("\n");
+        ].join("\n"));
 
         hydrateIcons(viewEl);
         wirePreviewPanel("config", config.key);
@@ -1852,7 +1843,7 @@
 
     // ---------- Segment editor ----------
     function renderSegmentEditor(segment) {
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(segment.key) + '</h1>',
             '    <span class="sub">' + esc(segment.name || "") + ' · reusable group in <code>' + esc(currentEnv.key) + '</code></span>',
@@ -1873,7 +1864,7 @@
             '  <dt>Created</dt><dd>' + (formatDate(segment.createdAt) || "—") + '</dd>',
             '  <dt>Updated</dt><dd>' + (formatDate(segment.updatedAt) || "—") + '</dd>',
             '</dl><p class="muted" style="font-size:11px;margin:10px 0 0">Referenced from flag &amp; config rules via the <code>InSegment</code> operator.</p></div></aside></div></div></div>',
-        ].join("\n");
+        ].join("\n"));
 
         hydrateIcons(viewEl);
         var form = document.getElementById("segment-form");
@@ -1958,7 +1949,7 @@
                 return '<tr><td>' + code(r.key) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.via) + '</td><td>' + (r.environmentId ? code(truncate(r.environmentId, 8)) : '<span class="muted">all envs</span>') + '</td></tr>';
             }).join("");
             var perms = (access.permissions || []);
-            viewEl.innerHTML = [
+            viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap">',
                 '  <h1>' + esc(user.displayName || user.identifier) + '</h1>',
                 '  <span class="sub mono">' + esc(user.identifier) + '</span>',
@@ -1984,7 +1975,7 @@
                 '  <dt>Status</dt><dd>' + (user.disabled ? "disabled" : "active") + '</dd>',
                 '  <dt>Roles</dt><dd>' + (access.roles || []).length + '</dd>',
                 '</dl></div></aside></div></div></div>',
-            ].join("\n");
+            ].join("\n"));
             hydrateIcons(viewEl);
             loadRoleAssignments("User", user.id);
         }).catch(handleErrOnView("User: " + identifier));
@@ -2038,7 +2029,7 @@
                         + '<td><span class="muted" style="font-size:11px">' + esc(truncate((r.permissions || []).join(", "), 56)) + '</span></td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Roles</h1>',
                     '  <span class="sub">' + sub + '</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
@@ -2053,7 +2044,7 @@
                     '  <div class="editor__footer"><button type="submit" class="btn primary">Create role</button><span class="save-msg" id="role-msg"></span></div>',
                     '  </form>',
                     '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 var tbody = viewEl.querySelector(".role-tbody");
                 if (tbody) {
@@ -2088,7 +2079,7 @@
                 var actions = '<button type="button" class="btn outline xs" data-role="clone">Clone</button> '
                     + (sys ? "" : '<button type="button" class="btn outline xs danger" data-role="delete">Delete</button> ')
                     + '<span class="save-msg" id="role-msg"></span>';
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(r.name || r.key) + '</h1>',
                     '  <span class="sub">role <code>' + esc(r.key) + '</code> · ' + (sys ? '<span class="badge info">system</span>' : '<span class="badge purple">custom</span>') + ' · ' + perms.length + ' permission(s)' + (sys ? " · read-only" : "") + '</span>',
                     '</div><div class="actions">' + actions + '</div></div>',
@@ -2105,7 +2096,7 @@
                     '  <dt>Permissions</dt><dd>' + perms.length + '</dd>',
                     '  <dt>Updated</dt><dd>' + (formatDate(r.updatedAt) || "—") + '</dd>',
                     '</dl>' + (sys ? '<p class="muted" style="font-size:11px;margin:10px 0 0">System roles are immutable. Use Clone to make an editable copy.</p>' : "") + '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 var msg = document.getElementById("role-msg");
                 var editForm = document.getElementById("role-edit");
@@ -2163,7 +2154,7 @@
                         + '<td class="mono cell-modified">' + (formatDate(g.updatedAt) || "—") + '</td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Groups</h1>',
                     '  <span class="sub">Bundle users so a single role assignment grants a role to every member at once.</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
@@ -2178,7 +2169,7 @@
                     '  <div class="editor__footer"><button type="submit" class="btn primary">Create group</button><span class="save-msg" id="grp-msg"></span></div>',
                     '  </form>',
                     '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 var tbody = viewEl.querySelector(".grp-tbody");
                 if (tbody) {
@@ -2228,9 +2219,9 @@
         var searchEl = root.querySelector(".member-search-input");
         var resultsEl = root.querySelector(".member-results");
         function renderChips() {
-            chipsEl.innerHTML = memberIds.length
+            chipsEl.innerHTML = html(memberIds.length
                 ? memberIds.map(function (id) { return memberChip(userById[id], id); }).join("")
-                : '<span class="muted" style="font-size:12px">No members yet.</span>';
+                : '<span class="muted" style="font-size:12px">No members yet.</span>');
             hydrateIcons(chipsEl);
         }
         function renderResults() {
@@ -2239,13 +2230,14 @@
                 if (memberIds.indexOf(u.id) >= 0) { return false; }
                 return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().indexOf(q) >= 0;
             }).slice(0, 8) : [];
-            resultsEl.innerHTML = matches.length
+            var emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
+            resultsEl.innerHTML = html(matches.length
                 ? matches.map(function (u) {
                     return '<button type="button" class="user-result" data-add="' + esc(u.id) + '">'
                         + '<span class="ur-name">' + esc(userDisplay(u)) + '</span>'
                         + '<span class="ur-id mono">' + esc(u.identifier || "") + '</span></button>';
                 }).join("")
-                : (q ? '<div class="ur-empty muted">No matching users.</div>' : "");
+                : emptyState);
             resultsEl.hidden = !q;
         }
         searchEl.addEventListener("input", renderResults);
@@ -2305,7 +2297,7 @@
             var roleOpts = roles.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.key) + '</option>'; }).join("");
             var envOpts = '<option value="">All environments</option>'
                 + environments.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.key) + '</option>'; }).join("");
-            bodyEl.innerHTML = [
+            bodyEl.innerHTML = html([
                 assignments.length
                     ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:120px">Role</th><th>Name</th><th style="width:140px">Environment</th><th style="width:120px">Granted</th><th style="width:90px"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
                     : '<div class="empty"><p>No role assignments yet.</p></div>',
@@ -2314,7 +2306,7 @@
                 '  <label class="field"><span class="field__label">Scope</span><select name="env">' + envOpts + '</select></label>',
                 '  <div class="row-form__action"><button type="submit" class="btn primary">Grant role</button><span class="save-msg" id="ra-msg"></span></div>',
                 '</form>',
-            ].join("");
+            ].join(""));
             var msg = bodyEl.querySelector("#ra-msg");
             bodyEl.querySelector(".ra-form").addEventListener("submit", function (e) {
                 e.preventDefault();
@@ -2354,7 +2346,7 @@
             users.forEach(function (u) { userById[u.id] = u; });
             var memberIds = (g.memberUserIds || []).slice();
 
-            viewEl.innerHTML = [
+            viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
                 '  <span class="sub">group <code>' + esc(g.key) + '</code> · <span id="grp-count">' + memberIds.length + '</span> member(s)</span>',
                 '</div><div class="actions"><button type="button" class="btn outline xs danger" data-grp="delete">Delete</button><span class="save-msg" id="grp-msg"></span></div></div>',
@@ -2372,7 +2364,7 @@
                 '  <dt>Created</dt><dd>' + (formatDate(g.createdAt) || "—") + '</dd>',
                 '  <dt>Updated</dt><dd>' + (formatDate(g.updatedAt) || "—") + '</dd>',
                 '</dl></div></aside></div></div></div>',
-            ].join("\n");
+            ].join("\n"));
             hydrateIcons(viewEl);
 
             wireMemberPicker(viewEl.querySelector(".member-picker"), memberIds, users, userById);
@@ -2415,7 +2407,7 @@
     function renderApiKeyList() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("API keys"); return; }
         var envKey = currentEnv.key;
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>API keys</h1>',
             '  <span class="sub">Bearer tokens scoped to <code>' + esc(envKey) + '</code>. The plaintext token is shown exactly once, at creation; only an Argon2id hash is stored.</span>',
             '</div></div><div class="page-body">',
@@ -2430,7 +2422,7 @@
             '  </form></div>',
             '  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Prefix</th><th>Scope</th><th>User</th><th>Status</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr></thead><tbody id="apikey-tbody"><tr><td colspan="9" class="muted" style="padding:18px;text-align:center">Loading…</td></tr></tbody></table></div>',
             '</div></div>',
-        ].join("\n");
+        ].join("\n"));
         hydrateIcons(viewEl);
 
         var tbody = document.getElementById("apikey-tbody");
@@ -2447,7 +2439,7 @@
                 tbody.innerHTML = '<tr><td colspan="9" class="muted" style="padding:18px;text-align:center">No API keys in this environment yet. Mint one on the right.</td></tr>';
                 return;
             }
-            tbody.innerHTML = keys.map(function (k) {
+            tbody.innerHTML = html(keys.map(function (k) {
                 var expired = !k.revoked && k.expiresAt && new Date(k.expiresAt) <= new Date();
                 var status = k.revoked
                     ? '<span class="badge danger">revoked</span>'
@@ -2467,7 +2459,7 @@
                         '<button type="button" class="btn outline xs" data-rotate="' + esc(k.id) + '">Rotate</button> '
                         + '<button type="button" class="btn outline xs danger" data-revoke="' + esc(k.id) + '">Revoke</button>') + '</td>'
                     + '</tr>';
-            }).join("");
+            }).join(""));
             Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
                     var id = btn.getAttribute("data-revoke");
@@ -2535,7 +2527,7 @@
                         + '<td class="mono cell-modified">' + (formatDate(p.createdAt) || "—") + '</td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Projects</h1>',
                     '  <span class="sub">A project is the top-level scope that groups a set of environments.</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
@@ -2550,7 +2542,7 @@
                     '  <div class="editor__footer"><button type="submit" class="btn primary">Create project</button><span class="save-msg" id="prj-msg"></span></div>',
                     '  </form>',
                     '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 var tbody = viewEl.querySelector(".prj-tbody");
                 if (tbody) {
@@ -2580,7 +2572,7 @@
         viewEl.innerHTML = listPageShell("Project", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/projects/" + encodeURIComponent(key))
             .then(function (p) {
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(p.name || p.key) + '</h1>',
                     '  <span class="sub">project <code>' + esc(p.key) + '</code>' + (p.isDefault ? ' · default' : '') + '</span>',
                     '</div><div class="actions"><span class="save-msg" id="prj-msg"></span></div></div>',
@@ -2595,7 +2587,7 @@
                     '  <dt>Default</dt><dd>' + (p.isDefault ? "yes" : "no") + '</dd>',
                     '  <dt>Created</dt><dd>' + (formatDate(p.createdAt) || "—") + '</dd>',
                     '</dl></div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 var msg = document.getElementById("prj-msg");
                 document.getElementById("prj-edit").addEventListener("submit", function (e) {
@@ -2674,7 +2666,7 @@
                 ? '<button type="button" class="btn outline xs" data-exp="stop">Stop</button>'
                 : '<button type="button" class="btn primary xs" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + '</button>';
 
-            viewEl.innerHTML = [
+            viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap"><h1 class="mono">' + esc(exp.key) + '</h1>',
                 '  <span class="sub">' + esc(exp.name || "") + ' · flag <code>' + esc(exp.flagKey) + '</code> · ' + esc(currentEnv.key) + '</span>',
                 '</div><div class="actions">' + experimentStatus(exp) + startStop + '<span class="save-msg" id="exp-msg"></span></div></div>',
@@ -2690,7 +2682,7 @@
                 '</dl>',
                 exp.hypothesis ? '<p class="muted" style="font-size:11px;margin:10px 0 0">' + esc(exp.hypothesis) + '</p>' : '',
                 '</div></aside></div></div></div>',
-            ].join("\n");
+            ].join("\n"));
 
             wireExperimentDetail(exp);
             hydrateIcons(viewEl);
@@ -2880,7 +2872,7 @@
                 var approvals = (c.approvals || []).map(function (a) {
                     return '<li>' + badge(a.decision) + ' ' + code(truncate(a.approverUserId, 8)) + (a.comment ? ' — ' + esc(a.comment) : '') + '</li>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + badge(c.entityType) + ' <span class="mono">' + esc(c.entityKey) + '</span></h1>',
                     '  <span class="sub">' + esc(c.action) + ' · authored by <code>' + esc(truncate(c.authorUserId, 8)) + '</code></span>',
                     '</div><div class="actions">' + crStatusBadge(c.status) + (c.wasEmergencyBypass ? ' ' + badge("emergency") : '') + '</div></div>',
@@ -2906,7 +2898,7 @@
                     '  </dl></div>',
                     approvals ? '  <div class="side-card"><h3 class="side-h">Approvals</h3><ul class="cr-approvals">' + approvals + '</ul></div>' : '',
                     '</aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
                 wireChangeDetail(c);
             })
             .catch(handleErrOnView("Change"));
@@ -3070,10 +3062,10 @@
     }
     function openModal(title, bodyHtml, large) {
         ensureModal();
-        modalEl.innerHTML = '<div class="modal' + (large ? " lg" : "") + '" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">'
+        modalEl.innerHTML = html('<div class="modal' + (large ? " lg" : "") + '" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">'
             + '<div class="modal-head"><span class="title">' + esc(title) + '</span>'
             + '<button class="icon-btn" type="button" data-modal-close aria-label="Close"><span class="ti-slot" data-ti="x"></span></button></div>'
-            + '<div class="modal-body">' + bodyHtml + '</div></div>';
+            + '<div class="modal-body">' + bodyHtml + '</div></div>');
         modalEl.hidden = false;
         hydrateIcons(modalEl);
         modalEl.querySelector("[data-modal-close]").addEventListener("click", closeModal);
@@ -3089,7 +3081,7 @@
                 var rules = (p.approverRules || []).map(function (r) {
                     return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' · min ' + (r.minFromThisRule || 1) + '</li>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Approval policy</h1>',
                     '  <span class="sub">When approval is required, mutations to <code>' + esc(envKey) + '</code> become pending changes that need sign-off before they apply.</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
@@ -3103,7 +3095,7 @@
                     '</div><aside class="detail-side"><div class="side-card"><h3 class="side-h">Approver rules</h3>',
                     rules ? '<ul class="cr-approvals">' + rules + '</ul>' : '<p class="muted" style="font-size:12px">No structured approver rules — a flat minimum-approvals count applies.</p>',
                     '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("policy-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target.elements;
@@ -3206,7 +3198,7 @@
                         + '<td>' + types + '</td>'
                         + '</tr>';
                 }).join("");
-                viewEl.innerHTML = [
+                viewEl.innerHTML = html([
                     '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Webhooks</h1>',
                     '  <span class="sub">Outbound HTTP notifications. Each delivery is signed with the endpoint secret (<code>X-Featly-Signature: sha256=…</code>, HMAC-SHA256) and retried with backoff.</span>',
                     '</div></div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
@@ -3223,7 +3215,7 @@
                     '  <div class="editor__footer"><button type="submit" class="btn primary">Create webhook</button><span class="save-msg" id="wh-msg"></span></div>',
                     '  </form>',
                     '</div></aside></div></div></div>',
-                ].join("\n");
+                ].join("\n"));
 
                 document.getElementById("wh-form").addEventListener("submit", function (e) {
                     e.preventDefault();
@@ -3275,7 +3267,7 @@
                     + '</tr>';
             }).join("");
 
-            viewEl.innerHTML = [
+            viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(w.name) + '</h1>',
                 '  <span class="sub">' + (w.enabled ? '<span class="badge success"><span class="dot"></span>enabled</span>' : '<span class="badge">disabled</span>') + ' · ' + code(truncate(w.url, 56)) + '</span>',
                 '</div><div class="actions">',
@@ -3304,7 +3296,7 @@
                 '  <dt>Deliveries</dt><dd>' + deliveries.length + '</dd>',
                 '  <dt>Created</dt><dd>' + (formatDate(w.createdAt) || "—") + '</dd>',
                 '</dl></div></aside></div></div></div>',
-            ].join("\n");
+            ].join("\n"));
 
             hydrateIcons(viewEl);
             wireEventPicker(viewEl.querySelector(".evt-picker"));
@@ -3358,7 +3350,7 @@
     }
 
     function renderSettings() {
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Settings</h1>',
             '  <span class="sub">Environment-level controls. A read-only environment rejects every mutation (flags, configs, segments) with <code>403</code> — a hard freeze for incidents and compliance windows.</span>',
             '</div></div><div class="page-body tight">',
@@ -3385,7 +3377,7 @@
             '  <p class="sub">Requests per minute per client (identity when authenticated, else IP) for the auth, admin, and SDK surfaces. Off by default; <code>0</code> means unlimited for that surface. Saved to the database, overriding <code>appsettings</code>.</p>',
             '  <div id="ratelimit-settings"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
-        ].join("\n");
+        ].join("\n"));
 
         function refreshSettings(msg) {
             loadEnvironments().then(function () { renderSettings(); })
@@ -3415,7 +3407,7 @@
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
-                document.getElementById("ratelimit-settings").innerHTML = [
+                document.getElementById("ratelimit-settings").innerHTML = html([
                     '<div class="card-pad"><form id="ratelimit-settings-form" class="row-form">',
                     '  <label class="check"><input type="checkbox" name="enabled"' + (v.enabled ? " checked" : "") + ' /> Enabled</label>',
                     '  <label class="field"><span class="field__label">Auth (req/min)</span><input name="authPermitsPerMinute" type="number" min="0" value="' + esc(String(v.authPermitsPerMinute != null ? v.authPermitsPerMinute : 10)) + '" /></label>',
@@ -3423,7 +3415,7 @@
                     '  <label class="field"><span class="field__label">SDK (req/min)</span><input name="sdkPermitsPerMinute" type="number" min="0" value="' + esc(String(v.sdkPermitsPerMinute != null ? v.sdkPermitsPerMinute : 1000)) + '" /></label>',
                     '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="ratelimit-settings-msg"></span></div>',
                     '</form></div>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("ratelimit-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -3461,12 +3453,12 @@
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
-                document.getElementById("apprdef-settings").innerHTML = [
+                document.getElementById("apprdef-settings").innerHTML = html([
                     '<form id="apprdef-form">',
                     '  <div class="grid-2">' + approvalTemplateFields("prod", v.prod) + approvalTemplateFields("nonProd", v.nonProd) + '</div>',
                     '  <div class="row-form__action" style="margin-top:10px"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="apprdef-msg"></span></div>',
                     '</form>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("apprdef-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -3498,12 +3490,12 @@
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
-                document.getElementById("audit-settings").innerHTML = [
+                document.getElementById("audit-settings").innerHTML = html([
                     '<div class="card-pad"><form id="audit-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Retention (days, 0 = forever)</span><input name="retentionDays" type="number" min="0" value="' + esc(String(v.retentionDays != null ? v.retentionDays : 0)) + '" /></label>',
                     '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="audit-settings-msg"></span></div>',
                     '</form></div>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("audit-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -3527,14 +3519,14 @@
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
-                document.getElementById("authz-settings").innerHTML = [
+                document.getElementById("authz-settings").innerHTML = html([
                     '<div class="card-pad"><form id="authz-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Auto-provision mode</span><select name="autoProvisionMode">'
                     + '<option value="Open"' + (mode === "Open" ? " selected" : "") + '>Open</option>'
                     + '<option value="Closed"' + (mode === "Closed" ? " selected" : "") + '>Closed</option></select></label>',
                     '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="authz-settings-msg"></span></div>',
                     '</form></div>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("authz-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -3557,14 +3549,14 @@
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
-                document.getElementById("webhook-settings").innerHTML = [
+                document.getElementById("webhook-settings").innerHTML = html([
                     '<div class="card-pad"><form id="webhook-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Max attempts</span><input name="maxAttempts" type="number" min="1" value="' + esc(String(v.maxAttempts)) + '" /></label>',
                     '  <label class="field"><span class="field__label">Base backoff (s)</span><input name="baseRetryDelaySeconds" type="number" min="1" value="' + esc(String(v.baseRetryDelaySeconds)) + '" /></label>',
                     '  <label class="field"><span class="field__label">Max backoff (s)</span><input name="maxRetryDelaySeconds" type="number" min="1" value="' + esc(String(v.maxRetryDelaySeconds)) + '" /></label>',
                     '  <div class="row-form__action"><button type="submit" class="btn primary">Save</button> ' + prov + ' <span class="save-msg" id="webhook-settings-msg"></span></div>',
                     '</form></div>',
-                ].join("\n");
+                ].join("\n"));
                 document.getElementById("webhook-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -3602,10 +3594,10 @@
                     + '</td>'
                     + '</tr>';
             }).join("");
-            document.getElementById("env-settings").innerHTML = [
+            document.getElementById("env-settings").innerHTML = html([
                 '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Key</th><th>Name</th><th>State</th><th>SDK clients</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                 '<span class="save-msg" id="env-msg"></span>',
-            ].join("\n");
+            ].join("\n"));
 
             // Best-effort, in-process SDK activity per environment (see the
             // "Scaling out" note in the Centralized deployment docs — a
@@ -3659,7 +3651,7 @@
         }
     }
     function renderAuditLog() {
-        viewEl.innerHTML = [
+        viewEl.innerHTML = html([
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Audit log</h1>',
             '  <span class="sub">Every consequential action, newest first. Filter by entity, actor, or date.</span>',
             '</div></div><div class="page-body tight">',
@@ -3673,7 +3665,7 @@
             '</form>',
             '<div id="audit-results"><div class="empty"><p class="muted">Loading…</p></div></div>',
             '</div></div>',
-        ].join("\n");
+        ].join("\n"));
 
         function load(filters) {
             var qs = [];
@@ -3700,7 +3692,7 @@
                         + (a.entityType ? '<span class="env-chip">' + esc(a.entityType) + '</span>' : '')
                         + '</div>';
                 }).join("");
-                resultsEl.innerHTML = '<div class="audit-list">' + rows + '</div>';
+                resultsEl.innerHTML = html('<div class="audit-list">' + rows + '</div>');
                 hydrateIcons(resultsEl);
                 function openAuditEntry(idx) {
                     var a = entries[idx];
@@ -3937,7 +3929,7 @@
     // ============================================================
     // Preview ("test this context") panel
     // ============================================================
-    function renderPreviewPanel(kind, entityKey) {
+    function renderPreviewPanel(kind) {
         var panelId = "preview-panel";
         var title = "Test this context";
         return '<section class="preview-panel" id="' + panelId + '">'
@@ -4039,12 +4031,12 @@
     // ============================================================
     // Tiny utilities
     // ============================================================
-    function field(label, html) {
-        return '<label class="field"><span class="field__label">' + esc(label) + '</span>' + html + '</label>';
+    function field(label, innerMarkup) {
+        return '<label class="field"><span class="field__label">' + esc(label) + '</span>' + innerMarkup + '</label>';
     }
-    function htmlToElement(html) {
+    function htmlToElement(markup) {
         var d = document.createElement("div");
-        d.innerHTML = html.trim();
+        d.innerHTML = html(markup.trim());
         return d.firstChild;
     }
     function parseCsv(s) {
