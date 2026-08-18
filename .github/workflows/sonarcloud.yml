@@ -137,6 +137,12 @@ jobs:
         # executes (flagged by SonarCloud's own githubactions:S7636 rule).
         # Reading it from the process environment at runtime avoids that.
         #
+        # sonar.coverage.exclusions: tests/** as a whole, not just the *Tests
+        # project glob -- tests/dashboard-smoke holds the dashboard's Playwright
+        # smoke and its ESLint config, neither of which is production code nor
+        # has (or should have) coverage. Without it, editing eslint.config.mjs
+        # fails the new-code coverage gate on a lint config (PR #313).
+        #
         # sonar.cpd.exclusions: every relational storage provider's source is
         # near-byte-identical across providers by design (ADR-0026's "own
         # DbContext per provider" decision explicitly accepts this duplication
@@ -173,7 +179,7 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
-          /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,samples/**,**/Featly.Engine.Benchmarks/**,**/Featly.Dashboard/wwwroot/**"
+          /d:sonar.coverage.exclusions="**/Migrations/**,**/*Tests/**,**/*.Tests.*,tests/**,samples/**,**/Featly.Engine.Benchmarks/**,**/Featly.Dashboard/wwwroot/**"
           /d:sonar.cpd.exclusions="src/Featly.Storage.Sqlite/**,src/Featly.Storage.Postgres/**,src/Featly.Storage.SqlServer/**,src/Featly.Storage.MySql/**,src/Featly.Storage.MongoDB/**,samples/Centralized.Postgres.Sample/**,samples/Centralized.MongoDB.Sample/**"
 
       - name: Build
