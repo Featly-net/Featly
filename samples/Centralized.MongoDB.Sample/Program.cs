@@ -54,6 +54,3 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 await app.RunAsync();
-
-/// <summary>Marker type so test factories can find this entry point.</summary>
-public partial class Program;

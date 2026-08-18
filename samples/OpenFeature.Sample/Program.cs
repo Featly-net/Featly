@@ -74,6 +74,3 @@ app.MapGet("/checkout", async (HttpContext http) =>
 });
 
 await app.RunAsync();
-
-/// <summary>Marker type so test factories can find this entry point.</summary>
-public partial class Program;

@@ -15,6 +15,8 @@ namespace Featly.Server.Endpoints;
 /// </summary>
 internal static class AdminEnvironmentsEndpoints
 {
+    private const string NoDefaultProject = "No default project.";
+
     public static RouteGroupBuilder MapAdminEnvironments(this RouteGroupBuilder group)
     {
         var admin = group.MapGroup("/admin/environments").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
@@ -53,7 +55,7 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Problems.NotFound("No default project.");
+            return Problems.NotFound(NoDefaultProject);
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, body.Key, ct).ConfigureAwait(false);
@@ -83,7 +85,7 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Problems.NotFound("No default project.");
+            return Problems.NotFound(NoDefaultProject);
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
@@ -102,7 +104,7 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Problems.NotFound("No default project.");
+            return Problems.NotFound(NoDefaultProject);
         }
 
         var existing = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
@@ -146,7 +148,7 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Problems.NotFound("No default project.");
+            return Problems.NotFound(NoDefaultProject);
         }
 
         var environment = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);
@@ -175,7 +177,7 @@ internal static class AdminEnvironmentsEndpoints
         var project = await store.Projects.GetDefaultAsync(ct).ConfigureAwait(false);
         if (project is null)
         {
-            return Problems.NotFound("No default project.");
+            return Problems.NotFound(NoDefaultProject);
         }
 
         var environment = await store.Environments.GetByKeyAsync(project.Id, key, ct).ConfigureAwait(false);

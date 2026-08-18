@@ -45,7 +45,4 @@ app.MapGet("/", () => Results.Ok(new
     consumers = "point an SDK app (e.g. WebApi.Sample) at Featly:Sdk:ServerUrl=http://localhost:5085",
 }));
 
-app.Run();
-
-/// <summary>Marker type so test factories can find this entry point.</summary>
-public partial class Program;
+await app.RunAsync();

@@ -21,8 +21,8 @@ internal static class ConditionEvaluator
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(50);
 
     // Compiled-regex cache keyed by the raw pattern. Patterns come from saved
-    // rule conditions (a bounded, admin-authored set), so the cache stays small;
-    // a null entry marks a pattern that failed to compile at all.
+    // rule conditions (a bounded, admin-authored set), so the cache stays
+    // small. A null entry marks a pattern that failed to compile at all.
     private static readonly ConcurrentDictionary<string, Regex?> s_regexCache = new(StringComparer.Ordinal);
 
     public static bool Matches(

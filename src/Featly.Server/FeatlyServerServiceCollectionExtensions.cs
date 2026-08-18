@@ -98,8 +98,8 @@ public static class FeatlyServerServiceCollectionExtensions
             .BindConfiguration(FeatlyAuthorizationOptions.SectionName);
 
         // Observability (issue #77): the Meter + ActivitySource that the server
-        // records to are always present (recording is free with no listener);
-        // AddMetrics guarantees an IMeterFactory is available even outside the
+        // records to are always present, since recording is free with no
+        // listener. AddMetrics guarantees an IMeterFactory is available even outside the
         // ASP.NET Core hosting stack. The OTLP export pipeline is opt-in via
         // AddFeatlyServerTelemetry(configuration).
         services.AddMetrics();

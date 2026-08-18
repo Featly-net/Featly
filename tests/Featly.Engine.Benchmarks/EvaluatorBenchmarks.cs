@@ -20,8 +20,9 @@ namespace Featly.Engine.Benchmarks;
 public class EvaluatorBenchmarks
 {
     private static readonly Guid EnvId = Guid.NewGuid();
+    private const string EnterprisePlan = "enterprise";
     private static readonly JsonElement Fallback = JsonSerializer.SerializeToElement(false);
-    private static readonly string[] EnterprisePlanArray = ["enterprise", "pro"];
+    private static readonly string[] EnterprisePlanArray = [EnterprisePlan, "pro"];
 
     private Flag _booleanNoRules = null!;
     private Flag _singleConditionRule = null!;
@@ -42,7 +43,7 @@ public class EvaluatorBenchmarks
             Attributes: new Dictionary<string, object?>
             {
                 ["user.country"] = "BR",
-                ["user.plan"] = "enterprise",
+                ["user.plan"] = EnterprisePlan,
                 ["user.age"] = 30,
                 ["user.email"] = "alice@example.com",
                 ["user.version"] = "2.5.1",
@@ -96,7 +97,7 @@ public class EvaluatorBenchmarks
         var enterprise = new Segment
         {
             Id = Guid.NewGuid(),
-            Key = "enterprise",
+            Key = EnterprisePlan,
             Name = "Enterprise",
             EnvironmentId = EnvId,
             Conditions =
@@ -105,11 +106,11 @@ public class EvaluatorBenchmarks
                 {
                     Attribute = "user.plan",
                     Operator = ConditionOperator.Equals,
-                    Value = JsonSerializer.SerializeToElement("enterprise"),
+                    Value = JsonSerializer.SerializeToElement(EnterprisePlan),
                 },
             ],
         };
-        _segmentLookup = new DictionarySegmentLookup(new Dictionary<string, Segment> { ["enterprise"] = enterprise });
+        _segmentLookup = new DictionarySegmentLookup(new Dictionary<string, Segment> { [EnterprisePlan] = enterprise });
 
         _segmentFlag = BuildBoolFlag(
         [
@@ -122,7 +123,7 @@ public class EvaluatorBenchmarks
                     {
                         Attribute = "ignored",
                         Operator = ConditionOperator.InSegment,
-                        Value = JsonSerializer.SerializeToElement("enterprise"),
+                        Value = JsonSerializer.SerializeToElement(EnterprisePlan),
                     },
                 ],
                 Outcome = new RuleOutcome { VariantKey = "on" },

@@ -125,9 +125,10 @@ internal sealed partial class ScheduledApplyWorker(
             return;
         }
 
-        // Apply is an idempotent upsert, so a concurrent double-apply is harmless;
-        // the atomic Approved -> Applied claim then ensures exactly one instance
-        // finalizes and emits the event. The loser skips (returns false).
+        // Apply is an idempotent upsert, so a concurrent double-apply is
+        // harmless. The atomic Approved -> Applied claim then ensures exactly
+        // one instance finalizes and emits the event. The loser skips
+        // (returns false).
         if (!await store.PendingChanges.TryClaimStatusAsync(change.Id, ChangeStatus.Approved, ChangeStatus.Applied, ct).ConfigureAwait(false))
         {
             return;

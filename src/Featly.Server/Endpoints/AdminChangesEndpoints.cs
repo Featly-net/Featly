@@ -20,6 +20,9 @@ namespace Featly.Server.Endpoints;
 /// </summary>
 internal static class AdminChangesEndpoints
 {
+    /// <summary>Entity-type label used in published change events.</summary>
+    private const string ChangeEntityType = "Change";
+
     public static RouteGroupBuilder MapAdminChanges(this RouteGroupBuilder group)
     {
         var admin = group.MapGroup("/admin/changes").RequireAuthorization(FeatlyAuthenticationDefaults.AdminPolicy);
@@ -101,7 +104,7 @@ internal static class AdminChangesEndpoints
             UpdatedAt = now,
         };
         await store.PendingChanges.CreateAsync(change, ct).ConfigureAwait(false);
-        await events.PublishAsync(FeatlyEventTypes.ChangeProposed, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+        await events.PublishAsync(FeatlyEventTypes.ChangeProposed, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
         return Results.Created($"/api/admin/changes/{change.Id}", change);
     }
@@ -204,12 +207,12 @@ internal static class AdminChangesEndpoints
 
         if (change.Status == ChangeStatus.Approved)
         {
-            await events.PublishAsync(FeatlyEventTypes.ChangeApproved, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            await events.PublishAsync(FeatlyEventTypes.ChangeApproved, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
                 new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
         }
         else if (change.Status == ChangeStatus.Rejected)
         {
-            await events.PublishAsync(FeatlyEventTypes.ChangeRejected, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+            await events.PublishAsync(FeatlyEventTypes.ChangeRejected, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
                 new { change.Id, change.EntityType, change.EntityKey, change.Action }, ct).ConfigureAwait(false);
         }
 
@@ -258,7 +261,7 @@ internal static class AdminChangesEndpoints
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
         await ChangeStaleness.MarkSiblingsStaleAsync(store, change, ct).ConfigureAwait(false);
         metrics.RecordChangeApplied(change.Action, bypassed: false);
-        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = false }, ct).ConfigureAwait(false);
         return Results.Ok(change);
     }
@@ -294,7 +297,7 @@ internal static class AdminChangesEndpoints
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
 
-        await events.PublishAsync(FeatlyEventTypes.ChangeScheduled, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+        await events.PublishAsync(FeatlyEventTypes.ChangeScheduled, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action, scheduledApplyAt = body.ScheduledApplyAt }, ct).ConfigureAwait(false);
 
         return Results.Ok(change);
@@ -346,7 +349,7 @@ internal static class AdminChangesEndpoints
         change.UpdatedAt = DateTimeOffset.UtcNow;
         await store.PendingChanges.UpdateAsync(change, ct).ConfigureAwait(false);
         metrics.RecordChangeApplied(change.Action, bypassed: true);
-        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, "Change", change.Id.ToString(), change.EnvironmentId, principal,
+        await events.PublishAsync(FeatlyEventTypes.ChangeApplied, ChangeEntityType, change.Id.ToString(), change.EnvironmentId, principal,
             new { change.Id, change.EntityType, change.EntityKey, change.Action, emergency = true }, ct).ConfigureAwait(false);
         return Results.Ok(change);
     }

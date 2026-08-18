@@ -273,6 +273,32 @@ public class AdminEnvironmentsEndpointTests
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    /// <summary>
+    /// Every environment write resolves the default project first. With
+    /// <c>AutoCreateDefaultProject</c> off and nothing bootstrapped, each one
+    /// must fail as a clean 404 rather than a 500 — the branch that guards
+    /// against a host that skipped project bootstrap entirely.
+    /// </summary>
+    [Fact]
+    public async Task Environment_writes_return_404_when_no_default_project_exists()
+    {
+        using var host = await FeatlyTestHost.CreateAsync(
+            new Dictionary<string, string?> { ["Featly:Server:AutoCreateDefaultProject"] = "false" });
+        var client = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await client.PostAsJsonAsync("/api/admin/environments", new { key = "staging", name = "Staging" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PutAsJsonAsync("/api/admin/environments/staging", new { key = "staging", name = "Staging" }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.DeleteAsync(new Uri("/api/admin/environments/staging", UriKind.Relative), ct))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsync(new Uri("/api/admin/environments/staging/lock", UriKind.Relative), content: null, ct))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsync(new Uri("/api/admin/environments/staging/unlock", UriKind.Relative), content: null, ct))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private static HttpClient AdminClient(IHost host)
     {
         var client = host.GetTestClient();
