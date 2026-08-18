@@ -13,16 +13,18 @@
 // wrappers), so those are whitelisted as sanitizers below; anything else
 // reaching a sink is an error, not a warning.
 //
-// Lives at the repo root (ESLint 9 flat config only lints files under the
-// config's own directory) but its dependencies are installed in
-// tests/dashboard-smoke/node_modules -- the one package.json in the repo, and
-// the directory whose CI workflow already sets up Node. Run it via
-// `npm run lint` from tests/dashboard-smoke. This is deliberately NOT a build
-// step for the dashboard: app.js is still served verbatim.
+// Lives here, next to the one package.json / node_modules in the repo, and
+// runs from the REPO ROOT via `npm run lint` (which cd's up two levels and
+// passes --config explicitly). That matters: ESLint 9's flat config resolves
+// the `files` globs below against its base path, and with an explicit
+// --config the base path is the cwd rather than this file's directory -- so
+// the root-relative globs match, and the dashboard source (which lives well
+// outside this folder) is in scope. Deliberately NOT a build step for the
+// dashboard: app.js is still served verbatim.
 
-import js from "./tests/dashboard-smoke/node_modules/@eslint/js/src/index.js";
-import globals from "./tests/dashboard-smoke/node_modules/globals/index.js";
-import noUnsanitized from "./tests/dashboard-smoke/node_modules/eslint-plugin-no-unsanitized/index.js";
+import js from "@eslint/js";
+import globals from "globals";
+import noUnsanitized from "eslint-plugin-no-unsanitized";
 
 // Helpers in app.js whose *return value* is safe to inject as HTML because
 // they escape their inputs. Keep this list short and honest -- adding a

@@ -2230,13 +2230,14 @@
                 if (memberIds.indexOf(u.id) >= 0) { return false; }
                 return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().indexOf(q) >= 0;
             }).slice(0, 8) : [];
+            var emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
             resultsEl.innerHTML = html(matches.length
                 ? matches.map(function (u) {
                     return '<button type="button" class="user-result" data-add="' + esc(u.id) + '">'
                         + '<span class="ur-name">' + esc(userDisplay(u)) + '</span>'
                         + '<span class="ur-id mono">' + esc(u.identifier || "") + '</span></button>';
                 }).join("")
-                : (q ? '<div class="ur-empty muted">No matching users.</div>' : ""));
+                : emptyState);
             resultsEl.hidden = !q;
         }
         searchEl.addEventListener("input", renderResults);

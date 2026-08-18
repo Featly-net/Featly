@@ -5,7 +5,7 @@
   "description": "Headless smoke test for the embedded Featly dashboard (logs in, visits every routed screen, fails on console/page errors or a screen that does not render) plus the dashboard's ESLint config (issue #229): the no-unsanitized rule forbids innerHTML/insertAdjacentHTML from raw data.",
   "type": "module",
   "scripts": {
-    "lint": "cd ../.. && eslint src/Featly.Dashboard/wwwroot tests/dashboard-smoke/smoke.mjs",
+    "lint": "cd ../.. && eslint --config tests/dashboard-smoke/eslint.config.mjs src/Featly.Dashboard/wwwroot tests/dashboard-smoke/smoke.mjs",
     "smoke": "node smoke.mjs"
   },
   "dependencies": {
