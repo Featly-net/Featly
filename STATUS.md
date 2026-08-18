@@ -5,12 +5,13 @@
 
 ## Active milestone
 
-**Storage providers complete; preparing the next preview.** Since `v0.1.0-preview.2` (2026-05-30) `main` has accumulated ~150 commits and 45 changelog entries with no release cut — the largest gap so far. Headline: **all five storage providers now ship** (SQLite, PostgreSQL, SQL Server, MySQL, MongoDB — ADR-0026/0032/0033/0034; issues #157, #274, #276, #277 closed), plus scheduled releases (ADR-0028), flag prerequisites (ADR-0027), the audit hash chain (ADR-0030), the webhook circuit breaker (ADR-0029), RFC 7807 errors (ADR-0031), opt-in rate limiting, CSRF for the dashboard session, API-key expiry/rotation, statistical significance for experiments, and SonarCloud/CodeQL gates in CI. 881 test methods across 11 test projects.
+**Releasing `v0.2.0-preview.1`** — the storage-provider release. Since `v0.1.0-preview.2` (2026-05-30) `main` accumulated ~150 commits, the largest gap between previews so far; this cut ships all of it. Headline: **all five storage providers now ship** (SQLite, PostgreSQL, SQL Server, MySQL, MongoDB — ADR-0026/0032/0033/0034; issues #157, #274, #276, #277 closed), plus scheduled releases (ADR-0028), flag prerequisites (ADR-0027), the audit hash chain (ADR-0030), the webhook circuit breaker (ADR-0029), RFC 7807 errors (ADR-0031), opt-in rate limiting, CSRF for the dashboard session, API-key expiry/rotation, statistical significance for experiments, and SonarCloud/CodeQL gates in CI. 881 test methods across 11 test projects.
 
-The two decisions that are the maintainer's to make, both written up and waiting:
+The release follows [docs/RELEASING.md](docs/RELEASING.md): the `[Unreleased]` changelog is cut and consolidated into `[0.2.0-preview.1]` (with the security-hardening pass and the ~40 PRs that never had an entry written up from their PRs), the front-door docs are current, and the tag is what publishes to nuget.org.
 
-- **Cut the release.** The `[Unreleased]` changelog is `0.2.0-preview.1`-sized (four new packages), not a patch. The process is now documented in [docs/RELEASING.md](docs/RELEASING.md); the pre-release checklist there is what stands between `main` and a tag.
-- **Dashboard ES baseline** (issue #229). ESLint + a `no-unsanitized` XSS gate landed (#313), the CSS duplicate-selector sweep landed (#314) and the nested-ternary sweep is in review (#315). The remaining ~120 Sonar findings in `app.js` are all "use ES2015+ syntax" — a baseline decision (ES5 vs ES2020) that gates both them and the modularization the issue asks for.
+Still the maintainer's call, written up and waiting:
+
+- **Dashboard ES baseline** (issue #229). ESLint + a `no-unsanitized` XSS gate landed (#313), the CSS duplicate-selector and nested-ternary sweeps landed (#314, #315). The remaining ~120 Sonar findings in `app.js` are all "use ES2015+ syntax" — a baseline decision (ES5 vs ES2020) that gates both them and the modularization the issue asks for.
 
 Permanent, documented limitations of the new providers: MySQL has no `featly db --provider mysql` (Pomelo/EF Core 10 version conflict, ADR-0033); MongoDB has no `featly db rollback` (no framework-derived "down" for index steps, ADR-0034).
 

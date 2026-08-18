@@ -89,12 +89,19 @@ git push origin v0.2.0-preview.1
 ```
 
 The tag push triggers `release.yml` on the tag ref → `pack` → `Publish to
-nuget.org (tag)`. That job runs in the `nuget-org` GitHub environment, so
-it also honours any reviewer/wait rule configured there.
+nuget.org (tag)`. **That job does not run unattended.** It targets the
+`nuget-org` GitHub environment, which is configured with a *required
+reviewer* (currently @thiagoluga): after `pack` succeeds the publish job
+sits at "Waiting for review" in the Actions UI until the reviewer clicks
+**Approve and deploy** — that click is the actual moment packages leave for
+nuget.org. This is the deliberate guard-rail for an irreversible action;
+if an automated agent or a script does the tagging, the human still gets
+the last word. Approve from the run's page (`gh run view <id> --web`).
 
 ### 3. Verify
 
-- [ ] `gh run list --workflow release.yml --limit 2` shows the tag run `success`.
+- [ ] `gh run list --workflow release.yml --limit 2` shows the tag run
+      `success` (it will show `waiting` until the environment reviewer approves).
 - [ ] `curl -s https://api.nuget.org/v3-flatcontainer/featly.sdk/index.json`
       lists the new version (nuget.org indexing can lag a few minutes).
 - [ ] `gh release create vX.Y.Z-preview.N --notes-from-tag` (or paste the
