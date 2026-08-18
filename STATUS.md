@@ -5,7 +5,18 @@
 
 ## Active milestone
 
-**Releasing `v0.1.0-preview.2`** — the dashboard preview. Builds on `v0.1.0-preview.1` (M1–M12) with a full redesign of the embedded UI plus the screens, endpoints, and tests that close the remaining management gaps, and adds server OpenTelemetry, a container story for the centralized sample, and refreshed docs. 367 tests passing. The public API is still pre-1.0; promotion to stable `v0.1.0` follows on a separate go-ahead.
+**Storage providers complete; preparing the next preview.** Since `v0.1.0-preview.2` (2026-05-30) `main` has accumulated ~150 commits and 45 changelog entries with no release cut — the largest gap so far. Headline: **all five storage providers now ship** (SQLite, PostgreSQL, SQL Server, MySQL, MongoDB — ADR-0026/0032/0033/0034; issues #157, #274, #276, #277 closed), plus scheduled releases (ADR-0028), flag prerequisites (ADR-0027), the audit hash chain (ADR-0030), the webhook circuit breaker (ADR-0029), RFC 7807 errors (ADR-0031), opt-in rate limiting, CSRF for the dashboard session, API-key expiry/rotation, statistical significance for experiments, and SonarCloud/CodeQL gates in CI. 881 test methods across 11 test projects.
+
+The two decisions that are the maintainer's to make, both written up and waiting:
+
+- **Cut the release.** The `[Unreleased]` changelog is `0.2.0-preview.1`-sized (four new packages), not a patch. The process is now documented in [docs/RELEASING.md](docs/RELEASING.md); the pre-release checklist there is what stands between `main` and a tag.
+- **Dashboard ES baseline** (issue #229). ESLint + a `no-unsanitized` XSS gate landed (#313), the CSS duplicate-selector sweep landed (#314) and the nested-ternary sweep is in review (#315). The remaining ~120 Sonar findings in `app.js` are all "use ES2015+ syntax" — a baseline decision (ES5 vs ES2020) that gates both them and the modularization the issue asks for.
+
+Permanent, documented limitations of the new providers: MySQL has no `featly db --provider mysql` (Pomelo/EF Core 10 version conflict, ADR-0033); MongoDB has no `featly db rollback` (no framework-derived "down" for index steps, ADR-0034).
+
+## Previous milestone
+
+**Released `v0.1.0-preview.2`** — the dashboard preview. Builds on `v0.1.0-preview.1` (M1–M12) with a full redesign of the embedded UI plus the screens, endpoints, and tests that close the remaining management gaps, and adds server OpenTelemetry, a container story for the centralized sample, and refreshed docs. 367 tests passing. The public API is still pre-1.0; promotion to stable `v0.1.0` follows on a separate go-ahead.
 
 ### Dashboard redesign + follow-ups (complete)
 
@@ -23,9 +34,9 @@
 - [x] **Container (#89 / closes #78)** — `Centralized.Sample` Dockerfile + docker-compose; `docker compose up` with persisted SQLite.
 - [x] **Docs (#90 / closes #79)** — refreshed dashboard screenshots in README + getting-started.
 
-**Cutting `v0.1.0-preview.2` now** (the dashboard preview); promotion to stable `v0.1.0` follows on a separate go-ahead.
+`v0.1.0-preview.2` shipped 2026-05-30 (the dashboard preview); promotion to stable `v0.1.0` follows on a separate go-ahead.
 
-## Previous milestone
+## Milestone before that
 
 **Released `v0.1.0-preview.1`** — the first public preview, packaging all of M12 on top of M1–M11. M12 (the final milestone) is **complete**: all five PRs merged. The preview is cut first; promotion to stable `v0.1.0` follows on a separate go-ahead.
 

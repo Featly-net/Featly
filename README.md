@@ -169,6 +169,7 @@ public class CheckoutController(IFeatlyClient featly) : ControllerBase
 - [OpenFeature](docs/OPENFEATURE.md) — adopt the vendor-neutral OpenFeature API
 - [Performance](docs/PERFORMANCE.md) — evaluation benchmarks and targets
 - [Security audit](docs/SECURITY_AUDIT.md) — the v0.1.0 security review
+- [Releasing](docs/RELEASING.md) — how versions are computed, the two publish paths, and the pre-release checklist
 - [Architecture](ARCHITECTURE.md) — full architectural design, evaluation engine, contracts, APIs, [ADRs](docs/adr/)
 - [Implementation plan](PLAN.md) — milestones, ordering, current focus
 - [Contributing](CONTRIBUTING.md) — how to contribute code or ideas
