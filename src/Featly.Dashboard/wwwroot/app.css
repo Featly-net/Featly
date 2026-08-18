@@ -346,6 +346,7 @@ p:last-child { margin-bottom: 0; }
     grid-area: main;
     padding: var(--space-6);
     overflow-x: auto;
+    flex: 1 1 auto;
 }
 
 .app-footer {
@@ -410,11 +411,13 @@ p:last-child { margin-bottom: 0; }
 }
 
 .card {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
     padding: var(--space-5);
     margin-bottom: var(--space-4);
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-lg);
+    display: flex;
+    flex-direction: column;
 }
 
 .muted { color: var(--color-fg-muted); }
@@ -469,16 +472,6 @@ p:last-child { margin-bottom: 0; }
 }
 
 /* Badges + dots */
-.badge {
-    display: inline-block;
-    padding: 0.125rem var(--space-2);
-    font-size: 0.75rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-bg-muted);
-    color: var(--color-fg-muted);
-    border: 1px solid var(--color-border);
-}
-
 .dot {
     display: inline-block;
     width: 0.5rem;
@@ -675,12 +668,6 @@ p:last-child { margin-bottom: 0; }
 
 .editor textarea { resize: vertical; min-height: 2.5rem; font-family: var(--font-mono); }
 
-.grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-}
-
 .check {
     display: inline-flex;
     align-items: center;
@@ -850,14 +837,6 @@ p:last-child { margin-bottom: 0; }
 .condition-row > select { flex: 1 1 130px; min-width: 0; }
 .condition-row > .check,
 .condition-row > .icon-btn { flex: 0 0 auto; }
-
-.outcome {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    border-top: 1px dashed var(--color-border);
-    padding-top: var(--space-3);
-}
 
 .splits {
     display: flex;
@@ -1122,12 +1101,6 @@ p:last-child { margin-bottom: 0; }
     flex-direction: column;
     gap: var(--space-2);
 }
-.bar-row {
-    display: grid;
-    grid-template-columns: 8rem 1fr 9rem;
-    align-items: center;
-    gap: var(--space-3);
-}
 .bar-row__label {
     font-family: var(--font-mono, monospace);
     font-size: 0.8125rem;
@@ -1182,18 +1155,21 @@ p:last-child { margin-bottom: 0; }
 }
 
 .audit-filter {
-    display: flex;
-    gap: var(--space-2);
     margin-bottom: var(--space-4);
+    display: flex;
     flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
 }
 .audit-filter input {
     flex: 1 1 12rem;
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-bg);
-    color: var(--color-fg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    height: 28px;
+    padding: 0 8px;
+    background: var(--bg2);
+    color: var(--fg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-md);
+    font-size: 12px;
 }
 
 
@@ -1617,12 +1593,6 @@ p:last-child { margin-bottom: 0; }
 .toggle.lg.on::after { transform: translateX(18px); }
 
 /* ------------------------ Card / Surfaces ------------------------ */
-.card {
-  background: var(--bg);
-  border: 0.5px solid var(--border);
-  border-radius: var(--r-lg);
-  display: flex; flex-direction: column;
-}
 .card.flat { background: var(--bg2); border-color: transparent; }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1843,7 +1813,7 @@ p:last-child { margin-bottom: 0; }
   font: 500 11px var(--font-mono);
   color: var(--fg-muted);
 }
-.rule-head .summary { font-size: 12.5px; color: var(--fg); }
+.rule-head .summary { font-size: 12.5px; color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rule-head .summary .mono { color: var(--accent); }
 .rule-head .summary .op   { color: var(--fg-muted); font-family: var(--font-mono); padding: 0 4px; }
 .rule-head .summary .val  { color: var(--purple-fg); font-family: var(--font-mono); }
@@ -1907,7 +1877,6 @@ p:last-child { margin-bottom: 0; }
 .rule.default .rule-head .rule-num { color: var(--fg-faint); }
 
 /* collapsible behaviour */
-.rule-head .summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rule-head .meta .check { gap: 4px; }
 .rule-head .chev { color: var(--fg-faint); display: inline-flex; transition: transform var(--t-quick); }
 .rule.collapsed .rule-head .chev { transform: rotate(-90deg); }
@@ -1935,10 +1904,13 @@ p:last-child { margin-bottom: 0; }
 
 /* ------------------------ Side panel (metadata) ------------------------ */
 .side-card {
-  background: var(--bg2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-bg-elevated);
+  border: 0.5px solid var(--border);
   border-radius: var(--r-lg);
   padding: 14px;
-  display: flex; flex-direction: column; gap: 12px;
 }
 .side-card + .side-card { margin-top: 12px; }
 .side-row { display: flex; flex-direction: column; gap: 3px; }
@@ -2152,7 +2124,7 @@ p:last-child { margin-bottom: 0; }
 }
 .audit-row .ic i { font-size: 12px; }
 .audit-row .desc .who { font-weight: 500; }
-.audit-row .desc .entity { font-family: var(--font-mono); font-size: 12px; }
+.audit-row .desc .entity { font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); }
 .audit-row .env-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11px; color: var(--fg-muted);
@@ -2245,7 +2217,6 @@ p:last-child { margin-bottom: 0; }
    per-screen rewrites (step 5); .app-main keeps its padding meanwhile.
    ============================================================================ */
 .app-content { display: flex; flex-direction: column; min-width: 0; }
-.app-main { flex: 1 1 auto; }
 
 /* Inline-SVG icon slots (filled by app.js icon()). */
 .ti-slot { display: inline-flex; align-items: center; justify-content: center; }
@@ -2369,16 +2340,12 @@ p:last-child { margin-bottom: 0; }
 .inbox-card .status-line .ti-slot { width: 12px; height: 12px; }
 .audit-list { display: flex; flex-direction: column; }
 .audit-row.warn { background: var(--warn-bg); }
-.audit-row .desc .entity { color: var(--fg-muted); }
-.audit-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.audit-filter input { height: 28px; padding: 0 8px; background: var(--bg2); color: var(--fg); border: 0.5px solid var(--border); border-radius: var(--r-md); font-size: 12px; }
 
 /* Detail screens (redesign step 5): 2-column layout + metadata side-card. */
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
 .detail-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .detail-main .editor { background: var(--color-bg-elevated); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 16px; }
 .detail-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 60px; }
-.side-card { background: var(--color-bg-elevated); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 14px; }
 .side-h { margin: 0 0 10px; font: 500 11px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-faint); }
 .side-dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 12px; align-items: center; }
 .side-dl dt { color: var(--fg-muted); }
