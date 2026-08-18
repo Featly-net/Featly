@@ -346,7 +346,9 @@
     function updateEnvPill() {
         if (!envPill) { return; }
         var key = ((currentEnv && currentEnv.key) || "").toLowerCase();
-        var tone = /prod/.test(key) ? "prod" : (/stag|stg|uat|pre/.test(key) ? "staging" : "dev");
+        var tone = "dev";
+        if (/prod/.test(key)) { tone = "prod"; }
+        else if (/stag|stg|uat|pre/.test(key)) { tone = "staging"; }
         envPill.className = "env-pill " + tone;
         if (envLock) { envLock.hidden = !(currentEnv && currentEnv.readOnly); }
     }
@@ -842,7 +844,7 @@
 
     function flagTypeBadge(type) {
         var t = String(type == null ? "" : type);
-        var variant = t === "Boolean" ? " info" : (t === "Json" ? " accent" : "");
+        var variant = { Boolean: " info", Json: " accent" }[t] || "";
         return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
     }
     function flagStatusBadge(f) {
@@ -1084,6 +1086,12 @@
     }
 
     // ---------- Shared list helpers (redesign, step 5) ----------
+    // Flattens one cell of a row into text the client-side list filter can
+    // match against: arrays (tags) join with a space, null/undefined become "".
+    function searchableText(v) {
+        if (Array.isArray(v)) { return v.join(" "); }
+        return v == null ? "" : v;
+    }
     function listPageShell(title, subHtml, bodyHtml, actionsHtml) {
         return [
             '<div class="page">',
@@ -1124,7 +1132,7 @@
             var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
             var rows = all.filter(function (r) {
                 if (!q) { return true; }
-                var hay = fields.map(function (f) { var v = r[f]; return Array.isArray(v) ? v.join(" ") : (v == null ? "" : v); }).join(" ").toLowerCase();
+                var hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
                 return hay.indexOf(q) >= 0;
             });
             tbody.innerHTML = html(rows.length
@@ -1226,9 +1234,15 @@
     }
 
     // ---------- Configs list (redesign) ----------
+    // Badge tone for a config's value type; shared by the list badge and the
+    // detail-header badge so the two never drift.
+    function configTypeVariant(type) {
+        var t = String(type == null ? "" : type);
+        return { Json: " accent", Bool: " info" }[t] || "";
+    }
     function configTypeBadge(type) {
         var t = String(type == null ? "" : type);
-        var variant = t === "Json" ? " accent" : (t === "Bool" ? " info" : "");
+        var variant = configTypeVariant(t);
         return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
     }
     function configRow(c) {
@@ -1766,7 +1780,7 @@
             '<div class="page"><div class="page-head">',
             '  <div class="title-wrap"><h1 class="mono">' + esc(config.key) + '</h1>',
             '    <span class="sub">' + esc(config.name || "") + ' · ' + esc(config.type) + ' · evaluated in <code>' + esc(currentEnv.key) + '</code></span>',
-            '  </div><div class="actions">' + archivedPill(config.archived) + '<span class="badge sq' + (config.type === "Json" ? " accent" : (config.type === "Bool" ? " info" : "")) + '">' + esc(config.type) + '</span></div>',
+            '  </div><div class="actions">' + archivedPill(config.archived) + '<span class="badge sq' + configTypeVariant(config.type) + '">' + esc(config.type) + '</span></div>',
             '</div><div class="page-body"><div class="detail-grid"><div class="detail-main">',
             '<form id="config-form" class="editor">',
             field("Name", '<input name="name" required value="' + esc(config.name) + '" />'),
@@ -2283,9 +2297,11 @@
             environments.forEach(function (e) { envById[e.id] = e; });
             var rows = assignments.map(function (a) {
                 var role = roleById[a.roleId];
-                var envLabel = a.environmentId
-                    ? (envById[a.environmentId] ? code(envById[a.environmentId].key) : code(truncate(a.environmentId, 8)))
-                    : '<span class="muted">all envs</span>';
+                var envLabel = '<span class="muted">all envs</span>';
+                if (a.environmentId) {
+                    var knownEnv = envById[a.environmentId];
+                    envLabel = code(knownEnv ? knownEnv.key : truncate(a.environmentId, 8));
+                }
                 return '<tr data-ra="' + esc(a.id) + '">'
                     + '<td>' + (role ? code(role.key) : code(truncate(a.roleId, 8))) + '</td>'
                     + '<td>' + (role ? esc(role.name) : '—') + '</td>'
@@ -2441,11 +2457,9 @@
             }
             tbody.innerHTML = html(keys.map(function (k) {
                 var expired = !k.revoked && k.expiresAt && new Date(k.expiresAt) <= new Date();
-                var status = k.revoked
-                    ? '<span class="badge danger">revoked</span>'
-                    : expired
-                        ? '<span class="badge warn">expired</span>'
-                        : '<span class="badge success"><span class="dot"></span>active</span>';
+                var status = '<span class="badge success"><span class="dot"></span>active</span>';
+                if (k.revoked) { status = '<span class="badge danger">revoked</span>'; }
+                else if (expired) { status = '<span class="badge warn">expired</span>'; }
                 return '<tr>'
                     + '<td>' + esc(k.name) + '</td>'
                     + '<td>' + code(k.prefix) + '</td>'
@@ -2857,7 +2871,7 @@
 
     function crStatusBadge(status) {
         var s = String(status == null ? "" : status);
-        var v = (s === "Approved" || s === "Applied") ? " success" : (s === "Rejected" ? " danger" : (s === "Pending" ? " warn" : ""));
+        var v = { Approved: " success", Applied: " success", Rejected: " danger", Pending: " warn" }[s] || "";
         return '<span class="badge' + v + '">' + esc(s || "—") + '</span>';
     }
 
@@ -3032,8 +3046,8 @@
         var adds = 0, dels = 0;
         var body = lines.map(function (l) {
             if (l.t === "add") { adds++; } else if (l.t === "del") { dels++; }
-            var cls = l.t === "add" ? " add" : (l.t === "del" ? " del" : "");
-            var sym = l.t === "add" ? "+" : (l.t === "del" ? "-" : " ");
+            var cls = { add: " add", del: " del" }[l.t] || "";
+            var sym = { add: "+", del: "-" }[l.t] || " ";
             return '<div class="line' + cls + '">'
                 + '<span class="ln">' + (l.o == null ? "" : l.o) + '</span>'
                 + '<span class="ln">' + (l.nn == null ? "" : l.nn) + '</span>'
@@ -3124,7 +3138,7 @@
     // Webhooks + Audit log (M10)
     // ============================================================
     function deliveryStatusBadge(status) {
-        var v = status === "Succeeded" ? " success" : (status === "Dead" ? " danger" : " warn");
+        var v = { Succeeded: " success", Dead: " danger" }[status] || " warn";
         return '<span class="badge' + v + '">' + esc(status) + '</span>';
     }
 

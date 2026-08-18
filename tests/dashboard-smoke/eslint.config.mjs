@@ -96,6 +96,10 @@ export default [
             // is how it expresses best-effort localStorage/JSON access.
             "no-unused-vars": ["error", { argsIgnorePattern: "^_$", caughtErrorsIgnorePattern: "^_$" }],
             "no-empty": ["error", { allowEmptyCatch: true }],
+            // Sonar's S3358, enforced locally: a nested ternary reads as a
+            // puzzle; the file's idiom for "value -> css class" is a lookup
+            // table or a small if/else, both of which stay flat.
+            "no-nested-ternary": "error",
         },
     },
 
