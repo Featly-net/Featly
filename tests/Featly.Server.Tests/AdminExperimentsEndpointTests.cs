@@ -24,6 +24,7 @@ public class AdminExperimentsEndpointTests
     private const string AdminKey = "admin-key-test";
     private const string SdkKey = "sdk-key-test";
     private static readonly string[] CheckoutMetric = ["checkout.completed"];
+    private static readonly string[] CheckoutMetrics = ["checkout.completed", "checkout.started"];
 
     [Fact]
     public async Task POST_creates_experiment_then_GET_returns_it()
@@ -52,6 +53,58 @@ public class AdminExperimentsEndpointTests
         loaded.MetricKeys.Should().ContainSingle().Which.Should().Be("checkout.completed");
         loaded.StickyAssignments.Should().BeTrue();
         loaded.IsActive.Should().BeFalse(); // draft until started
+    }
+
+    [Fact]
+    public async Task PUT_updates_editable_fields_and_rejects_a_key_rename()
+    {
+        using var host = await FeatlyTestHost.CreateAsync();
+        var admin = AdminClient(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        await SeedFlagAsync(admin);
+        (await admin.PostAsJsonAsync("/api/admin/experiments", new
+        {
+            key = "checkout-color",
+            name = "Checkout color",
+            flagKey = "checkout",
+            metricKeys = CheckoutMetric,
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Only name / hypothesis / metric keys / sticky are editable via PUT.
+        var update = await admin.PutAsJsonAsync("/api/admin/experiments/checkout-color", new
+        {
+            key = "checkout-color",
+            name = "Checkout colour (renamed)",
+            hypothesis = "green still wins",
+            flagKey = "checkout",
+            metricKeys = CheckoutMetrics,
+            stickyAssignments = true,
+        }, ct);
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var loaded = await update.Content.ReadFromJsonAsync<Experiment>(TestJson.Options, cancellationToken: ct);
+        loaded.Should().NotBeNull();
+        loaded!.Name.Should().Be("Checkout colour (renamed)");
+        loaded.Hypothesis.Should().Be("green still wins");
+        loaded.MetricKeys.Should().BeEquivalentTo("checkout.completed", "checkout.started");
+        loaded.StickyAssignments.Should().BeTrue();
+
+        // Body key must match the URL key — a rename is not a PUT.
+        (await admin.PutAsJsonAsync("/api/admin/experiments/checkout-color", new
+        {
+            key = "something-else",
+            name = "n",
+            flagKey = "checkout",
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Unknown key is a clean 404.
+        (await admin.PutAsJsonAsync("/api/admin/experiments/nope", new
+        {
+            key = "nope",
+            name = "n",
+            flagKey = "checkout",
+        }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
