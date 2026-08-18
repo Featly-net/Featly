@@ -4,7 +4,7 @@
 
 ## Status
 
-**Preview.** Milestones M1–M12 are complete: flags, configs, segments, experiments, projects and environments, custom RBAC, approval workflows, audit log, webhooks, an embedded dashboard, an OpenFeature provider, and a `featly` CLI all ship and are covered by the test suite.
+**Preview.** Milestones M1–M12 are complete: flags, configs, segments, experiments, projects and environments, custom RBAC, approval workflows (including scheduled apply), audit log with a tamper-evident hash chain, webhooks with a circuit breaker, an embedded dashboard, an OpenFeature provider, a `featly` CLI, and **five storage providers** — SQLite, PostgreSQL, SQL Server, MySQL/MariaDB, and MongoDB — all ship and are covered by the test suite.
 
 The public API is **pre-1.0 and may still change between previews**, so pin an exact version. It is not a placeholder — it works end to end; it is simply not yet promised to be source-compatible with 1.0.
 
@@ -17,6 +17,16 @@ dotnet add package Featly.Server
 dotnet add package Featly.Dashboard
 dotnet add package Featly.Storage.Sqlite
 ```
+
+Swap the storage package for the database you already run — each one is a drop-in `AddFeatly<Provider>Store()` behind the same `IFeatlyStore` contract:
+
+| Package | Notes |
+|---|---|
+| `Featly.Storage.Sqlite` | zero-config default; single-node |
+| `Featly.Storage.Postgres` | multi-node; real cross-replica push via `LISTEN`/`NOTIFY` |
+| `Featly.Storage.SqlServer` | multi-node; polling-only change notification |
+| `Featly.Storage.MySql` | MySQL/MariaDB; multi-node; polling-only |
+| `Featly.Storage.MongoDB` | requires a replica set; real cross-replica push via Change Streams |
 
 Consume flags from any .NET app:
 
