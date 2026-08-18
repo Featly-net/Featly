@@ -5,11 +5,9 @@
 
 ## Active milestone
 
-**Releasing `v0.2.0-preview.1`** — the storage-provider release. Since `v0.1.0-preview.2` (2026-05-30) `main` accumulated ~150 commits, the largest gap between previews so far; this cut ships all of it. Headline: **all five storage providers now ship** (SQLite, PostgreSQL, SQL Server, MySQL, MongoDB — ADR-0026/0032/0033/0034; issues #157, #274, #276, #277 closed), plus scheduled releases (ADR-0028), flag prerequisites (ADR-0027), the audit hash chain (ADR-0030), the webhook circuit breaker (ADR-0029), RFC 7807 errors (ADR-0031), opt-in rate limiting, CSRF for the dashboard session, API-key expiry/rotation, statistical significance for experiments, and SonarCloud/CodeQL gates in CI. 881 test methods across 11 test projects.
+**Released `v0.2.0-preview.1`** (2026-08-18) — the storage-provider release, published to nuget.org (16 packages) with a matching [GitHub Release](https://github.com/Featly-net/Featly/releases/tag/v0.2.0-preview.1). Since `v0.1.0-preview.2` (2026-05-30) `main` had accumulated ~150 commits, the largest gap between previews so far; this cut shipped all of it. Headline: **all five storage providers now ship** (SQLite, PostgreSQL, SQL Server, MySQL, MongoDB — ADR-0026/0032/0033/0034; issues #157, #274, #276, #277 closed), plus scheduled releases (ADR-0028), flag prerequisites (ADR-0027), the audit hash chain (ADR-0030), the webhook circuit breaker (ADR-0029), RFC 7807 errors (ADR-0031), opt-in rate limiting, CSRF for the dashboard session, API-key expiry/rotation, statistical significance for experiments, and SonarCloud/CodeQL gates in CI. 881 test methods across 11 test projects.
 
-The release follows [docs/RELEASING.md](docs/RELEASING.md): the `[Unreleased]` changelog is cut and consolidated into `[0.2.0-preview.1]` (with the security-hardening pass and the ~40 PRs that never had an entry written up from their PRs), the front-door docs are current, and the tag is what publishes to nuget.org.
-
-Still the maintainer's call, written up and waiting:
+The cut followed [docs/RELEASING.md](docs/RELEASING.md) end to end — first use of the written process. Next up is whatever lands in the (currently empty) `[Unreleased]` changelog; the one open design decision is:
 
 - **Dashboard ES baseline** (issue #229). ESLint + a `no-unsanitized` XSS gate landed (#313), the CSS duplicate-selector and nested-ternary sweeps landed (#314, #315). The remaining ~120 Sonar findings in `app.js` are all "use ES2015+ syntax" — a baseline decision (ES5 vs ES2020) that gates both them and the modularization the issue asks for.
 
