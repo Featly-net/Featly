@@ -89,11 +89,10 @@ export default [
                 insertAdjacentHTML: { properties: [1], escape: { methods: dashboardSanitizers } },
             }],
 
-            // ADR-0036 makes const/let the baseline; these two flip to "error"
-            // in the var->const/let conversion slice of #229. Off until then so
-            // the ADR PR itself stays a docs + config change.
-            "no-var": "off",
-            "prefer-const": "off",
+            // ADR-0036: const/let is the baseline; app.js has no `var` left and
+            // these keep it that way.
+            "no-var": "error",
+            "prefer-const": "error",
             "no-redeclare": ["error", { builtinGlobals: false }],
             // `_` is the file's convention for a deliberately-ignored argument
             // (catch (_) {...}, .then(function (_) {...})), and an empty catch
