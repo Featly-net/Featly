@@ -20,6 +20,13 @@
 //
 // Single-file, no build step, no framework. Sections are marked with banner
 // comments so navigation stays manageable.
+//
+// Language baseline (ADR-0036): ES2020 syntax on evergreen browsers. The
+// file predates that decision and is being converted rule-family by
+// rule-family (issue #229) -- new code should use const/let, arrow
+// functions, template literals, `?.`/`??`, and the modern standard library
+// (`includes`, `dataset`, `Number.isNaN`, `replaceAll`) rather than matching
+// the surrounding ES5-era style. Still served verbatim: no transpiler.
 
 (function () {
     "use strict";

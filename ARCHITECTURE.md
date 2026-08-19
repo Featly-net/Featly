@@ -1377,6 +1377,7 @@ Detailed ADRs will live in `docs/adr/`. The top-level decisions and their ration
 | [ADR-033](docs/adr/0033-mysql-storage-provider.md) | MySQL storage provider — Pomelo EF Core provider, own DbContext, polling-only `IChangeNotifier` | Accepted |
 | [ADR-034](docs/adr/0034-mongodb-storage-provider.md) | MongoDB storage provider — MongoDB.Driver (not EF Core), replica-set requirement, Change Streams `IChangeNotifier` | Accepted |
 | [ADR-035](docs/adr/0035-accept-endpoint-twinning.md) | Accept admin-endpoint twinning — no generic `EntityWriteFlow`; readability over the duplication metric | Accepted |
+| [ADR-036](docs/adr/0036-dashboard-es-baseline.md) | Dashboard JavaScript baseline is ES2020 syntax on evergreen browsers; native ES modules, still no build step | Accepted |
 
 ---
 
