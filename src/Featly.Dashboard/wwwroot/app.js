@@ -157,7 +157,7 @@
                 if (p.errors && typeof p.errors === "object") {
                     const parts = [];
                     Object.keys(p.errors).forEach(function (k) {
-                        parts.push([].concat(p.errors[k]).join(" "));
+                        parts.push([p.errors[k]].flat().join(" "));
                     });
                     if (parts.length) { return parts.join(" "); }
                 }
@@ -308,8 +308,7 @@
         "archive": '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
         "rotate-ccw": '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'
     };
-    function icon(name, size) {
-        size = size || 16;
+    function icon(name, size = 16) {
         return '<svg class="ti" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" '
             + 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
             + 'stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + '</svg>';
@@ -379,8 +378,7 @@
         const parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
         if (detail) {
             parts.push('<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>');
-            parts.push('<span class="sep">/</span>');
-            parts.push('<span class="crumb current">' + esc(detail) + '</span>');
+            parts.push('<span class="sep">/</span>', '<span class="crumb current">' + esc(detail) + '</span>');
         } else {
             parts.push('<span class="crumb current">' + esc(section) + '</span>');
         }
@@ -429,13 +427,13 @@
         const path = window.location.pathname;
         if (!path.startsWith(mountPath)) { return { key: "overview", params: {}, navRoute: "/" }; }
         const sub = path.slice(mountPath.length) || "/";
-        for (let i = 0; i < routes.length; i++) {
-            const m = sub.match(routes[i].match);
+        for (const route of routes) {
+            const m = route.match.exec(sub);
             if (m) {
                 return {
-                    key: routes[i].key,
-                    params: routes[i].params(m),
-                    navRoute: navRouteFor(routes[i].key),
+                    key: route.key,
+                    params: route.params(m),
+                    navRoute: navRouteFor(route.key),
                 };
             }
         }
@@ -632,7 +630,7 @@
         const nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().includes(q)); })
             .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
         const ents = (paletteEntityCache.items || []).filter(function (e) {
-            return !q || e.label.toLowerCase().includes(q) || (e.sub && e.sub.toLowerCase().includes(q));
+            return !q || e.label.toLowerCase().includes(q) || e.sub?.toLowerCase().includes(q);
         });
         ents.forEach(function (e) { e.group = "Entities"; });
         const ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
@@ -976,7 +974,7 @@
                 '  <th style="width:28px"><input type="checkbox" id="flag-check-all" aria-label="Select all" /></th>',
                 '  <th style="width:54px">Status</th><th>Key / Name</th><th style="width:120px">Type</th>',
                 '  <th style="width:84px">Variants</th><th>Tags</th><th style="width:140px">Last modified</th><th style="width:48px"></th>',
-                '</tr></thead><tbody id="flag-tbody">' + (all.length ? all.map(flagRow).join("") : emptyListRow(flagListArchived ? "No archived flags." : "No flags yet.", 8)) + '</tbody></table></div>',
+                '</tr></thead><tbody id="flag-tbody">' + (all.length ? all.map(flagRow).join("") : emptyListRow(listEmptyMessage(flagListArchived, "flags"), 8)) + '</tbody></table></div>',
                 '<div class="list-foot"><span id="flag-count">Showing ' + all.length + ' of ' + all.length + ' flags</span>',
                 '<span class="mono">Click a row to open · <span class="kbd-key">/</span> to filter</span></div>',
             ].join("");
@@ -1224,6 +1222,9 @@
             });
         }
     }
+    function listEmptyMessage(archived, noun) {
+        return archived ? "No archived " + noun + "." : "No " + noun + " yet.";
+    }
     // Placeholder row spanning the table when a list (or archived view) is empty.
     function emptyListRow(text, colspan) {
         return '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">' + esc(text) + '</td></tr>';
@@ -1290,7 +1291,7 @@
             '  <th style="width:28px"><input type="checkbox" class="check-all" aria-label="Select all" /></th>',
             '  <th style="width:120px">Type</th><th>Key / Name</th><th>Value</th><th>Tags</th>',
             '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
-            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(configRow).join("") : emptyListRow(configListArchived ? "No archived configs." : "No configs yet.", 7)) + '</tbody></table></div>',
+            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(configRow).join("") : emptyListRow(listEmptyMessage(configListArchived, "configs"), 7)) + '</tbody></table></div>',
             listFoot(all.length, "configs"),
         ].join("");
         return listPageShell("Configs", "Typed configuration values evaluated in <code>" + esc(currentEnv.key) + "</code>.", body,
@@ -1329,7 +1330,7 @@
             '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
             '  <th>Key / Name</th><th style="width:120px">Conditions</th>',
             '  <th style="width:140px">Last modified</th><th style="width:48px"></th>',
-            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(segmentRow).join("") : emptyListRow(segmentListArchived ? "No archived segments." : "No segments yet.", 4)) + '</tbody></table></div>',
+            '</tr></thead><tbody class="list-tbody">' + (all.length ? all.map(segmentRow).join("") : emptyListRow(listEmptyMessage(segmentListArchived, "segments"), 4)) + '</tbody></table></div>',
             listFoot(all.length, "segments"),
         ].join("");
         return listPageShell("Segments", "Reusable user groups referenced from flag and config rules via the <code>InSegment</code> operator.", body,
@@ -1351,12 +1352,12 @@
         switch (type) {
             case "Int": case "Long": {
                 const i = Number.parseInt(raw, 10);
-                if (Number.isNaN(i)) { throw new Error("Default value must be an integer."); }
+                if (Number.isNaN(i)) { throw new TypeError("Default value must be an integer."); }
                 return i;
             }
             case "Double": case "Decimal": {
                 const n = Number.parseFloat(raw);
-                if (Number.isNaN(n)) { throw new Error("Default value must be a number."); }
+                if (Number.isNaN(n)) { throw new TypeError("Default value must be a number."); }
                 return n;
             }
             case "Bool": return raw === "true" || raw === true;
@@ -1640,7 +1641,7 @@
         while ((m = re.exec(src)) !== null) {
             out += e(src.slice(last, m.index));
             const tok = m[0]; let cls;
-            if (tok.charAt(0) === '"') { cls = m[1] ? "json-key" : "json-str"; }
+            if (tok.startsWith('"')) { cls = m[1] ? "json-key" : "json-str"; }
             else if (tok === "true" || tok === "false") { cls = "json-bool"; }
             else if (tok === "null") { cls = "json-null"; }
             else { cls = "json-num"; }
@@ -2331,7 +2332,7 @@
                     if (!window.confirm("Revoke this role assignment?")) { return; }
                     api("DELETE", "/admin/role-assignments/" + encodeURIComponent(btn.dataset.revoke))
                         .then(function () { loadRoleAssignments(assigneeType, assigneeId); })
-                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } });
+                        .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); } });
                 });
             });
         }).catch(function () {
@@ -2651,9 +2652,10 @@
         ]).then(function (res) {
             const exp = res[0];
             const analytics = res[1];
+            const startLabel = exp.stoppedAt ? "Restart" : "Start";
             const startStop = exp.isActive
                 ? '<button type="button" class="btn outline xs" data-exp="stop">Stop</button>'
-                : '<button type="button" class="btn primary xs" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + '</button>';
+                : '<button type="button" class="btn primary xs" data-exp="start">' + startLabel + '</button>';
 
             viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap"><h1 class="mono">' + esc(exp.key) + '</h1>',
@@ -3339,6 +3341,12 @@
         }).catch(handleErrOnView("Webhook"));
     }
 
+    // Provenance pill for a settings card: which layer the effective value came from.
+    function settingsSourceBadge(source) {
+        if (source === "Database") { return '<span class="badge success"><span class="dot"></span>from database</span>'; }
+        return '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+    }
+
     function renderSettings() {
         viewEl.innerHTML = html([
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>Settings</h1>',
@@ -3394,9 +3402,7 @@
             api("GET", "/admin/settings/rate-limit").then(function (view) {
                 const v = view?.value || {};
                 const source = view?.source || "";
-                const prov = source === "Database"
-                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
-                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                const prov = settingsSourceBadge(source);
                 document.getElementById("ratelimit-settings").innerHTML = html([
                     '<div class="card-pad"><form id="ratelimit-settings-form" class="row-form">',
                     '  <label class="check"><input type="checkbox" name="enabled"' + (v.enabled ? " checked" : "") + ' /> Enabled</label>',
@@ -3440,9 +3446,7 @@
             api("GET", "/admin/settings/approval-defaults").then(function (view) {
                 const v = view?.value || {};
                 const source = view?.source || "";
-                const prov = source === "Database"
-                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
-                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                const prov = settingsSourceBadge(source);
                 document.getElementById("apprdef-settings").innerHTML = html([
                     '<form id="apprdef-form">',
                     '  <div class="grid-2">' + approvalTemplateFields("prod", v.prod) + approvalTemplateFields("nonProd", v.nonProd) + '</div>',
@@ -3477,9 +3481,7 @@
             api("GET", "/admin/settings/audit").then(function (view) {
                 const v = view?.value || {};
                 const source = view?.source || "";
-                const prov = source === "Database"
-                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
-                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                const prov = settingsSourceBadge(source);
                 document.getElementById("audit-settings").innerHTML = html([
                     '<div class="card-pad"><form id="audit-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Retention (days, 0 = forever)</span><input name="retentionDays" type="number" min="0" value="' + esc(String(v.retentionDays != null ? v.retentionDays : 0)) + '" /></label>',
@@ -3506,9 +3508,7 @@
                 const v = view?.value || {};
                 const mode = v.autoProvisionMode || "Open";
                 const source = view?.source || "";
-                const prov = source === "Database"
-                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
-                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                const prov = settingsSourceBadge(source);
                 document.getElementById("authz-settings").innerHTML = html([
                     '<div class="card-pad"><form id="authz-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Auto-provision mode</span><select name="autoProvisionMode">'
@@ -3536,9 +3536,7 @@
             api("GET", "/admin/settings/webhook").then(function (view) {
                 const v = view?.value || {};
                 const source = view?.source || "";
-                const prov = source === "Database"
-                    ? '<span class="badge success"><span class="dot"></span>from database</span>'
-                    : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
+                const prov = settingsSourceBadge(source);
                 document.getElementById("webhook-settings").innerHTML = html([
                     '<div class="card-pad"><form id="webhook-settings-form" class="row-form">',
                     '  <label class="field"><span class="field__label">Max attempts</span><input name="maxAttempts" type="number" min="1" value="' + esc(String(v.maxAttempts)) + '" /></label>',
