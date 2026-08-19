@@ -196,7 +196,7 @@
             }
             if (res.status === 204) { return null; }
             var ct = res.headers.get("Content-Type") || "";
-            return ct.indexOf("application/json") >= 0 ? res.json() : res.text();
+            return ct.includes("application/json") ? res.json() : res.text();
         });
     }
 
@@ -444,18 +444,18 @@
 
     function navRouteFor(key) {
         if (key === "overview") { return "/"; }
-        if (key.indexOf("flag") === 0) { return "/flags"; }
-        if (key.indexOf("config") === 0) { return "/configs"; }
-        if (key.indexOf("segment") === 0) { return "/segments"; }
-        if (key.indexOf("experiment") === 0) { return "/experiments"; }
-        if (key.indexOf("user") === 0) { return "/users"; }
-        if (key.indexOf("role") === 0) { return "/roles"; }
-        if (key.indexOf("group") === 0) { return "/groups"; }
-        if (key.indexOf("apiKey") === 0) { return "/apikeys"; }
-        if (key.indexOf("project") === 0) { return "/projects"; }
+        if (key.startsWith("flag")) { return "/flags"; }
+        if (key.startsWith("config")) { return "/configs"; }
+        if (key.startsWith("segment")) { return "/segments"; }
+        if (key.startsWith("experiment")) { return "/experiments"; }
+        if (key.startsWith("user")) { return "/users"; }
+        if (key.startsWith("role")) { return "/roles"; }
+        if (key.startsWith("group")) { return "/groups"; }
+        if (key.startsWith("apiKey")) { return "/apikeys"; }
+        if (key.startsWith("project")) { return "/projects"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
-        if (key.indexOf("webhook") === 0) { return "/webhooks"; }
+        if (key.startsWith("webhook")) { return "/webhooks"; }
         if (key === "auditLog") { return "/audit"; }
         if (key === "settings") { return "/settings"; }
         return "/";
@@ -618,10 +618,10 @@
 
     function paletteFilter(q) {
         q = (q || "").trim().toLowerCase();
-        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().indexOf(q) >= 0); })
+        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().includes(q)); })
             .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
         var ents = (paletteEntityCache.items || []).filter(function (e) {
-            return !q || e.label.toLowerCase().indexOf(q) >= 0 || (e.sub && e.sub.toLowerCase().indexOf(q) >= 0);
+            return !q || e.label.toLowerCase().includes(q) || (e.sub && e.sub.toLowerCase().includes(q));
         });
         ents.forEach(function (e) { e.group = "Entities"; });
         var ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
@@ -997,7 +997,7 @@
                 if (flagListTab === "disabled" && f.enabled) { return false; }
                 if (q) {
                     var hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
-                    if (hay.indexOf(q) < 0) { return false; }
+                    if (!hay.includes(q)) { return false; }
                 }
                 return true;
             });
@@ -1140,7 +1140,7 @@
             var rows = all.filter(function (r) {
                 if (!q) { return true; }
                 var hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
-                return hay.indexOf(q) >= 0;
+                return hay.includes(q);
             });
             tbody.innerHTML = html(rows.length
                 ? rows.map(rowFn).join("")
@@ -1611,7 +1611,7 @@
         var target = (otherFlags || []).find(function (f) { return f.key === p.flagKey; });
         if (!target) { return '<span class="muted">Select a flag</span>'; }
         return (target.variants || []).map(function (v) {
-            var checked = (p.requiredVariantKeys || []).indexOf(v.key) !== -1;
+            var checked = (p.requiredVariantKeys || []).includes(v.key);
             return '<label class="check"><input type="checkbox" class="prereq-variant" value="' + esc(v.key) + '"' + (checked ? " checked" : "") + ' /> ' + esc(v.key) + '</label>';
         }).join(" ") || '<span class="muted">No variants</span>';
     }
@@ -2023,7 +2023,7 @@
         return PERMISSION_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.perms.map(function (p) {
-                    var on = current.indexOf(p) >= 0;
+                    var on = current.includes(p);
                     return '<label class="check perm"><input type="checkbox" class="perm-cb" value="' + p + '"'
                         + (on ? " checked" : "") + (readOnly ? " disabled" : "") + ' /> ' + p + '</label>';
                 }).join("")
@@ -2248,8 +2248,8 @@
         function renderResults() {
             var q = (searchEl.value || "").trim().toLowerCase();
             var matches = q ? users.filter(function (u) {
-                if (memberIds.indexOf(u.id) >= 0) { return false; }
-                return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().indexOf(q) >= 0;
+                if (memberIds.includes(u.id)) { return false; }
+                return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().includes(q);
             }).slice(0, 8) : [];
             var emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
             resultsEl.innerHTML = html(matches.length
@@ -2266,7 +2266,7 @@
             var btn = e.target.closest("[data-add]");
             if (!btn) { return; }
             var id = btn.getAttribute("data-add");
-            if (memberIds.indexOf(id) < 0) { memberIds.push(id); }
+            if (!memberIds.includes(id)) { memberIds.push(id); }
             searchEl.value = "";
             renderResults();
             renderChips();
@@ -3168,7 +3168,7 @@
         var groups = WEBHOOK_EVENT_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.types.map(function (t) {
-                    var on = !all && selected.indexOf(t) >= 0;
+                    var on = !all && selected.includes(t);
                     return '<label class="check evt"><input type="checkbox" class="evt-cb" value="' + t + '"'
                         + (on ? " checked" : "") + (all ? " disabled" : "") + ' /> ' + t + '</label>';
                 }).join("")
