@@ -317,16 +317,16 @@
     function hydrateIcons(root) {
         var slots = (root || document).querySelectorAll("[data-ti]");
         Array.prototype.forEach.call(slots, function (el) {
-            if (el.getAttribute("data-ti-done") === "1") { return; }
-            el.innerHTML = icon(el.getAttribute("data-ti"));
-            el.setAttribute("data-ti-done", "1");
+            if (el.dataset.tiDone === "1") { return; }
+            el.innerHTML = icon(el.dataset.ti);
+            el.dataset.tiDone = "1";
         });
     }
 
     // Theme: OS default, overridable by a stored choice; the toggle swaps the icon.
     var THEME_KEY = "featly.theme";
     function effectiveTheme() {
-        return document.documentElement.getAttribute("data-theme")
+        return document.documentElement.dataset.theme
             || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     }
     function applyThemeIcon() {
@@ -336,12 +336,12 @@
     function initTheme() {
         var saved = null;
         try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
-        if (saved === "dark" || saved === "light") { document.documentElement.setAttribute("data-theme", saved); }
+        if (saved === "dark" || saved === "light") { document.documentElement.dataset.theme = saved; }
         var btn = document.getElementById("theme-toggle");
         if (btn) {
             btn.addEventListener("click", function () {
                 var next = effectiveTheme() === "dark" ? "light" : "dark";
-                document.documentElement.setAttribute("data-theme", next);
+                document.documentElement.dataset.theme = next;
                 try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
                 applyThemeIcon();
             });
@@ -493,7 +493,7 @@
     }
     function applyNavGating() {
         navLinks.forEach(function (link) {
-            link.style.display = isNavEnabled(link.getAttribute("data-route")) ? "" : "none";
+            link.style.display = isNavEnabled(link.dataset.route) ? "" : "none";
         });
         // Hide a section header when every item under it (until the next header) is hidden.
         var nav = document.querySelector(".sb-scroll");
@@ -532,10 +532,10 @@
         if (!anchor) { return; }
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) { return; }
         event.preventDefault();
-        navigate(anchor.getAttribute("data-link"));
+        navigate(anchor.dataset.link);
     }
     document.addEventListener("click", onNavClick);
-    navLinks.forEach(function (link) { link.setAttribute("data-link", link.getAttribute("data-route")); });
+    navLinks.forEach(function (link) { link.dataset.link = link.dataset.route; });
 
     window.addEventListener("popstate", render);
     window.addEventListener("focus", function () {
@@ -659,15 +659,15 @@
         list.innerHTML = html(markup);
         hydrateIcons(list);
         Array.prototype.slice.call(list.querySelectorAll(".palette-item")).forEach(function (el) {
-            el.addEventListener("mousemove", function () { paletteActive = Number.parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
-            el.addEventListener("click", function () { paletteSelect(Number.parseInt(el.getAttribute("data-i"), 10)); });
+            el.addEventListener("mousemove", function () { paletteActive = Number.parseInt(el.dataset.i, 10); paletteHighlight(); });
+            el.addEventListener("click", function () { paletteSelect(Number.parseInt(el.dataset.i, 10)); });
         });
     }
 
     function paletteHighlight() {
         var els = paletteEl.querySelectorAll(".palette-item");
         Array.prototype.forEach.call(els, function (el) {
-            el.classList.toggle("active", Number.parseInt(el.getAttribute("data-i"), 10) === paletteActive);
+            el.classList.toggle("active", Number.parseInt(el.dataset.i, 10) === paletteActive);
         });
         var active = paletteEl.querySelector(".palette-item.active");
         if (active?.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
@@ -765,7 +765,7 @@
         notifPop.innerHTML = html(parts.join(""));
         hydrateIcons(notifPop);
         Array.prototype.slice.call(notifPop.querySelectorAll("[data-go]")).forEach(function (el) {
-            el.addEventListener("click", function (e) { e.preventDefault(); closeNotif(); navigate(el.getAttribute("data-go")); });
+            el.addEventListener("click", function (e) { e.preventDefault(); closeNotif(); navigate(el.dataset.go); });
         });
         updateNotifBadge(total);
     }
@@ -800,7 +800,7 @@
         var view = views[route.key];
         if (!view) { views.overview(); return; }
         navLinks.forEach(function (link) {
-            var active = link.getAttribute("data-route") === route.navRoute;
+            var active = link.dataset.route === route.navRoute;
             link.classList.toggle("active", active);
             if (active) { link.setAttribute("aria-current", "page"); } else { link.removeAttribute("aria-current"); }
         });
@@ -945,7 +945,7 @@
                 ].join("\n"));
                 hydrateIcons(panel);
                 panel.querySelectorAll("[data-key]").forEach(function (row) {
-                    row.addEventListener("click", function () { navigate("/flags/" + encodeURIComponent(row.getAttribute("data-key"))); });
+                    row.addEventListener("click", function () { navigate("/flags/" + encodeURIComponent(row.dataset.key)); });
                 });
                 var dismiss = document.getElementById("stale-flags-dismiss");
                 if (dismiss) { dismiss.addEventListener("click", function () { panel.innerHTML = ""; }); }
@@ -1025,7 +1025,7 @@
 
         Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (btn) {
             btn.addEventListener("click", function () {
-                flagListTab = btn.getAttribute("data-tab");
+                flagListTab = btn.dataset.tab;
                 Array.prototype.forEach.call(viewEl.querySelectorAll(".tab[data-tab]"), function (b) {
                     b.classList.toggle("active", b === btn);
                 });
@@ -1208,7 +1208,7 @@
     function wireArchiveControls(apiBase, isArchived, setArchived, rerender) {
         Array.prototype.forEach.call(viewEl.querySelectorAll(".seg[data-arch]"), function (btn) {
             btn.addEventListener("click", function () {
-                var next = btn.getAttribute("data-arch") === "1";
+                var next = btn.dataset.arch === "1";
                 if (next === isArchived) { return; }
                 setArchived(next);
                 rerender();
@@ -1220,7 +1220,7 @@
                 var btn = e.target.closest(".row-act");
                 if (!btn) { return; }
                 e.stopPropagation();
-                runArchiveAction(apiBase, btn.getAttribute("data-key"), isArchived, rerender);
+                runArchiveAction(apiBase, btn.dataset.key, isArchived, rerender);
             });
         }
     }
@@ -1707,7 +1707,7 @@
             }
         });
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.getAttribute("data-action");
+            var action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-variant") {
                 var list = form.querySelector(".variant-list");
                 list.insertAdjacentHTML("beforeend", renderVariantRow({ key: "", name: "", value: false }));
@@ -1823,7 +1823,7 @@
         var form = document.getElementById("config-form");
         wireJsonAreas(form);
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.getAttribute("data-action");
+            var action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-rule") {
                 var rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], value: config.defaultValue }, { kind: "config" }));
@@ -1893,7 +1893,7 @@
         hydrateIcons(viewEl);
         var form = document.getElementById("segment-form");
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.getAttribute("data-action");
+            var action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-condition") {
                 form.querySelector(".conditions-list").insertAdjacentHTML("beforeend", renderConditionRow({ attribute: "", operator: "Equals", value: "", negate: false }));
             } else if (action === "remove-condition") {
@@ -2126,7 +2126,7 @@
                 }
                 Array.prototype.slice.call(viewEl.querySelectorAll("[data-role]")).forEach(function (btn) {
                     btn.addEventListener("click", function () {
-                        var act = btn.getAttribute("data-role");
+                        var act = btn.dataset.role;
                         if (act === "delete") {
                             if (!window.confirm("Delete custom role '" + key + "'? Assignments to it stop granting access.")) { return; }
                             api("DELETE", "/admin/roles/" + encodeURIComponent(key))
@@ -2247,7 +2247,7 @@
         resultsEl.addEventListener("click", function (e) {
             var btn = e.target.closest("[data-add]");
             if (!btn) { return; }
-            var id = btn.getAttribute("data-add");
+            var id = btn.dataset.add;
             if (!memberIds.includes(id)) { memberIds.push(id); }
             searchEl.value = "";
             renderResults();
@@ -2256,7 +2256,7 @@
         chipsEl.addEventListener("click", function (e) {
             var btn = e.target.closest("[data-remove]");
             if (!btn) { return; }
-            var i = memberIds.indexOf(btn.getAttribute("data-remove"));
+            var i = memberIds.indexOf(btn.dataset.remove);
             if (i >= 0) { memberIds.splice(i, 1); }
             renderChips();
         });
@@ -2329,7 +2329,7 @@
             Array.prototype.forEach.call(bodyEl.querySelectorAll("[data-revoke]"), function (btn) {
                 btn.addEventListener("click", function () {
                     if (!window.confirm("Revoke this role assignment?")) { return; }
-                    api("DELETE", "/admin/role-assignments/" + encodeURIComponent(btn.getAttribute("data-revoke")))
+                    api("DELETE", "/admin/role-assignments/" + encodeURIComponent(btn.dataset.revoke))
                         .then(function () { loadRoleAssignments(assigneeType, assigneeId); })
                         .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } });
                 });
@@ -2465,7 +2465,7 @@
             }).join(""));
             Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var id = btn.getAttribute("data-revoke");
+                    var id = btn.dataset.revoke;
                     if (!window.confirm("Revoke this API key? Requests using it start failing immediately.")) { return; }
                     api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/revoke")
                         .then(refresh)
@@ -2474,7 +2474,7 @@
             });
             Array.prototype.slice.call(tbody.querySelectorAll("[data-rotate]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var id = btn.getAttribute("data-rotate");
+                    var id = btn.dataset.rotate;
                     if (!window.confirm("Rotate this API key? A replacement is minted and the old key is revoked immediately.")) { return; }
                     api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/rotate", {})
                         .then(function (res) {
@@ -2746,7 +2746,7 @@
         var msg = document.getElementById("exp-msg");
         Array.prototype.slice.call(document.querySelectorAll("[data-exp]")).forEach(function (btn) {
             btn.addEventListener("click", function () {
-                var action = btn.getAttribute("data-exp");
+                var action = btn.dataset.exp;
                 btn.disabled = true;
                 setMessageOn(msg, "loading", action === "start" ? "Starting…" : "Stopping…");
                 api("POST", "/admin/experiments/" + encodeURIComponent(exp.key) + "/" + action + "?env=" + encodeURIComponent(currentEnv.key))
@@ -2838,7 +2838,7 @@
                 list.addEventListener("click", function (e) {
                     if (e.target.closest("a, button")) { return; }
                     var card = e.target.closest(".inbox-card[data-cr]");
-                    if (card) { navigate("/inbox/" + encodeURIComponent(card.getAttribute("data-cr"))); }
+                    if (card) { navigate("/inbox/" + encodeURIComponent(card.dataset.cr)); }
                 });
             }
         }).catch(handleErrOnView("Inbox"));
@@ -2944,7 +2944,7 @@
         });
         Array.prototype.slice.call(document.querySelectorAll("[data-cr]")).forEach(function (btn) {
             btn.addEventListener("click", function () {
-                var action = btn.getAttribute("data-cr");
+                var action = btn.dataset.cr;
                 if (action === "approve") {
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/approvals", { decision: "Approve" })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
@@ -3311,7 +3311,7 @@
                     var btn = e.target.closest("[data-resend]");
                     if (!btn) { return; }
                     btn.disabled = true;
-                    api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries/" + encodeURIComponent(btn.getAttribute("data-resend")) + "/resend")
+                    api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries/" + encodeURIComponent(btn.dataset.resend) + "/resend")
                         .then(function () { flash("ok", "Delivery re-enqueued."); renderWebhookDetail(id); })
                         .catch(function (err) {
                             btn.disabled = false;
@@ -3322,7 +3322,7 @@
             }
             Array.prototype.slice.call(document.querySelectorAll("[data-wh]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var action = btn.getAttribute("data-wh");
+                    var action = btn.dataset.wh;
                     if (action === "test") {
                         setMessageOn(msg, "loading", "Enqueuing test…");
                         api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/test")
@@ -3603,15 +3603,15 @@
 
             Array.prototype.slice.call(document.querySelectorAll("#env-settings [data-env-action]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var key = btn.getAttribute("data-env-key");
-                    var action = btn.getAttribute("data-env-action");
+                    var key = btn.dataset.envKey;
+                    var action = btn.dataset.envAction;
                     var msg = document.getElementById("env-msg");
                     var p;
                     if (action === "lock" || action === "unlock") {
                         setMessageOn(msg, "loading", action === "lock" ? "Freezing…" : "Unfreezing…");
                         p = api("POST", "/admin/environments/" + encodeURIComponent(key) + "/" + action);
                     } else if (action === "rename") {
-                        var name = window.prompt("New name for environment '" + key + "':", btn.getAttribute("data-env-name") || "");
+                        var name = window.prompt("New name for environment '" + key + "':", btn.dataset.envName || "");
                         if (name == null) { return; }
                         setMessageOn(msg, "loading", "Renaming…");
                         p = api("PUT", "/admin/environments/" + encodeURIComponent(key), { key: key, name: name.trim() || null });
@@ -3706,9 +3706,9 @@
                     openModal(title, meta + body, true);
                 }
                 Array.prototype.slice.call(resultsEl.querySelectorAll(".audit-row")).forEach(function (row) {
-                    row.addEventListener("click", function () { openAuditEntry(Number.parseInt(row.getAttribute("data-idx"), 10)); });
+                    row.addEventListener("click", function () { openAuditEntry(Number.parseInt(row.dataset.idx, 10)); });
                     row.addEventListener("keydown", function (e) {
-                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditEntry(Number.parseInt(row.getAttribute("data-idx"), 10)); }
+                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditEntry(Number.parseInt(row.dataset.idx, 10)); }
                     });
                 });
             }).catch(handleErrOnView("Audit log"));
@@ -3835,7 +3835,7 @@
     function handleRuleAction(event, form, context) {
         var btn = event.target.closest("[data-action]");
         if (!btn) { return; }
-        var action = btn.getAttribute("data-action");
+        var action = btn.dataset.action;
         var card = btn.closest(".rule-card");
         if (action === "rule-remove" && card) { card.remove(); }
         else if (action === "rule-up" && card?.previousElementSibling) { card.parentNode.insertBefore(card, card.previousElementSibling); }
@@ -3869,7 +3869,7 @@
     function collectRules(form, context) {
         return Array.prototype.slice.call(form.querySelectorAll(".rule-card")).map(function (card, idx) {
             var rule = {
-                id: card.getAttribute("data-rule-id"),
+                id: card.dataset.ruleId,
                 order: idx,
                 name: card.querySelector(".r-name").value.trim() || null,
                 enabled: card.querySelector(".r-enabled").checked,
@@ -3957,7 +3957,7 @@
         panel.addEventListener("click", function (e) {
             var btn = e.target.closest("[data-action]");
             if (!btn) { return; }
-            var action = btn.getAttribute("data-action");
+            var action = btn.dataset.action;
             if (action === "preview-add-attr") {
                 attrsList.insertAdjacentHTML("beforeend", renderPreviewAttrRow());
             } else if (action === "preview-remove-attr") {
