@@ -377,8 +377,10 @@
         const detail = route.params && (route.params.key || route.params.id);
         const parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
         if (detail) {
-            parts.push('<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>');
-            parts.push('<span class="sep">/</span>', '<span class="crumb current">' + esc(detail) + '</span>');
+            parts.push(
+                '<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>',
+                '<span class="sep">/</span>',
+                '<span class="crumb current">' + esc(detail) + '</span>');
         } else {
             parts.push('<span class="crumb current">' + esc(section) + '</span>');
         }
