@@ -510,6 +510,17 @@
         });
     }
 
+    // A click anywhere on a list row (outside the controls inside it) opens the
+    // row's detail route. Shared by every list page that marks rows with data-key.
+    function wireRowNavigation(tbody, routePrefix) {
+        if (!tbody) { return; }
+        tbody.addEventListener("click", function (e) {
+            if (e.target.closest("input, button, a")) { return; }
+            var tr = e.target.closest("tr[data-key]");
+            if (tr) { navigate(routePrefix + encodeURIComponent(tr.getAttribute("data-key"))); }
+        });
+    }
+
     function navigate(path) {
         window.history.pushState({}, "", mountPath + path);
         render();
@@ -1022,11 +1033,7 @@
             });
         });
         if (filterInput) { filterInput.addEventListener("input", repaint); }
-        tbody.addEventListener("click", function (e) {
-            if (e.target.closest("input, button, a")) { return; }
-            var tr = e.target.closest("tr[data-key]");
-            if (tr) { navigate("/flags/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-        });
+        wireRowNavigation(tbody, "/flags/");
         if (checkAll) {
             checkAll.addEventListener("change", function () {
                 Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
@@ -1150,11 +1157,7 @@
             if (checkAll) { checkAll.checked = false; }
         }
         if (filterInput) { filterInput.addEventListener("input", repaint); }
-        tbody.addEventListener("click", function (e) {
-            if (e.target.closest("input, button, a")) { return; }
-            var tr = e.target.closest("tr[data-key]");
-            if (tr) { navigate(navBase + "/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-        });
+        wireRowNavigation(tbody, navBase + "/");
         if (checkAll) {
             checkAll.addEventListener("change", function () {
                 Array.prototype.forEach.call(tbody.querySelectorAll(".row-check"), function (c) { c.checked = checkAll.checked; });
@@ -1946,14 +1949,7 @@
                     : '<div class="empty"><p>No users yet.</p></div>';
                 viewEl.innerHTML = listPageShell("Users", sub, body);
                 hydrateIcons(viewEl);
-                var tb = viewEl.querySelector(".list-tbody");
-                if (tb) {
-                    tb.addEventListener("click", function (e) {
-                        if (e.target.closest("a, button, input")) { return; }
-                        var tr = e.target.closest("tr[data-key]");
-                        if (tr) { navigate("/users/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-                    });
-                }
+                wireRowNavigation(viewEl.querySelector(".list-tbody"), "/users/");
             })
             .catch(handleErrOnView("Users"));
     }
@@ -2067,14 +2063,7 @@
                     '</div></aside></div></div></div>',
                 ].join("\n"));
 
-                var tbody = viewEl.querySelector(".role-tbody");
-                if (tbody) {
-                    tbody.addEventListener("click", function (e) {
-                        if (e.target.closest("input, button, a")) { return; }
-                        var tr = e.target.closest("tr[data-key]");
-                        if (tr) { navigate("/roles/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-                    });
-                }
+                wireRowNavigation(viewEl.querySelector(".role-tbody"), "/roles/");
                 document.getElementById("role-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -2192,14 +2181,7 @@
                     '</div></aside></div></div></div>',
                 ].join("\n"));
 
-                var tbody = viewEl.querySelector(".grp-tbody");
-                if (tbody) {
-                    tbody.addEventListener("click", function (e) {
-                        if (e.target.closest("input, button, a")) { return; }
-                        var tr = e.target.closest("tr[data-key]");
-                        if (tr) { navigate("/groups/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-                    });
-                }
+                wireRowNavigation(viewEl.querySelector(".grp-tbody"), "/groups/");
                 document.getElementById("grp-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -2565,14 +2547,7 @@
                     '</div></aside></div></div></div>',
                 ].join("\n"));
 
-                var tbody = viewEl.querySelector(".prj-tbody");
-                if (tbody) {
-                    tbody.addEventListener("click", function (e) {
-                        if (e.target.closest("input, button, a")) { return; }
-                        var tr = e.target.closest("tr[data-key]");
-                        if (tr) { navigate("/projects/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-                    });
-                }
+                wireRowNavigation(viewEl.querySelector(".prj-tbody"), "/projects/");
                 document.getElementById("prj-form").addEventListener("submit", function (e) {
                     e.preventDefault();
                     var f = e.target;
@@ -2661,14 +2636,7 @@
                 }
                 viewEl.innerHTML = listPageShell("Experiments", sub, body);
                 hydrateIcons(viewEl);
-                var tb = viewEl.querySelector(".list-tbody");
-                if (tb) {
-                    tb.addEventListener("click", function (e) {
-                        if (e.target.closest("a, button, input")) { return; }
-                        var tr = e.target.closest("tr[data-key]");
-                        if (tr) { navigate("/experiments/" + encodeURIComponent(tr.getAttribute("data-key"))); }
-                    });
-                }
+                wireRowNavigation(viewEl.querySelector(".list-tbody"), "/experiments/");
             })
             .catch(handleErrOnView("Experiments"));
     }
