@@ -35,7 +35,7 @@
     // Config + DOM
     // ============================================================
     var meta = document.querySelector('meta[name="featly-mount-path"]');
-    var mountPath = (meta && meta.getAttribute("content")) || "/featly";
+    var mountPath = meta?.getAttribute("content") || "/featly";
     if (mountPath.endsWith("/")) { mountPath = mountPath.slice(0, -1); }
 
     var STORAGE_ENV_KEY = "featly.envKey";
@@ -127,7 +127,7 @@
                 boot();
             });
         }).catch(function (err) {
-            showAuthPrompt(err && err.message ? err.message : "Network error.");
+            showAuthPrompt(err?.message || "Network error.");
         });
     }
 
@@ -173,7 +173,7 @@
         var init = { method: method, headers: headers, credentials: "include" };
         // Cookie-authenticated mutations must echo the session's anti-forgery
         // token (synchronizer token, minted at login and returned by /me).
-        if (method !== "GET" && session && session.csrfToken) {
+        if (method !== "GET" && session?.csrfToken) {
             headers["X-Featly-Csrf"] = session.csrfToken;
         }
         if (body !== undefined) {
@@ -327,7 +327,7 @@
     var THEME_KEY = "featly.theme";
     function effectiveTheme() {
         return document.documentElement.getAttribute("data-theme")
-            || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     }
     function applyThemeIcon() {
         var slot = document.querySelector("#theme-toggle .ti-slot");
@@ -352,12 +352,12 @@
     // Env pill: colored pip (prod/staging/dev) + LOCKED badge from currentEnv.
     function updateEnvPill() {
         if (!envPill) { return; }
-        var key = ((currentEnv && currentEnv.key) || "").toLowerCase();
+        var key = (currentEnv?.key || "").toLowerCase();
         var tone = "dev";
         if (/prod/.test(key)) { tone = "prod"; }
         else if (/stag|stg|uat|pre/.test(key)) { tone = "staging"; }
         envPill.className = "env-pill " + tone;
-        if (envLock) { envLock.hidden = !(currentEnv && currentEnv.readOnly); }
+        if (envLock) { envLock.hidden = !currentEnv?.readOnly; }
     }
 
     // Breadcrumbs: workspace / section [ / detail key ].
@@ -479,7 +479,7 @@
         "/roles": "rbac",
         "/inbox": ["approvals", "rbac"],
     };
-    function featureOn(key) { return !featureFlags || featureFlags[key] !== false; }
+    function featureOn(key) { return featureFlags?.[key] !== false; }
     function isNavEnabled(navRoute) {
         var f = NAV_FEATURE[navRoute];
         if (!f) { return true; }
@@ -488,7 +488,7 @@
     function loadMeta() {
         return fetch("/api/meta", { credentials: "include" })
             .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (m) { featureFlags = (m && m.features) || null; })
+            .then(function (m) { featureFlags = m?.features || null; })
             .catch(function () { featureFlags = null; });
     }
     function applyNavGating() {
@@ -598,7 +598,7 @@
     }
 
     function paletteLoadEntities() {
-        var envKey = currentEnv && currentEnv.key;
+        var envKey = currentEnv?.key;
         if (!envKey) { paletteEntityCache = { env: null, items: [] }; return Promise.resolve(); }
         if (paletteEntityCache.env === envKey && paletteEntityCache.items) { return Promise.resolve(); }
         var q = "?env=" + encodeURIComponent(envKey);
@@ -659,7 +659,7 @@
             el.classList.toggle("active", Number.parseInt(el.getAttribute("data-i"), 10) === paletteActive);
         });
         var active = paletteEl.querySelector(".palette-item.active");
-        if (active && active.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
+        if (active?.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
     }
 
     function paletteSelect(i) {
@@ -698,7 +698,7 @@
         document.addEventListener("mousedown", function (e) {
             if (!notifOpen) { return; }
             var bell = document.getElementById("notif-btn");
-            if (notifPop.contains(e.target) || (bell && bell.contains(e.target))) { return; }
+            if (notifPop.contains(e.target) || bell?.contains(e.target)) { return; }
             closeNotif();
         });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape" && notifOpen) { closeNotif(); } });
@@ -991,7 +991,7 @@
         if (!tbody) { return; }
 
         function visibleRows() {
-            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            var q = (filterInput?.value || "").trim().toLowerCase();
             return all.filter(function (f) {
                 if (flagListTab === "enabled" && !f.enabled) { return false; }
                 if (flagListTab === "disabled" && f.enabled) { return false; }
@@ -1136,7 +1136,7 @@
         var checkAll = viewEl.querySelector(".check-all");
         if (!tbody) { return; }
         function repaint() {
-            var q = (filterInput && filterInput.value ? filterInput.value : "").trim().toLowerCase();
+            var q = (filterInput?.value || "").trim().toLowerCase();
             var rows = all.filter(function (r) {
                 if (!q) { return true; }
                 var hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
@@ -1186,7 +1186,7 @@
     // POST the archive/unarchive verb, then re-render the list. `readOnlyEnv` blocks
     // the action client-side with a hint (the server also returns 403).
     function runArchiveAction(apiBase, key, archived, rerender) {
-        if (currentEnv && currentEnv.readOnly) {
+        if (currentEnv?.readOnly) {
             flash("err", "Environment is read-only.");
             return;
         }
@@ -1197,7 +1197,7 @@
                 rerender();
             })
             .catch(function (e) {
-                flash("err", "Action failed: " + (e && e.message ? e.message : "error"));
+                flash("err", "Action failed: " + (e?.message || "error"));
             });
     }
     // Wires the Active/Archived toggle and per-row archive/restore buttons for a list.
@@ -1649,7 +1649,7 @@
     }
 
     function jsonHlFor(ta) {
-        return ta.parentElement && ta.parentElement.classList.contains("json-editor")
+        return ta.parentElement?.classList.contains("json-editor")
             ? ta.parentElement.querySelector(".json-hl") : null;
     }
     // Paint one editor's highlight overlay (the textarea text is transparent, so
@@ -1670,7 +1670,7 @@
             if (ta) { paintJsonArea(ta); }
         });
         form.addEventListener("scroll", function (e) {
-            var ta = e.target.closest && e.target.closest(".json-area");
+            var ta = e.target.closest?.(".json-area");
             if (ta) { var hl = jsonHlFor(ta); if (hl) { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; } }
         }, true);
         form.addEventListener("focusout", function (e) {
@@ -2145,7 +2145,7 @@
                                 .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                         } else if (act === "clone") {
                             var newKey = window.prompt("Key for the new custom role:", key + "-copy");
-                            if (newKey == null || !newKey.trim()) { return; }
+                            if (!newKey?.trim()) { return; }
                             var payload = { key: newKey.trim(), name: (r.name || key) + " (copy)" };
                             if (sys) { payload.cloneFromSystemRole = r.key; } else { payload.permissions = perms; }
                             api("POST", "/admin/roles", payload)
@@ -2711,7 +2711,7 @@
     }
 
     function renderExperimentAnalytics(exp, a) {
-        if (!a || !a.variants || a.variants.length === 0) {
+        if (!a?.variants?.length) {
             return '<div class="empty"><p>No exposures recorded yet.</p>'
                 + '<p class="muted">' + (exp.isActive ? "Evaluate the flag from an SDK client to start collecting data." : "Start the experiment to begin collecting exposures.") + '</p></div>';
         }
@@ -2746,12 +2746,12 @@
                 var label = v.variantKey;
                 if (isBaseline) {
                     label += " (baseline)";
-                } else if (m && m.pValue != null) {
+                } else if (m?.pValue != null) {
                     label += m.isSignificant ? " (p=" + m.pValue.toFixed(3) + ", significant)" : " (p=" + m.pValue.toFixed(3) + ")";
                 }
                 return barRow(label, Math.min(pct, 100), pct + "% (" + convs + "/" + (v.exposedSubjects || 0) + ")", "bar--conversion");
             }).join("");
-            var winnerCallout = winner && winner.variantKey
+            var winnerCallout = winner?.variantKey
                 ? '<div class="badge success" style="margin-bottom:8px"><span class="dot"></span>Winner: ' + esc(winner.variantKey) + ' (p=' + winner.pValue.toFixed(3) + ')</div>'
                 : '<div class="muted" style="margin-bottom:8px;font-size:11px">No variant is significantly better than the baseline yet.</div>';
             sections.push(
@@ -2989,7 +2989,7 @@
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "schedule") {
                     var input = document.getElementById("cr-schedule-input");
-                    if (!input || !input.value) {
+                    if (!input?.value) {
                         if (msg) { msg.className = "save-msg save-msg--error"; msg.textContent = "Pick a date and time first."; }
                         return;
                     }
@@ -3252,7 +3252,7 @@
                         // The signing secret is returned exactly once. Reveal it so
                         // the operator can copy it into the receiver, then link to detail.
                         var reveal = document.getElementById("wh-reveal");
-                        if (reveal && created && created.secret) {
+                        if (reveal && created?.secret) {
                             reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
                                 + '<strong>Webhook created. Copy the signing secret now — it will not be shown again.</strong>'
                                 + '<pre class="cr-json" style="margin:8px 0 0">' + esc(created.secret) + '</pre>'
@@ -3348,7 +3348,7 @@
                         .catch(function (err) {
                             btn.disabled = false;
                             if (err.kind === "auth") { showAuthPrompt(); return; }
-                            flash("err", "Resend failed: " + (err && err.message ? err.message : "error"));
+                            flash("err", "Resend failed: " + (err?.message || "error"));
                         });
                 });
             }
@@ -3423,8 +3423,8 @@
 
         function loadRateLimitSettings() {
             api("GET", "/admin/settings/rate-limit").then(function (view) {
-                var v = (view && view.value) || {};
-                var source = (view && view.source) || "";
+                var v = view?.value || {};
+                var source = view?.source || "";
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
@@ -3469,8 +3469,8 @@
         }
         function loadApprovalDefaultsSettings() {
             api("GET", "/admin/settings/approval-defaults").then(function (view) {
-                var v = (view && view.value) || {};
-                var source = (view && view.source) || "";
+                var v = view?.value || {};
+                var source = view?.source || "";
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
@@ -3506,8 +3506,8 @@
 
         function loadAuditSettings() {
             api("GET", "/admin/settings/audit").then(function (view) {
-                var v = (view && view.value) || {};
-                var source = (view && view.source) || "";
+                var v = view?.value || {};
+                var source = view?.source || "";
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
@@ -3534,9 +3534,9 @@
 
         function loadAuthorizationSettings() {
             api("GET", "/admin/settings/authorization").then(function (view) {
-                var v = (view && view.value) || {};
+                var v = view?.value || {};
                 var mode = v.autoProvisionMode || "Open";
-                var source = (view && view.source) || "";
+                var source = view?.source || "";
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
@@ -3565,8 +3565,8 @@
 
         function loadWebhookSettings() {
             api("GET", "/admin/settings/webhook").then(function (view) {
-                var v = (view && view.value) || {};
-                var source = (view && view.source) || "";
+                var v = view?.value || {};
+                var source = view?.source || "";
                 var prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
@@ -3785,9 +3785,9 @@
         }
         var out = "";
         if (context.kind === "flag") {
-            if (rule.outcome && rule.outcome.splits && rule.outcome.splits.length) {
+            if (rule.outcome?.splits?.length) {
                 out = '<span class="op">&rarr; split</span>';
-            } else if (rule.outcome && rule.outcome.variantKey) {
+            } else if (rule.outcome?.variantKey) {
                 out = '<span class="op">&rarr;</span><span class="val">' + esc(rule.outcome.variantKey) + '</span>';
             }
         } else {
@@ -3799,12 +3799,12 @@
     function renderRuleCard(rule, context, index) {
         var outcomeHtml;
         if (context.kind === "flag") {
-            var hasSplits = !!(rule.outcome && rule.outcome.splits && rule.outcome.splits.length);
+            var hasSplits = !!rule.outcome?.splits?.length;
             var variantOpts = (context.variants || []).map(function (v) {
                 return '<option value="' + esc(v.key) + '"' + (rule.outcome && rule.outcome.variantKey === v.key ? " selected" : "") + '>' + esc(v.key) + '</option>';
             }).join("");
             var splitsHtml = '<div class="splits' + (hasSplits ? "" : " hidden") + '">'
-                + ((rule.outcome && rule.outcome.splits) || []).map(renderSplitRow).join("")
+                + (rule.outcome?.splits || []).map(renderSplitRow).join("")
                 + '<button type="button" class="btn outline xs" data-action="add-split">+ Add split</button>'
                 + '</div>';
             outcomeHtml =
@@ -3870,8 +3870,8 @@
         var action = btn.getAttribute("data-action");
         var card = btn.closest(".rule-card");
         if (action === "rule-remove" && card) { card.remove(); }
-        else if (action === "rule-up" && card && card.previousElementSibling) { card.parentNode.insertBefore(card, card.previousElementSibling); }
-        else if (action === "rule-down" && card && card.nextElementSibling) { card.parentNode.insertBefore(card.nextElementSibling, card); }
+        else if (action === "rule-up" && card?.previousElementSibling) { card.parentNode.insertBefore(card, card.previousElementSibling); }
+        else if (action === "rule-down" && card?.nextElementSibling) { card.parentNode.insertBefore(card.nextElementSibling, card); }
         else if (action === "add-condition") {
             card.querySelector(".conditions-list").insertAdjacentHTML("beforeend", renderConditionRow({ attribute: "", operator: "Equals", value: "", negate: false }));
         }
