@@ -1631,7 +1631,7 @@
     // Regex tokenizer -> colored spans. Operates on the raw string, escaping
     // each segment, so it is safe to inject as HTML.
     function highlightJson(src) {
-        function e(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        function e(t) { return t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
         var re = /"(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
         var out = "", last = 0, m;
         while ((m = re.exec(src)) !== null) {
