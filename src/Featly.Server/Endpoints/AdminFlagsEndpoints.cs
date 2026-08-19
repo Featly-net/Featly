@@ -360,15 +360,10 @@ public sealed record FlagWriteRequest(
     IReadOnlyList<Prerequisite>? Prerequisites = null)
 {
     /// <summary>Presence errors for members the binder lets through as null (issue #324); null when the body is complete.</summary>
-    internal Dictionary<string, string[]>? Validate()
-    {
-        var errors = new Dictionary<string, string[]>();
-        WriteRequestValidation.Required(errors, "key", Key);
-        WriteRequestValidation.Required(errors, "name", Name);
-        WriteRequestValidation.Required(errors, "defaultVariantKey", DefaultVariantKey);
-        WriteRequestValidation.Required(errors, "variants", Variants);
-        return WriteRequestValidation.NullIfEmpty(errors);
-    }
+    internal Dictionary<string, string[]>? Validate() => WriteRequestValidation.Begin()
+        .Text("key", Key).Text("name", Name).Text("defaultVariantKey", DefaultVariantKey)
+        .List("variants", Variants)
+        .Result();
 
     internal Flag ToEntity(Guid environmentId, string actor) => new()
     {
