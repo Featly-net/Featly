@@ -58,12 +58,15 @@ export default [
         ignores: ["**/node_modules/**"],
     },
 
-    // --- The dashboard: browser, ES5 script, IIFE ---------------------------
+    // --- The dashboard: browser, classic script (IIFE) ---------------------
+    // Baseline per ADR-0036: ES2020 syntax on evergreen browsers (2022 here so
+    // String#replaceAll parses). sourceType stays "script" until the
+    // modularisation slice of #229 flips index.html to type="module".
     {
         files: ["src/Featly.Dashboard/wwwroot/**/*.js"],
         ...js.configs.recommended,
         languageOptions: {
-            ecmaVersion: 2020,
+            ecmaVersion: 2022,
             sourceType: "script",
             globals: {
                 ...globals.browser,
@@ -86,8 +89,9 @@ export default [
                 insertAdjacentHTML: { properties: [1], escape: { methods: dashboardSanitizers } },
             }],
 
-            // ES5 house style in app.js: `var` and function expressions are
-            // the norm there, not something to lint away in this PR.
+            // ADR-0036 makes const/let the baseline; these two flip to "error"
+            // in the var->const/let conversion slice of #229. Off until then so
+            // the ADR PR itself stays a docs + config change.
             "no-var": "off",
             "prefer-const": "off",
             "no-redeclare": ["error", { builtinGlobals: false }],
