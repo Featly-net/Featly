@@ -22,11 +22,11 @@
 // comments so navigation stays manageable.
 //
 // Language baseline (ADR-0036): ES2020 syntax on evergreen browsers. The
-// file predates that decision and is being converted rule-family by
-// rule-family (issue #229) -- new code should use const/let, arrow
-// functions, template literals, `?.`/`??`, and the modern standard library
-// (`includes`, `dataset`, `Number.isNaN`, `replaceAll`) rather than matching
-// the surrounding ES5-era style. Still served verbatim: no transpiler.
+// syntax-modernisation slices of issue #229 are done (const/let, `?.`,
+// `dataset`, `includes`, `Number.*`, `replaceAll`; `no-var`/`prefer-const`
+// are lint errors). New code may also use arrow functions, template literals
+// and `??` freely. Still served verbatim: no transpiler. What remains of
+// #229 is the split into native ES modules.
 
 (function () {
     "use strict";
@@ -34,28 +34,28 @@
     // ============================================================
     // Config + DOM
     // ============================================================
-    var meta = document.querySelector('meta[name="featly-mount-path"]');
-    var mountPath = meta?.getAttribute("content") || "/featly";
+    const meta = document.querySelector('meta[name="featly-mount-path"]');
+    let mountPath = meta?.getAttribute("content") || "/featly";
     if (mountPath.endsWith("/")) { mountPath = mountPath.slice(0, -1); }
 
-    var STORAGE_ENV_KEY = "featly.envKey";
+    const STORAGE_ENV_KEY = "featly.envKey";
 
-    var viewEl = document.getElementById("view");
-    var envSelect = document.getElementById("env-select");
-    var envPill = document.getElementById("env-pill");
-    var envLock = document.getElementById("env-lock");
-    var crumbsEl = document.getElementById("crumbs");
-    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".sb-item"));
+    const viewEl = document.getElementById("view");
+    const envSelect = document.getElementById("env-select");
+    const envPill = document.getElementById("env-pill");
+    const envLock = document.getElementById("env-lock");
+    const crumbsEl = document.getElementById("crumbs");
+    const navLinks = Array.prototype.slice.call(document.querySelectorAll(".sb-item"));
 
     // Sidebar account row reflects the session.
-    var sbUserName = document.getElementById("sb-user-name");
-    var sbUserRole = document.getElementById("sb-user-role");
-    var sbAvatar = document.getElementById("sb-avatar");
+    const sbUserName = document.getElementById("sb-user-name");
+    const sbUserRole = document.getElementById("sb-user-role");
+    const sbAvatar = document.getElementById("sb-avatar");
 
     // Tracks whether /api/auth/me has confirmed an active session this load.
     // The cookie itself is HttpOnly so JS can't read it directly — we infer
     // session state by hitting /me and remembering the result.
-    var session = null;
+    let session = null;
 
     // POST /logout clears the cookie server-side; we then reload so the login
     // screen shows. credentials:'include' is mandatory — without it the browser
@@ -66,9 +66,9 @@
         fetch("/api/auth/logout", { method: "POST", credentials: "include" })
             .finally(function () { session = null; location.reload(); });
     }
-    var accountBtn = document.getElementById("account-btn");
+    const accountBtn = document.getElementById("account-btn");
     if (accountBtn) { accountBtn.addEventListener("click", signOut); }
-    var sbUserEl = document.getElementById("sb-user");
+    const sbUserEl = document.getElementById("sb-user");
     if (sbUserEl) {
         sbUserEl.addEventListener("click", signOut);
         sbUserEl.addEventListener("keydown", function (e) {
@@ -100,7 +100,7 @@
         ].join("\n"));
         document.getElementById("auth-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var v = document.getElementById("auth-token").value.trim();
+            const v = document.getElementById("auth-token").value.trim();
             if (!v) { return; }
             login(v);
         });
@@ -152,10 +152,10 @@
     function problemMessage(body) {
         if (!body) { return ""; }
         try {
-            var p = JSON.parse(body);
+            const p = JSON.parse(body);
             if (p && typeof p === "object") {
                 if (p.errors && typeof p.errors === "object") {
-                    var parts = [];
+                    const parts = [];
                     Object.keys(p.errors).forEach(function (k) {
                         parts.push([].concat(p.errors[k]).join(" "));
                     });
@@ -168,9 +168,9 @@
     }
 
     function api(method, path, body) {
-        var url = path.startsWith("http") ? path : "/api" + path;
-        var headers = {};
-        var init = { method: method, headers: headers, credentials: "include" };
+        const url = path.startsWith("http") ? path : "/api" + path;
+        const headers = {};
+        const init = { method: method, headers: headers, credentials: "include" };
         // Cookie-authenticated mutations must echo the session's anti-forgery
         // token (synchronizer token, minted at login and returned by /me).
         if (method !== "GET" && session?.csrfToken) {
@@ -183,19 +183,19 @@
         return fetch(url, init).then(function (res) {
             if (res.status === 401 || res.status === 403) {
                 session = null;
-                var err = new Error("Session expired — please sign in again.");
+                const err = new Error("Session expired — please sign in again.");
                 err.kind = "auth";
                 throw err;
             }
             if (!res.ok) {
                 return res.text().then(function (b) {
-                    var err = new Error(problemMessage(b) || ("Request failed (" + res.status + ")"));
+                    const err = new Error(problemMessage(b) || ("Request failed (" + res.status + ")"));
                     err.status = res.status;
                     throw err;
                 });
             }
             if (res.status === 204) { return null; }
-            var ct = res.headers.get("Content-Type") || "";
+            const ct = res.headers.get("Content-Type") || "";
             return ct.includes("application/json") ? res.json() : res.text();
         });
     }
@@ -203,15 +203,15 @@
     // ============================================================
     // Environments
     // ============================================================
-    var environments = [];
-    var currentEnv = null;
+    let environments = [];
+    let currentEnv = null;
 
     function loadEnvironments() {
         return api("GET", "/admin/environments").then(function (list) {
             environments = Array.isArray(list) ? list : [];
-            var saved = null;
+            let saved = null;
             try { saved = localStorage.getItem(STORAGE_ENV_KEY); } catch (_) {}
-            var pick = environments.find(function (e) { return e.key === saved; })
+            const pick = environments.find(function (e) { return e.key === saved; })
                 || environments.find(function (e) { return e.isDefault; })
                 || environments[0];
             currentEnv = pick || null;
@@ -221,7 +221,7 @@
 
     function renderEnvSelect() {
         envSelect.innerHTML = html(environments.map(function (e) {
-            var sel = currentEnv && e.id === currentEnv.id ? " selected" : "";
+            const sel = currentEnv && e.id === currentEnv.id ? " selected" : "";
             return '<option value="' + esc(e.key) + '"' + sel + '>' + esc(e.name || e.key) + (e.readOnly ? " (read-only)" : "") + '</option>';
         }).join(""));
         envSelect.disabled = environments.length === 0;
@@ -229,7 +229,7 @@
     }
 
     envSelect.addEventListener("change", function () {
-        var picked = environments.find(function (e) { return e.key === envSelect.value; });
+        const picked = environments.find(function (e) { return e.key === envSelect.value; });
         if (!picked) { return; }
         currentEnv = picked;
         try { localStorage.setItem(STORAGE_ENV_KEY, picked.key); } catch (_) {}
@@ -257,13 +257,13 @@
     function truncate(s, n) { s = String(s || ""); return s.length <= n ? s : s.slice(0, n - 1) + "…"; }
     function formatDate(iso) {
         if (!iso) { return ""; }
-        var d = new Date(iso);
+        const d = new Date(iso);
         if (Number.isNaN(d.getTime())) { return esc(iso); }
-        var fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+        const fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
         return '<time datetime="' + esc(iso) + '" title="' + esc(iso) + '">' + esc(fmt.format(d)) + '</time>';
     }
     function setMessage(kind, text) {
-        var slot = document.getElementById("save-msg");
+        const slot = document.getElementById("save-msg");
         if (!slot) { return; }
         slot.className = "save-msg save-msg--" + kind;
         slot.textContent = text;
@@ -274,7 +274,7 @@
     // ============================================================
     // Inline-SVG icons (Lucide path data). No webfont — see README §6. This is
     // the shell subset; more icons are added with the per-screen rewrites.
-    var ICONS = {
+    const ICONS = {
         "home": '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
         "inbox": '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
         "flag": '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
@@ -315,7 +315,7 @@
             + 'stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + '</svg>';
     }
     function hydrateIcons(root) {
-        var slots = (root || document).querySelectorAll("[data-ti]");
+        const slots = (root || document).querySelectorAll("[data-ti]");
         Array.prototype.forEach.call(slots, function (el) {
             if (el.dataset.tiDone === "1") { return; }
             el.innerHTML = icon(el.dataset.ti);
@@ -324,23 +324,23 @@
     }
 
     // Theme: OS default, overridable by a stored choice; the toggle swaps the icon.
-    var THEME_KEY = "featly.theme";
+    const THEME_KEY = "featly.theme";
     function effectiveTheme() {
         return document.documentElement.dataset.theme
             || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     }
     function applyThemeIcon() {
-        var slot = document.querySelector("#theme-toggle .ti-slot");
+        const slot = document.querySelector("#theme-toggle .ti-slot");
         if (slot) { slot.innerHTML = icon(effectiveTheme() === "dark" ? "sun" : "moon"); }
     }
     function initTheme() {
-        var saved = null;
+        let saved = null;
         try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
         if (saved === "dark" || saved === "light") { document.documentElement.dataset.theme = saved; }
-        var btn = document.getElementById("theme-toggle");
+        const btn = document.getElementById("theme-toggle");
         if (btn) {
             btn.addEventListener("click", function () {
-                var next = effectiveTheme() === "dark" ? "light" : "dark";
+                const next = effectiveTheme() === "dark" ? "light" : "dark";
                 document.documentElement.dataset.theme = next;
                 try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
                 applyThemeIcon();
@@ -352,8 +352,8 @@
     // Env pill: colored pip (prod/staging/dev) + LOCKED badge from currentEnv.
     function updateEnvPill() {
         if (!envPill) { return; }
-        var key = (currentEnv?.key || "").toLowerCase();
-        var tone = "dev";
+        const key = (currentEnv?.key || "").toLowerCase();
+        let tone = "dev";
         if (/prod/.test(key)) { tone = "prod"; }
         else if (/stag|stg|uat|pre/.test(key)) { tone = "staging"; }
         envPill.className = "env-pill " + tone;
@@ -361,7 +361,7 @@
     }
 
     // Breadcrumbs: workspace / section [ / detail key ].
-    var SECTION_LABELS = {
+    const SECTION_LABELS = {
         overview: "Overview", inbox: "Inbox", changeDetail: "Inbox",
         flagList: "Flags", flagDetail: "Flags", configList: "Configs", configDetail: "Configs",
         segmentList: "Segments", segmentDetail: "Segments",
@@ -374,9 +374,9 @@
     };
     function renderCrumbs(route) {
         if (!crumbsEl) { return; }
-        var section = SECTION_LABELS[route.key] || "Overview";
-        var detail = route.params && (route.params.key || route.params.id);
-        var parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
+        const section = SECTION_LABELS[route.key] || "Overview";
+        const detail = route.params && (route.params.key || route.params.id);
+        const parts = ['<span class="crumb">Featly</span>', '<span class="sep">/</span>'];
         if (detail) {
             parts.push('<a class="crumb" data-link="' + esc(route.navRoute) + '" href="' + esc(mountPath + route.navRoute) + '">' + esc(section) + '</a>');
             parts.push('<span class="sep">/</span>');
@@ -387,7 +387,7 @@
         crumbsEl.innerHTML = html(parts.join(""));
     }
 
-    var OPERATORS = [
+    const OPERATORS = [
         "Equals", "NotEquals", "In", "NotIn",
         "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual",
         "Contains", "StartsWith", "EndsWith", "Matches",
@@ -397,7 +397,7 @@
     // ============================================================
     // Router
     // ============================================================
-    var routes = [
+    const routes = [
         { match: /^\/?$/,                key: "overview",     params: function () { return {}; } },
         { match: /^\/flags\/(.+)$/,      key: "flagDetail",   params: function (m) { return { key: decodeURIComponent(m[1]) }; } },
         { match: /^\/flags\/?$/,         key: "flagList",     params: function () { return {}; } },
@@ -426,11 +426,11 @@
     ];
 
     function currentRoute() {
-        var path = window.location.pathname;
+        const path = window.location.pathname;
         if (!path.startsWith(mountPath)) { return { key: "overview", params: {}, navRoute: "/" }; }
-        var sub = path.slice(mountPath.length) || "/";
-        for (var i = 0; i < routes.length; i++) {
-            var m = sub.match(routes[i].match);
+        const sub = path.slice(mountPath.length) || "/";
+        for (let i = 0; i < routes.length; i++) {
+            const m = sub.match(routes[i].match);
             if (m) {
                 return {
                     key: routes[i].key,
@@ -463,10 +463,10 @@
 
     // ---------- Feature toggles (ADR-0024) ----------
     // Populated from GET /api/meta at boot; null until loaded (treat all as on).
-    var featureFlags = null;
+    let featureFlags = null;
     // Maps a nav/base route to the feature area(s) it needs. Routes not listed
     // are core (always shown). An array means "enabled if any is on".
-    var NAV_FEATURE = {
+    const NAV_FEATURE = {
         "/flags": "flags",
         "/configs": "configs",
         "/segments": "segments",
@@ -481,7 +481,7 @@
     };
     function featureOn(key) { return featureFlags?.[key] !== false; }
     function isNavEnabled(navRoute) {
-        var f = NAV_FEATURE[navRoute];
+        const f = NAV_FEATURE[navRoute];
         if (!f) { return true; }
         return Array.isArray(f) ? f.some(featureOn) : featureOn(f);
     }
@@ -496,13 +496,13 @@
             link.style.display = isNavEnabled(link.dataset.route) ? "" : "none";
         });
         // Hide a section header when every item under it (until the next header) is hidden.
-        var nav = document.querySelector(".sb-scroll");
+        const nav = document.querySelector(".sb-scroll");
         if (!nav) { return; }
-        var kids = Array.prototype.slice.call(nav.children);
+        const kids = Array.prototype.slice.call(nav.children);
         kids.forEach(function (el, i) {
             if (!el.classList.contains("sb-section")) { return; }
-            var anyVisible = false;
-            for (var j = i + 1; j < kids.length; j++) {
+            let anyVisible = false;
+            for (let j = i + 1; j < kids.length; j++) {
                 if (kids[j].classList.contains("sb-section")) { break; }
                 if (kids[j].classList.contains("sb-item") && kids[j].style.display !== "none") { anyVisible = true; break; }
             }
@@ -516,7 +516,7 @@
         if (!tbody) { return; }
         tbody.addEventListener("click", function (e) {
             if (e.target.closest("input, button, a")) { return; }
-            var tr = e.target.closest("tr[data-key]");
+            const tr = e.target.closest("tr[data-key]");
             if (tr) { navigate(routePrefix + encodeURIComponent(tr.dataset.key)); }
         });
     }
@@ -528,7 +528,7 @@
     }
 
     function onNavClick(event) {
-        var anchor = event.target.closest("a[data-link]");
+        const anchor = event.target.closest("a[data-link]");
         if (!anchor) { return; }
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) { return; }
         event.preventDefault();
@@ -549,9 +549,9 @@
     // flag/config/segment in the current environment by key or name.
     // No new endpoints — reuses the admin list APIs + the router.
     // ============================================================
-    var paletteEl = null, paletteOpen = false, paletteItems = [], paletteActive = 0;
-    var paletteEntityCache = { env: null, items: null };
-    var NAV_COMMANDS = [
+    let paletteEl = null, paletteOpen = false, paletteItems = [], paletteActive = 0;
+    let paletteEntityCache = { env: null, items: null };
+    const NAV_COMMANDS = [
         { label: "Overview", route: "/", ti: "home" },
         { label: "Inbox", route: "/inbox", ti: "inbox" },
         { label: "Flags", route: "/flags", ti: "flag" },
@@ -585,7 +585,7 @@
         document.body.appendChild(paletteEl);
         hydrateIcons(paletteEl);
         paletteEl.addEventListener("mousedown", function (e) { if (e.target === paletteEl) { closePalette(); } });
-        var input = paletteEl.querySelector("#palette-q");
+        const input = paletteEl.querySelector("#palette-q");
         input.addEventListener("input", function () { paletteFilter(input.value); });
         input.addEventListener("keydown", paletteKeydown);
         return paletteEl;
@@ -596,7 +596,7 @@
         ensurePalette();
         paletteEl.hidden = false;
         paletteOpen = true;
-        var input = paletteEl.querySelector("#palette-q");
+        const input = paletteEl.querySelector("#palette-q");
         input.value = "";
         paletteFilter("");
         input.focus();
@@ -609,17 +609,17 @@
     }
 
     function paletteLoadEntities() {
-        var envKey = currentEnv?.key;
+        const envKey = currentEnv?.key;
         if (!envKey) { paletteEntityCache = { env: null, items: [] }; return Promise.resolve(); }
         if (paletteEntityCache.env === envKey && paletteEntityCache.items) { return Promise.resolve(); }
-        var q = "?env=" + encodeURIComponent(envKey);
-        var none = Promise.resolve([]);
+        const q = "?env=" + encodeURIComponent(envKey);
+        const none = Promise.resolve([]);
         return Promise.all([
             featureOn("flags") ? api("GET", "/admin/flags" + q).catch(function () { return []; }) : none,
             featureOn("configs") ? api("GET", "/admin/configs" + q).catch(function () { return []; }) : none,
             featureOn("segments") ? api("GET", "/admin/segments" + q).catch(function () { return []; }) : none,
         ]).then(function (res) {
-            var items = [];
+            const items = [];
             (res[0] || []).forEach(function (f) { items.push({ label: f.key, sub: f.name || "", kind: "Flag", route: "/flags/" + encodeURIComponent(f.key), ti: "flag" }); });
             (res[1] || []).forEach(function (c) { items.push({ label: c.key, sub: c.name || "", kind: "Config", route: "/configs/" + encodeURIComponent(c.key), ti: "sliders" }); });
             (res[2] || []).forEach(function (s) { items.push({ label: s.key, sub: s.name || "", kind: "Segment", route: "/segments/" + encodeURIComponent(s.key), ti: "segment" }); });
@@ -629,25 +629,25 @@
 
     function paletteFilter(q) {
         q = (q || "").trim().toLowerCase();
-        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().includes(q)); })
+        const nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().includes(q)); })
             .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
-        var ents = (paletteEntityCache.items || []).filter(function (e) {
+        const ents = (paletteEntityCache.items || []).filter(function (e) {
             return !q || e.label.toLowerCase().includes(q) || (e.sub && e.sub.toLowerCase().includes(q));
         });
         ents.forEach(function (e) { e.group = "Entities"; });
-        var ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
+        const ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
         paletteItems = ordered.slice(0, 40);
         paletteActive = 0;
         paletteRender();
     }
 
     function paletteRender() {
-        var list = paletteEl.querySelector("#palette-list");
+        const list = paletteEl.querySelector("#palette-list");
         if (!paletteItems.length) {
             list.innerHTML = '<div class="palette-section-label">No matches</div>';
             return;
         }
-        var markup = "", lastGroup = null;
+        let markup = "", lastGroup = null;
         paletteItems.forEach(function (it, i) {
             if (it.group !== lastGroup) { markup += '<div class="palette-section-label">' + esc(it.group) + '</div>'; lastGroup = it.group; }
             markup += '<div class="palette-item' + (i === paletteActive ? " active" : "") + '" data-i="' + i + '" role="option">'
@@ -665,16 +665,16 @@
     }
 
     function paletteHighlight() {
-        var els = paletteEl.querySelectorAll(".palette-item");
+        const els = paletteEl.querySelectorAll(".palette-item");
         Array.prototype.forEach.call(els, function (el) {
             el.classList.toggle("active", Number.parseInt(el.dataset.i, 10) === paletteActive);
         });
-        var active = paletteEl.querySelector(".palette-item.active");
+        const active = paletteEl.querySelector(".palette-item.active");
         if (active?.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
     }
 
     function paletteSelect(i) {
-        var it = paletteItems[i];
+        const it = paletteItems[i];
         if (!it) { return; }
         closePalette();
         navigate(it.route);
@@ -693,14 +693,14 @@
             if (paletteOpen) { closePalette(); } else { openPalette(); }
         } else if (e.key === "Escape" && paletteOpen) { closePalette(); }
     });
-    var globalSearchBtn = document.getElementById("global-search");
+    const globalSearchBtn = document.getElementById("global-search");
     if (globalSearchBtn) { globalSearchBtn.addEventListener("click", openPalette); }
 
     // ============================================================
     // Notifications popover (bell): pending approvals + role-upgrade
     // requests, reusing the same admin endpoints as the Inbox.
     // ============================================================
-    var notifPop = null, notifOpen = false;
+    let notifPop = null, notifOpen = false;
     function ensureNotifPop() {
         if (notifPop) { return notifPop; }
         notifPop = document.createElement("div");
@@ -708,7 +708,7 @@
         document.body.appendChild(notifPop);
         document.addEventListener("mousedown", function (e) {
             if (!notifOpen) { return; }
-            var bell = document.getElementById("notif-btn");
+            const bell = document.getElementById("notif-btn");
             if (notifPop.contains(e.target) || bell?.contains(e.target)) { return; }
             closeNotif();
         });
@@ -726,7 +726,7 @@
     }
     function toggleNotif() { if (notifOpen) { closeNotif(); } else { openNotif(); } }
     function fetchNotifications() {
-        var none = Promise.resolve([]);
+        const none = Promise.resolve([]);
         return Promise.all([
             featureOn("approvals") ? api("GET", "/admin/changes?status=Pending").catch(function () { return []; }) : none,
             featureOn("rbac") ? api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }) : none,
@@ -735,8 +735,8 @@
         }).catch(function () { return { changes: [], upgrades: [] }; });
     }
     function renderNotifPop(changes, upgrades) {
-        var total = changes.length + upgrades.length;
-        var parts = ['<div class="notif-head">Notifications <span class="count">' + total + '</span></div>', '<div class="notif-list">'];
+        const total = changes.length + upgrades.length;
+        const parts = ['<div class="notif-head">Notifications <span class="count">' + total + '</span></div>', '<div class="notif-list">'];
         if (!total) {
             parts.push('<div class="notif-empty">You’re all caught up.</div>');
         } else {
@@ -770,9 +770,9 @@
         updateNotifBadge(total);
     }
     function updateNotifBadge(total) {
-        var bell = document.getElementById("notif-btn");
+        const bell = document.getElementById("notif-btn");
         if (!bell) { return; }
-        var dot = bell.querySelector(".dot-count");
+        let dot = bell.querySelector(".dot-count");
         if (total > 0) {
             if (!dot) { dot = document.createElement("span"); dot.className = "dot-count"; bell.appendChild(dot); }
             dot.textContent = total > 9 ? "9+" : String(total);
@@ -782,7 +782,7 @@
         if (!isAuthenticated()) { return; }
         fetchNotifications().then(function (d) { updateNotifBadge(d.changes.length + d.upgrades.length); });
     }
-    var notifBtn = document.getElementById("notif-btn");
+    const notifBtn = document.getElementById("notif-btn");
     if (notifBtn) { notifBtn.addEventListener("click", function (e) { e.stopPropagation(); toggleNotif(); }); }
 
     // ============================================================
@@ -790,17 +790,17 @@
     // ============================================================
     function render() {
         if (!isAuthenticated()) { showAuthPrompt(); return; }
-        var route = currentRoute();
+        const route = currentRoute();
         // A disabled feature area is not navigable — fall back to Overview.
         if (route.key !== "overview" && !isNavEnabled(route.navRoute)) {
             navLinks.forEach(function (l) { l.classList.remove("active"); l.removeAttribute("aria-current"); });
             views.overview();
             return;
         }
-        var view = views[route.key];
+        const view = views[route.key];
         if (!view) { views.overview(); return; }
         navLinks.forEach(function (link) {
-            var active = link.dataset.route === route.navRoute;
+            const active = link.dataset.route === route.navRoute;
             link.classList.toggle("active", active);
             if (active) { link.setAttribute("aria-current", "page"); } else { link.removeAttribute("aria-current"); }
         });
@@ -809,7 +809,7 @@
         view(route.params);
     }
 
-    var views = {
+    const views = {
         overview: function () {
             viewEl.innerHTML = html([
                 '<h1>Overview</h1>',
@@ -854,15 +854,15 @@
 
     // ---------- Flags list (redesigned, step 5) ----------
     // Tab + filter state survives re-renders within a session.
-    var flagListTab = "all";
+    let flagListTab = "all";
     // Archive view toggle per list (false = active items, true = archived items).
-    var flagListArchived = false;
-    var configListArchived = false;
-    var segmentListArchived = false;
+    let flagListArchived = false;
+    let configListArchived = false;
+    let segmentListArchived = false;
 
     function flagTypeBadge(type) {
-        var t = String(type == null ? "" : type);
-        var variant = { Boolean: " info", Json: " accent" }[t] || "";
+        const t = String(type == null ? "" : type);
+        const variant = { Boolean: " info", Json: " accent" }[t] || "";
         return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
     }
     function flagStatusBadge(f) {
@@ -871,7 +871,7 @@
             : '<span class="badge"><span class="dot"></span>off</span>';
     }
     function flagTagsCell(f) {
-        var tags = f.tags || [];
+        const tags = f.tags || [];
         if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
         return '<div class="tag-list">' + tags.map(function (t) {
             return '<span class="tag muted">' + esc(t) + '</span>';
@@ -915,18 +915,18 @@
     // archived flag with a still-active experiment) — a lightweight, dismissible
     // panel above the table. Best-effort: silently does nothing on error.
     function loadStaleFlagsPanel() {
-        var panel = document.getElementById("stale-flags-panel");
+        const panel = document.getElementById("stale-flags-panel");
         if (!panel) { return; }
         api("GET", "/admin/flags/stale?env=" + encodeURIComponent(currentEnv.key))
             .then(function (candidates) {
                 candidates = Array.isArray(candidates) ? candidates : [];
                 if (!candidates.length) { return; }
-                var reasonLabel = {
+                const reasonLabel = {
                     NoTargetingRules: "No targeting rules",
                     ExperimentStalledNoExposures: "Stalled experiment",
                     ArchivedButExperimentStillActive: "Archived, experiment still active",
                 };
-                var rows = candidates.map(function (c) {
+                const rows = candidates.map(function (c) {
                     return '<div class="bar-row" data-key="' + esc(c.flagKey) + '" style="cursor:pointer">'
                         + '<div class="bar-row__label mono">' + esc(c.flagKey) + '</div>'
                         + '<div class="bar-row__value" style="flex:1;text-align:left;white-space:normal">'
@@ -947,24 +947,24 @@
                 panel.querySelectorAll("[data-key]").forEach(function (row) {
                     row.addEventListener("click", function () { navigate("/flags/" + encodeURIComponent(row.dataset.key)); });
                 });
-                var dismiss = document.getElementById("stale-flags-dismiss");
+                const dismiss = document.getElementById("stale-flags-dismiss");
                 if (dismiss) { dismiss.addEventListener("click", function () { panel.innerHTML = ""; }); }
             })
             .catch(function () { /* best-effort */ });
     }
 
     function flagListMarkup(all, loading) {
-        var enabled = all.filter(function (f) { return f.enabled; }).length;
-        var tabs = [
+        const enabled = all.filter(function (f) { return f.enabled; }).length;
+        const tabs = [
             { k: "all", label: "All flags", n: all.length },
             { k: "enabled", label: "Enabled", n: enabled },
             { k: "disabled", label: "Disabled", n: all.length - enabled },
         ];
-        var tabsHtml = tabs.map(function (t) {
+        const tabsHtml = tabs.map(function (t) {
             return '<button class="tab' + (t.k === flagListTab ? " active" : "") + '" type="button" data-tab="' + t.k + '">'
                 + esc(t.label) + ' <span class="count">' + t.n + '</span></button>';
         }).join("");
-        var body = loading
+        const body = loading
             ? '<div class="empty"><p class="muted">Loading…</p></div>'
             : [
                 '<div class="filter-bar">' + archiveToggle(flagListArchived),
@@ -995,26 +995,26 @@
     }
 
     function wireFlagList(all) {
-        var tbody = document.getElementById("flag-tbody");
-        var countEl = document.getElementById("flag-count");
-        var filterInput = document.getElementById("flag-filter");
-        var checkAll = document.getElementById("flag-check-all");
+        const tbody = document.getElementById("flag-tbody");
+        const countEl = document.getElementById("flag-count");
+        const filterInput = document.getElementById("flag-filter");
+        const checkAll = document.getElementById("flag-check-all");
         if (!tbody) { return; }
 
         function visibleRows() {
-            var q = (filterInput?.value || "").trim().toLowerCase();
+            const q = (filterInput?.value || "").trim().toLowerCase();
             return all.filter(function (f) {
                 if (flagListTab === "enabled" && !f.enabled) { return false; }
                 if (flagListTab === "disabled" && f.enabled) { return false; }
                 if (q) {
-                    var hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
+                    const hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
                     if (!hay.includes(q)) { return false; }
                 }
                 return true;
             });
         }
         function repaint() {
-            var rows = visibleRows();
+            const rows = visibleRows();
             tbody.innerHTML = html(rows.length
                 ? rows.map(flagRow).join("")
                 : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No flags match this filter.</td></tr>');
@@ -1044,7 +1044,7 @@
     }
 
     function wireFlagNew() {
-        var btn = document.getElementById("flag-new");
+        const btn = document.getElementById("flag-new");
         if (btn) { btn.addEventListener("click", openCreateFlagModal); }
     }
 
@@ -1074,13 +1074,13 @@
 
         document.getElementById("flag-create-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
-            var msg = document.getElementById("flag-create-msg");
-            var key = f.key.value.trim();
+            const f = e.target;
+            const msg = document.getElementById("flag-create-msg");
+            const key = f.key.value.trim();
             if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
-            var type = f.type.value;
-            var seed = seedFlagVariants(type);
-            var tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+            const type = f.type.value;
+            const seed = seedFlagVariants(type);
+            const tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
             setMessageOn(msg, "loading", "Creating…");
             api("POST", "/admin/flags?env=" + encodeURIComponent(currentEnv.key), {
                 key: key,
@@ -1095,7 +1095,7 @@
                 .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
         });
 
-        var keyInput = document.querySelector("#flag-create-form [name=key]");
+        const keyInput = document.querySelector("#flag-create-form [name=key]");
         if (keyInput) { keyInput.focus(); }
     }
 
@@ -1129,7 +1129,7 @@
         return listPageShell(title, "", '<div class="empty"><p>No environment selected yet.</p></div>');
     }
     function tagsCell(row) {
-        var tags = row.tags || [];
+        const tags = row.tags || [];
         if (!tags.length) { return '<span class="muted" style="font-size:11px">—</span>'; }
         return '<div class="tag-list">' + tags.map(function (t) { return '<span class="tag muted">' + esc(t) + '</span>'; }).join("") + '</div>';
     }
@@ -1137,16 +1137,16 @@
     // count is .list-count, filter input is .list-filter. `fields` are the row
     // properties searched; `rowFn` re-renders one row; navBase + key → detail route.
     function wireSimpleList(all, navBase, noun, fields, rowFn, colspan) {
-        var tbody = viewEl.querySelector(".list-tbody");
-        var countEl = viewEl.querySelector(".list-count");
-        var filterInput = viewEl.querySelector(".list-filter");
-        var checkAll = viewEl.querySelector(".check-all");
+        const tbody = viewEl.querySelector(".list-tbody");
+        const countEl = viewEl.querySelector(".list-count");
+        const filterInput = viewEl.querySelector(".list-filter");
+        const checkAll = viewEl.querySelector(".check-all");
         if (!tbody) { return; }
         function repaint() {
-            var q = (filterInput?.value || "").trim().toLowerCase();
-            var rows = all.filter(function (r) {
+            const q = (filterInput?.value || "").trim().toLowerCase();
+            const rows = all.filter(function (r) {
                 if (!q) { return true; }
-                var hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
+                const hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
                 return hay.includes(q);
             });
             tbody.innerHTML = html(rows.length
@@ -1179,9 +1179,9 @@
     }
     // Per-row action cell: Archive on the active list, Restore on the archived list.
     function archiveActionCell(key, archived) {
-        var act = archived ? "restore" : "archive";
-        var ic = archived ? "rotate-ccw" : "archive";
-        var label = (archived ? "Restore " : "Archive ") + key;
+        const act = archived ? "restore" : "archive";
+        const ic = archived ? "rotate-ccw" : "archive";
+        const label = (archived ? "Restore " : "Archive ") + key;
         return '<td class="col-actions"><button class="icon-btn row-act" type="button" data-act="' + act
             + '" data-key="' + esc(key) + '" title="' + (archived ? "Restore" : "Archive") + '" aria-label="' + esc(label) + '">'
             + icon(ic) + '</button></td>';
@@ -1193,7 +1193,7 @@
             flash("err", "Environment is read-only.");
             return;
         }
-        var verb = archived ? "unarchive" : "archive";
+        const verb = archived ? "unarchive" : "archive";
         api("POST", apiBase + "/" + encodeURIComponent(key) + "/" + verb + "?env=" + encodeURIComponent(currentEnv.key))
             .then(function () {
                 flash("ok", (archived ? "Restored " : "Archived ") + key);
@@ -1208,16 +1208,16 @@
     function wireArchiveControls(apiBase, isArchived, setArchived, rerender) {
         Array.prototype.forEach.call(viewEl.querySelectorAll(".seg[data-arch]"), function (btn) {
             btn.addEventListener("click", function () {
-                var next = btn.dataset.arch === "1";
+                const next = btn.dataset.arch === "1";
                 if (next === isArchived) { return; }
                 setArchived(next);
                 rerender();
             });
         });
-        var tbody = viewEl.querySelector(".list-tbody") || document.getElementById("flag-tbody");
+        const tbody = viewEl.querySelector(".list-tbody") || document.getElementById("flag-tbody");
         if (tbody) {
             tbody.addEventListener("click", function (e) {
-                var btn = e.target.closest(".row-act");
+                const btn = e.target.closest(".row-act");
                 if (!btn) { return; }
                 e.stopPropagation();
                 runArchiveAction(apiBase, btn.dataset.key, isArchived, rerender);
@@ -1229,9 +1229,9 @@
         return '<tr><td colspan="' + (colspan || 8) + '" class="muted" style="padding:18px;text-align:center">' + esc(text) + '</td></tr>';
     }
     // Lightweight transient toast, bottom-right. kind: "ok" | "err".
-    var flashTimer = null;
+    let flashTimer = null;
     function flash(kind, text) {
-        var el = document.getElementById("toast");
+        let el = document.getElementById("toast");
         if (!el) {
             el = document.createElement("div");
             el.id = "toast";
@@ -1247,12 +1247,12 @@
     // Badge tone for a config's value type; shared by the list badge and the
     // detail-header badge so the two never drift.
     function configTypeVariant(type) {
-        var t = String(type == null ? "" : type);
+        const t = String(type == null ? "" : type);
         return { Json: " accent", Bool: " info" }[t] || "";
     }
     function configTypeBadge(type) {
-        var t = String(type == null ? "" : type);
-        var variant = configTypeVariant(t);
+        const t = String(type == null ? "" : type);
+        const variant = configTypeVariant(t);
         return '<span class="badge sq' + variant + '">' + esc(t || "—") + '</span>';
     }
     function configRow(c) {
@@ -1284,7 +1284,7 @@
             .catch(handleErrOnView("Configs"));
     }
     function configListMarkup(all, loading) {
-        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+        const body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
             listFilterBar("Filter by key, name, or tag", archiveToggle(configListArchived)),
             '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
             '  <th style="width:28px"><input type="checkbox" class="check-all" aria-label="Select all" /></th>',
@@ -1324,7 +1324,7 @@
             .catch(handleErrOnView("Segments"));
     }
     function segmentListMarkup(all, loading) {
-        var body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
+        const body = loading ? '<div class="empty"><p class="muted">Loading…</p></div>' : [
             listFilterBar("Filter by key or name", archiveToggle(segmentListArchived)),
             '<div class="tbl-wrap"><table class="tbl"><thead><tr>',
             '  <th>Key / Name</th><th style="width:120px">Conditions</th>',
@@ -1337,10 +1337,10 @@
     }
 
     // ---------- Config create ----------
-    var CONFIG_TYPES = ["String", "Int", "Long", "Double", "Decimal", "Bool", "DateTime", "TimeSpan", "Json"];
+    const CONFIG_TYPES = ["String", "Int", "Long", "Double", "Decimal", "Bool", "DateTime", "TimeSpan", "Json"];
 
     function wireConfigNew() {
-        var b = document.getElementById("config-new");
+        const b = document.getElementById("config-new");
         if (b) { b.addEventListener("click", openCreateConfigModal); }
     }
 
@@ -1350,12 +1350,12 @@
         raw = raw == null ? "" : raw;
         switch (type) {
             case "Int": case "Long": {
-                var i = Number.parseInt(raw, 10);
+                const i = Number.parseInt(raw, 10);
                 if (Number.isNaN(i)) { throw new Error("Default value must be an integer."); }
                 return i;
             }
             case "Double": case "Decimal": {
-                var n = Number.parseFloat(raw);
+                const n = Number.parseFloat(raw);
                 if (Number.isNaN(n)) { throw new Error("Default value must be a number."); }
                 return n;
             }
@@ -1368,7 +1368,7 @@
 
     function openCreateConfigModal() {
         if (!currentEnv) { return; }
-        var typeOpts = CONFIG_TYPES.map(function (t) { return '<option>' + t + '</option>'; }).join("");
+        const typeOpts = CONFIG_TYPES.map(function (t) { return '<option>' + t + '</option>'; }).join("");
         openModal("New config", [
             '<form id="config-create-form" class="editor">',
             field("Key", '<input name="key" required placeholder="checkout.timeout" autocomplete="off" spellcheck="false" />'),
@@ -1384,14 +1384,14 @@
         wireJsonAreas(document.getElementById("config-create-form"));
         document.getElementById("config-create-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
-            var msg = document.getElementById("config-create-msg");
-            var key = f.key.value.trim();
+            const f = e.target;
+            const msg = document.getElementById("config-create-msg");
+            const key = f.key.value.trim();
             if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
-            var defaultValue;
+            let defaultValue;
             try { defaultValue = coerceConfigDefault(f.type.value, f.defaultValue.value.trim()); }
             catch (err) { setMessageOn(msg, "error", err.message); return; }
-            var tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+            const tags = f.tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
             setMessageOn(msg, "loading", "Creating…");
             api("POST", "/admin/configs?env=" + encodeURIComponent(currentEnv.key), {
                 key: key,
@@ -1404,13 +1404,13 @@
                 .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
         });
 
-        var k = document.querySelector("#config-create-form [name=key]");
+        const k = document.querySelector("#config-create-form [name=key]");
         if (k) { k.focus(); }
     }
 
     // ---------- Segment create ----------
     function wireSegmentNew() {
-        var b = document.getElementById("segment-new");
+        const b = document.getElementById("segment-new");
         if (b) { b.addEventListener("click", openCreateSegmentModal); }
     }
 
@@ -1427,9 +1427,9 @@
 
         document.getElementById("segment-create-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
-            var msg = document.getElementById("segment-create-msg");
-            var key = f.key.value.trim();
+            const f = e.target;
+            const msg = document.getElementById("segment-create-msg");
+            const key = f.key.value.trim();
             if (!key) { setMessageOn(msg, "error", "Key is required."); return; }
             setMessageOn(msg, "loading", "Creating…");
             api("POST", "/admin/segments?env=" + encodeURIComponent(currentEnv.key), {
@@ -1441,7 +1441,7 @@
                 .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
         });
 
-        var k = document.querySelector("#segment-create-form [name=key]");
+        const k = document.querySelector("#segment-create-form [name=key]");
         if (k) { k.focus(); }
     }
 
@@ -1456,8 +1456,8 @@
             api("GET", "/admin/flags?env=" + encodeURIComponent(currentEnv.key)).catch(function () { return []; }),
         ])
             .then(function (results) {
-                var flag = results[0];
-                var otherFlags = (results[1] || []).filter(function (f) { return f.key !== flag.key && !f.archived; });
+                const flag = results[0];
+                const otherFlags = (results[1] || []).filter(function (f) { return f.key !== flag.key && !f.archived; });
                 renderFlagEditor(flag, otherFlags);
             })
             .catch(handleErrOnView("Flag: " + key));
@@ -1486,11 +1486,11 @@
     // ---------- Flag editor ----------
     function renderFlagEditor(flag, otherFlags) {
         otherFlags = otherFlags || [];
-        var variantOpts = (flag.variants || []).map(function (v) {
+        const variantOpts = (flag.variants || []).map(function (v) {
             return '<option value="' + esc(v.key) + '"' + (v.key === flag.defaultVariantKey ? " selected" : "") + '>' + esc(v.key) + '</option>';
         }).join("");
 
-        var statusBadge = flag.enabled
+        const statusBadge = flag.enabled
             ? '<span class="badge success"><span class="dot"></span>on</span>'
             : '<span class="badge"><span class="dot"></span>off</span>';
         viewEl.innerHTML = html([
@@ -1552,7 +1552,7 @@
         if ((flag.prerequisites || []).length > 0) {
             api("POST", "/admin/preview/flags/" + encodeURIComponent(flag.key) + "?env=" + encodeURIComponent(currentEnv.key), { targetingKey: null, attributes: {} })
                 .then(function (r) {
-                    var cell = document.getElementById("flag-prereq-status");
+                    const cell = document.getElementById("flag-prereq-status");
                     if (!cell) { return; }
                     if (r.reason === "PrerequisiteNotMet") {
                         cell.innerHTML = '<span class="badge warn"><span class="dot"></span>Not met</span>';
@@ -1572,7 +1572,7 @@
         // which stays local-only. Best-effort: leave the placeholder on error.
         api("GET", "/admin/flags/" + encodeURIComponent(flag.key) + "/activity?env=" + encodeURIComponent(currentEnv.key))
             .then(function (a) {
-                var cell = document.getElementById("flag-last-evaluated");
+                const cell = document.getElementById("flag-last-evaluated");
                 if (!cell) { return; }
                 if (a.lastExposureAt) {
                     cell.textContent = formatDate(a.lastExposureAt) + " (" + a.totalExposureEvents + " exposure(s))";
@@ -1600,7 +1600,7 @@
     // flagKey re-renders them (wired in wireFlagEditor).
     function renderPrerequisiteRow(p, otherFlags) {
         p = p || { flagKey: "", requiredVariantKeys: [] };
-        var flagOpts = (otherFlags || []).map(function (f) {
+        const flagOpts = (otherFlags || []).map(function (f) {
             return '<option value="' + esc(f.key) + '"' + (f.key === p.flagKey ? " selected" : "") + '>' + esc(f.key) + '</option>';
         }).join("");
         return '<div class="prereq-row">'
@@ -1611,10 +1611,10 @@
     }
 
     function renderPrereqVariantChecks(p, otherFlags) {
-        var target = (otherFlags || []).find(function (f) { return f.key === p.flagKey; });
+        const target = (otherFlags || []).find(function (f) { return f.key === p.flagKey; });
         if (!target) { return '<span class="muted">Select a flag</span>'; }
         return (target.variants || []).map(function (v) {
-            var checked = (p.requiredVariantKeys || []).includes(v.key);
+            const checked = (p.requiredVariantKeys || []).includes(v.key);
             return '<label class="check"><input type="checkbox" class="prereq-variant" value="' + esc(v.key) + '"' + (checked ? " checked" : "") + ' /> ' + esc(v.key) + '</label>';
         }).join(" ") || '<span class="muted">No variants</span>';
     }
@@ -1635,11 +1635,11 @@
     // each segment, so it is safe to inject as HTML.
     function highlightJson(src) {
         function e(t) { return t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
-        var re = /"(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
-        var out = "", last = 0, m;
+        const re = /"(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+        let out = "", last = 0, m;
         while ((m = re.exec(src)) !== null) {
             out += e(src.slice(last, m.index));
-            var tok = m[0], cls;
+            const tok = m[0]; let cls;
             if (tok.charAt(0) === '"') { cls = m[1] ? "json-key" : "json-str"; }
             else if (tok === "true" || tok === "false") { cls = "json-bool"; }
             else if (tok === "null") { cls = "json-null"; }
@@ -1658,7 +1658,7 @@
     // Paint one editor's highlight overlay (the textarea text is transparent, so
     // an unpainted overlay would show nothing — every .json-area must be painted).
     function paintJsonArea(ta) {
-        var hl = jsonHlFor(ta);
+        const hl = jsonHlFor(ta);
         if (hl) { hl.innerHTML = highlightJson(ta.value); hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; }
     }
     function repaintJson(root) {
@@ -1669,17 +1669,17 @@
     // dynamically-added rule cards/variants are covered; wired once per form.
     function wireJsonAreas(form) {
         form.addEventListener("input", function (e) {
-            var ta = e.target.closest(".json-area");
+            const ta = e.target.closest(".json-area");
             if (ta) { paintJsonArea(ta); }
         });
         form.addEventListener("scroll", function (e) {
-            var ta = e.target.closest?.(".json-area");
-            if (ta) { var hl = jsonHlFor(ta); if (hl) { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; } }
+            const ta = e.target.closest?.(".json-area");
+            if (ta) { const hl = jsonHlFor(ta); if (hl) { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; } }
         }, true);
         form.addEventListener("focusout", function (e) {
-            var ta = e.target.closest(".json-area");
+            const ta = e.target.closest(".json-area");
             if (!ta) { return; }
-            var raw = ta.value.trim();
+            const raw = ta.value.trim();
             if (raw !== "") {
                 try { ta.value = JSON.stringify(JSON.parse(raw), null, 2); ta.classList.remove("invalid"); }
                 catch (_) { ta.classList.add("invalid"); }
@@ -1693,11 +1693,11 @@
 
     function wireFlagEditor(flag, otherFlags) {
         otherFlags = otherFlags || [];
-        var form = document.getElementById("flag-form");
+        const form = document.getElementById("flag-form");
         wireJsonAreas(form);
         // Wire any pre-existing split toggles (rules loaded with splits).
         Array.prototype.slice.call(form.querySelectorAll(".rule-card")).forEach(function (card) {
-            var toggle = card.querySelector(".split-toggle");
+            const toggle = card.querySelector(".split-toggle");
             if (toggle) {
                 toggle.dataset.wired = "1";
                 toggle.addEventListener("change", function () {
@@ -1707,19 +1707,19 @@
             }
         });
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.dataset.action;
+            const action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-variant") {
-                var list = form.querySelector(".variant-list");
+                const list = form.querySelector(".variant-list");
                 list.insertAdjacentHTML("beforeend", renderVariantRow({ key: "", name: "", value: false }));
                 repaintJson(list);
             } else if (action === "remove-variant") {
                 e.target.closest(".variant-row").remove();
             } else if (action === "add-rule") {
-                var rulesEl = form.querySelector(".rules-list");
+                const rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], outcome: { variantKey: flag.defaultVariantKey } }, { kind: "flag", variants: flag.variants || [] }));
                 repaintJson(rulesEl);
             } else if (action === "add-prerequisite") {
-                var prereqList = form.querySelector(".prereq-list");
+                const prereqList = form.querySelector(".prereq-list");
                 prereqList.insertAdjacentHTML("beforeend", renderPrerequisiteRow({ flagKey: otherFlags[0] ? otherFlags[0].key : "", requiredVariantKeys: [] }, otherFlags));
             } else if (action === "remove-prerequisite") {
                 e.target.closest(".prereq-row").remove();
@@ -1729,14 +1729,14 @@
         });
         form.addEventListener("change", function (e) {
             if (e.target.classList.contains("prereq-flag-key")) {
-                var row = e.target.closest(".prereq-row");
+                const row = e.target.closest(".prereq-row");
                 row.querySelector(".prereq-variants").innerHTML = renderPrereqVariantChecks({ flagKey: e.target.value, requiredVariantKeys: [] }, otherFlags);
             }
         });
         form.addEventListener("submit", function (e) {
             e.preventDefault();
             try {
-                var body = collectFlagBody(form, flag);
+                const body = collectFlagBody(form, flag);
                 setMessage("loading", "Saving…");
                 api("PUT", "/admin/flags/" + encodeURIComponent(flag.key) + "?env=" + encodeURIComponent(currentEnv.key), body)
                     .then(function (updated) { setMessage("success", "Saved."); renderFlagEditor(updated || body, otherFlags); })
@@ -1751,7 +1751,7 @@
     }
 
     function collectFlagBody(form, flag) {
-        var body = {
+        const body = {
             key: flag.key,
             name: form.elements["name"].value.trim(),
             description: form.elements["description"].value.trim() || null,
@@ -1759,19 +1759,19 @@
             enabled: form.elements["enabled"].checked,
             defaultVariantKey: form.elements["defaultVariantKey"].value,
             variants: Array.prototype.slice.call(form.querySelectorAll(".variant-row")).map(function (row, idx) {
-                var key = row.querySelector(".v-key").value.trim();
-                var name = row.querySelector(".v-name").value.trim();
-                var valueRaw = row.querySelector(".v-value").value;
+                const key = row.querySelector(".v-key").value.trim();
+                const name = row.querySelector(".v-name").value.trim();
+                const valueRaw = row.querySelector(".v-value").value;
                 if (!key) { throw new Error("Variant #" + (idx + 1) + ": key is required."); }
-                var value;
+                let value;
                 try { value = JSON.parse(valueRaw); } catch (_) { throw new Error("Variant '" + key + "': value must be valid JSON."); }
                 return { key: key, name: name || key, description: null, value: value };
             }),
             tags: parseCsv(form.elements["tags"].value),
             rules: collectRules(form, { kind: "flag" }),
             prerequisites: Array.prototype.slice.call(form.querySelectorAll(".prereq-row")).map(function (row, idx) {
-                var flagKey = row.querySelector(".prereq-flag-key").value;
-                var requiredVariantKeys = Array.prototype.slice.call(row.querySelectorAll(".prereq-variant:checked")).map(function (cb) { return cb.value; });
+                const flagKey = row.querySelector(".prereq-flag-key").value;
+                const requiredVariantKeys = Array.prototype.slice.call(row.querySelectorAll(".prereq-variant:checked")).map(function (cb) { return cb.value; });
                 if (!flagKey) { throw new Error("Prerequisite #" + (idx + 1) + ": select a flag."); }
                 if (requiredVariantKeys.length === 0) { throw new Error("Prerequisite on '" + flagKey + "': select at least one required variant."); }
                 return { flagKey: flagKey, requiredVariantKeys: requiredVariantKeys };
@@ -1820,12 +1820,12 @@
 
         hydrateIcons(viewEl);
         wirePreviewPanel("config", config.key);
-        var form = document.getElementById("config-form");
+        const form = document.getElementById("config-form");
         wireJsonAreas(form);
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.dataset.action;
+            const action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-rule") {
-                var rulesEl = form.querySelector(".rules-list");
+                const rulesEl = form.querySelector(".rules-list");
                 rulesEl.insertAdjacentHTML("beforeend", renderRuleCard({ id: cryptoId(), order: rulesEl.children.length, name: "", enabled: true, conditions: [], value: config.defaultValue }, { kind: "config" }));
                 repaintJson(rulesEl);
             } else {
@@ -1835,7 +1835,7 @@
         form.addEventListener("submit", function (e) {
             e.preventDefault();
             try {
-                var body = collectConfigBody(form, config);
+                const body = collectConfigBody(form, config);
                 setMessage("loading", "Saving…");
                 api("PUT", "/admin/configs/" + encodeURIComponent(config.key) + "?env=" + encodeURIComponent(currentEnv.key), body)
                     .then(function (updated) { setMessage("success", "Saved."); renderConfigEditor(updated || body); })
@@ -1850,8 +1850,8 @@
     }
 
     function collectConfigBody(form, config) {
-        var defaultRaw = form.elements["defaultValue"].value;
-        var defaultValue;
+        const defaultRaw = form.elements["defaultValue"].value;
+        let defaultValue;
         try { defaultValue = JSON.parse(defaultRaw); }
         catch (_) { throw new Error("Default value must be valid JSON."); }
         return {
@@ -1891,9 +1891,9 @@
         ].join("\n"));
 
         hydrateIcons(viewEl);
-        var form = document.getElementById("segment-form");
+        const form = document.getElementById("segment-form");
         form.addEventListener("click", function (e) {
-            var action = e.target.closest("[data-action]")?.dataset.action;
+            const action = e.target.closest("[data-action]")?.dataset.action;
             if (action === "add-condition") {
                 form.querySelector(".conditions-list").insertAdjacentHTML("beforeend", renderConditionRow({ attribute: "", operator: "Equals", value: "", negate: false }));
             } else if (action === "remove-condition") {
@@ -1903,7 +1903,7 @@
         form.addEventListener("submit", function (e) {
             e.preventDefault();
             try {
-                var body = {
+                const body = {
                     key: segment.key,
                     name: form.elements["name"].value.trim(),
                     description: form.elements["description"].value.trim() || null,
@@ -1937,12 +1937,12 @@
             + '</tr>';
     }
     function renderUserList() {
-        var sub = "People with access — auto-provisioned on first sign-in, or created via the admin API.";
+        const sub = "People with access — auto-provisioned on first sign-in, or created via the admin API.";
         viewEl.innerHTML = listPageShell("Users", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/users")
             .then(function (users) {
                 users = Array.isArray(users) ? users : [];
-                var body = users.length
+                const body = users.length
                     ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name / Identifier</th><th>Email</th>'
                         + '<th style="width:90px">Status</th><th style="width:140px">Created</th></tr></thead>'
                         + '<tbody class="list-tbody">' + users.map(userRow).join("") + '</tbody></table></div>'
@@ -1960,12 +1960,12 @@
             api("GET", "/admin/users/" + encodeURIComponent(identifier)),
             api("GET", "/admin/users/" + encodeURIComponent(identifier) + "/effective-access"),
         ]).then(function (res) {
-            var user = res[0];
-            var access = res[1];
-            var roleRows = (access.roles || []).map(function (r) {
+            const user = res[0];
+            const access = res[1];
+            const roleRows = (access.roles || []).map(function (r) {
                 return '<tr><td>' + code(r.key) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.via) + '</td><td>' + (r.environmentId ? code(truncate(r.environmentId, 8)) : '<span class="muted">all envs</span>') + '</td></tr>';
             }).join("");
-            var perms = (access.permissions || []);
+            const perms = (access.permissions || []);
             viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap">',
                 '  <h1>' + esc(user.displayName || user.identifier) + '</h1>',
@@ -2000,7 +2000,7 @@
 
     // Every Permission enum member, grouped for the role editor matrix
     // (mirrors Featly.Abstractions/Permission.cs).
-    var PERMISSION_GROUPS = [
+    const PERMISSION_GROUPS = [
         { label: "Flags", perms: ["FlagRead", "FlagCreate", "FlagUpdate", "FlagArchive"] },
         { label: "Configs", perms: ["ConfigRead", "ConfigCreate", "ConfigUpdate", "ConfigArchive"] },
         { label: "Segments", perms: ["SegmentRead", "SegmentCreate", "SegmentUpdate", "SegmentArchive"] },
@@ -2019,7 +2019,7 @@
         return PERMISSION_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.perms.map(function (p) {
-                    var on = current.includes(p);
+                    const on = current.includes(p);
                     return '<label class="check perm"><input type="checkbox" class="perm-cb" value="' + p + '"'
                         + (on ? " checked" : "") + (readOnly ? " disabled" : "") + ' /> ' + p + '</label>';
                 }).join("")
@@ -2032,12 +2032,12 @@
     }
 
     function renderRoleList() {
-        var sub = "Permission sets. System roles are immutable; clone one to make an editable custom role.";
+        const sub = "Permission sets. System roles are immutable; clone one to make an editable custom role.";
         viewEl.innerHTML = listPageShell("Roles", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/roles")
             .then(function (roles) {
                 roles = Array.isArray(roles) ? roles : [];
-                var rows = roles.map(function (r) {
+                const rows = roles.map(function (r) {
                     return '<tr data-key="' + esc(r.key) + '">'
                         + '<td class="mono cell-key">' + esc(r.key) + '</td>'
                         + '<td>' + esc(r.name) + '</td>'
@@ -2066,8 +2066,8 @@
                 wireRowNavigation(viewEl.querySelector(".role-tbody"), "/roles/");
                 document.getElementById("role-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("role-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("role-msg");
                     setMessageOn(msg, "loading", "Creating…");
                     api("POST", "/admin/roles", {
                         key: f.key.value.trim(),
@@ -2084,9 +2084,9 @@
         viewEl.innerHTML = listPageShell("Role", esc(key), '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/roles/" + encodeURIComponent(key))
             .then(function (r) {
-                var sys = !!r.isSystem;
-                var perms = r.permissions || [];
-                var actions = '<button type="button" class="btn outline xs" data-role="clone">Clone</button> '
+                const sys = !!r.isSystem;
+                const perms = r.permissions || [];
+                const actions = '<button type="button" class="btn outline xs" data-role="clone">Clone</button> '
                     + (sys ? "" : '<button type="button" class="btn outline xs danger" data-role="delete">Delete</button> ')
                     + '<span class="save-msg" id="role-msg"></span>';
                 viewEl.innerHTML = html([
@@ -2108,12 +2108,12 @@
                     '</dl>' + (sys ? '<p class="muted" style="font-size:11px;margin:10px 0 0">System roles are immutable. Use Clone to make an editable copy.</p>' : "") + '</div></aside></div></div></div>',
                 ].join("\n"));
 
-                var msg = document.getElementById("role-msg");
-                var editForm = document.getElementById("role-edit");
+                const msg = document.getElementById("role-msg");
+                const editForm = document.getElementById("role-edit");
                 if (!sys && editForm) {
                     editForm.addEventListener("submit", function (e) {
                         e.preventDefault();
-                        var f = e.target;
+                        const f = e.target;
                         setMessageOn(msg, "loading", "Saving…");
                         api("PUT", "/admin/roles/" + encodeURIComponent(key), {
                             key: key,
@@ -2126,16 +2126,16 @@
                 }
                 Array.prototype.slice.call(viewEl.querySelectorAll("[data-role]")).forEach(function (btn) {
                     btn.addEventListener("click", function () {
-                        var act = btn.dataset.role;
+                        const act = btn.dataset.role;
                         if (act === "delete") {
                             if (!window.confirm("Delete custom role '" + key + "'? Assignments to it stop granting access.")) { return; }
                             api("DELETE", "/admin/roles/" + encodeURIComponent(key))
                                 .then(function () { navigate("/roles"); })
                                 .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                         } else if (act === "clone") {
-                            var newKey = window.prompt("Key for the new custom role:", key + "-copy");
+                            const newKey = window.prompt("Key for the new custom role:", key + "-copy");
                             if (!newKey?.trim()) { return; }
-                            var payload = { key: newKey.trim(), name: (r.name || key) + " (copy)" };
+                            const payload = { key: newKey.trim(), name: (r.name || key) + " (copy)" };
                             if (sys) { payload.cloneFromSystemRole = r.key; } else { payload.permissions = perms; }
                             api("POST", "/admin/roles", payload)
                                 .then(function (c) { navigate("/roles/" + encodeURIComponent(c.key)); })
@@ -2155,7 +2155,7 @@
         api("GET", "/admin/groups")
             .then(function (groups) {
                 groups = Array.isArray(groups) ? groups : [];
-                var rows = groups.map(function (g) {
+                const rows = groups.map(function (g) {
                     return '<tr data-key="' + esc(g.key) + '">'
                         + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(g.key) + '</span>'
                         + '<span class="cell-name">' + esc(g.name || "") + '</span></div></td>'
@@ -2184,8 +2184,8 @@
                 wireRowNavigation(viewEl.querySelector(".grp-tbody"), "/groups/");
                 document.getElementById("grp-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("grp-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("grp-msg");
                     setMessageOn(msg, "loading", "Creating…");
                     api("POST", "/admin/groups", {
                         key: f.key.value.trim(),
@@ -2202,7 +2202,7 @@
     function userDisplay(u) { return u ? (u.displayName || u.identifier || u.id) : ""; }
 
     function memberChip(u, id) {
-        var label = u ? esc(userDisplay(u)) : '<span class="mono">' + esc(truncate(id, 8)) + '</span>';
+        const label = u ? esc(userDisplay(u)) : '<span class="mono">' + esc(truncate(id, 8)) + '</span>';
         return '<span class="member-chip" data-id="' + esc(id) + '">' + label
             + '<button type="button" class="chip-x" data-remove="' + esc(id) + '" aria-label="Remove member">' + icon("x", 12) + '</button></span>';
     }
@@ -2218,9 +2218,9 @@
 
     // Drives the live membership array against a chips+search container.
     function wireMemberPicker(root, memberIds, users, userById) {
-        var chipsEl = root.querySelector(".member-chips");
-        var searchEl = root.querySelector(".member-search-input");
-        var resultsEl = root.querySelector(".member-results");
+        const chipsEl = root.querySelector(".member-chips");
+        const searchEl = root.querySelector(".member-search-input");
+        const resultsEl = root.querySelector(".member-results");
         function renderChips() {
             chipsEl.innerHTML = html(memberIds.length
                 ? memberIds.map(function (id) { return memberChip(userById[id], id); }).join("")
@@ -2228,12 +2228,12 @@
             hydrateIcons(chipsEl);
         }
         function renderResults() {
-            var q = (searchEl.value || "").trim().toLowerCase();
-            var matches = q ? users.filter(function (u) {
+            const q = (searchEl.value || "").trim().toLowerCase();
+            const matches = q ? users.filter(function (u) {
                 if (memberIds.includes(u.id)) { return false; }
                 return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().includes(q);
             }).slice(0, 8) : [];
-            var emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
+            const emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
             resultsEl.innerHTML = html(matches.length
                 ? matches.map(function (u) {
                     return '<button type="button" class="user-result" data-add="' + esc(u.id) + '">'
@@ -2245,18 +2245,18 @@
         }
         searchEl.addEventListener("input", renderResults);
         resultsEl.addEventListener("click", function (e) {
-            var btn = e.target.closest("[data-add]");
+            const btn = e.target.closest("[data-add]");
             if (!btn) { return; }
-            var id = btn.dataset.add;
+            const id = btn.dataset.add;
             if (!memberIds.includes(id)) { memberIds.push(id); }
             searchEl.value = "";
             renderResults();
             renderChips();
         });
         chipsEl.addEventListener("click", function (e) {
-            var btn = e.target.closest("[data-remove]");
+            const btn = e.target.closest("[data-remove]");
             if (!btn) { return; }
-            var i = memberIds.indexOf(btn.dataset.remove);
+            const i = memberIds.indexOf(btn.dataset.remove);
             if (i >= 0) { memberIds.splice(i, 1); }
             renderChips();
         });
@@ -2272,23 +2272,23 @@
 
     // assigneeType is the string "User" or "Group"; assigneeId is the entity GUID.
     function loadRoleAssignments(assigneeType, assigneeId) {
-        var bodyEl = viewEl.querySelector(".ra-card .ra-body");
+        const bodyEl = viewEl.querySelector(".ra-card .ra-body");
         if (!bodyEl) { return; }
         Promise.all([
             api("GET", "/admin/role-assignments?assigneeId=" + encodeURIComponent(assigneeId)),
             api("GET", "/admin/roles"),
         ]).then(function (res) {
-            var assignments = Array.isArray(res[0]) ? res[0] : [];
-            var roles = Array.isArray(res[1]) ? res[1] : [];
-            var roleById = {};
+            const assignments = Array.isArray(res[0]) ? res[0] : [];
+            const roles = Array.isArray(res[1]) ? res[1] : [];
+            const roleById = {};
             roles.forEach(function (r) { roleById[r.id] = r; });
-            var envById = {};
+            const envById = {};
             environments.forEach(function (e) { envById[e.id] = e; });
-            var rows = assignments.map(function (a) {
-                var role = roleById[a.roleId];
-                var envLabel = '<span class="muted">all envs</span>';
+            const rows = assignments.map(function (a) {
+                const role = roleById[a.roleId];
+                let envLabel = '<span class="muted">all envs</span>';
                 if (a.environmentId) {
-                    var knownEnv = envById[a.environmentId];
+                    const knownEnv = envById[a.environmentId];
                     envLabel = code(knownEnv ? knownEnv.key : truncate(a.environmentId, 8));
                 }
                 return '<tr data-ra="' + esc(a.id) + '">'
@@ -2299,8 +2299,8 @@
                     + '<td class="col-actions"><button type="button" class="btn outline xs danger" data-revoke="' + esc(a.id) + '">Revoke</button></td>'
                     + '</tr>';
             }).join("");
-            var roleOpts = roles.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.key) + '</option>'; }).join("");
-            var envOpts = '<option value="">All environments</option>'
+            const roleOpts = roles.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.key) + '</option>'; }).join("");
+            const envOpts = '<option value="">All environments</option>'
                 + environments.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.key) + '</option>'; }).join("");
             bodyEl.innerHTML = html([
                 assignments.length
@@ -2312,10 +2312,10 @@
                 '  <div class="row-form__action"><button type="submit" class="btn primary">Grant role</button><span class="save-msg" id="ra-msg"></span></div>',
                 '</form>',
             ].join(""));
-            var msg = bodyEl.querySelector("#ra-msg");
+            const msg = bodyEl.querySelector("#ra-msg");
             bodyEl.querySelector(".ra-form").addEventListener("submit", function (e) {
                 e.preventDefault();
-                var f = e.target;
+                const f = e.target;
                 if (!f.role.value) { setMessageOn(msg, "error", "Pick a role."); return; }
                 setMessageOn(msg, "loading", "Granting…");
                 api("POST", "/admin/role-assignments", {
@@ -2345,11 +2345,11 @@
             api("GET", "/admin/groups/" + encodeURIComponent(key)),
             api("GET", "/admin/users"),
         ]).then(function (res) {
-            var g = res[0];
-            var users = Array.isArray(res[1]) ? res[1] : [];
-            var userById = {};
+            const g = res[0];
+            const users = Array.isArray(res[1]) ? res[1] : [];
+            const userById = {};
             users.forEach(function (u) { userById[u.id] = u; });
-            var memberIds = (g.memberUserIds || []).slice();
+            const memberIds = (g.memberUserIds || []).slice();
 
             viewEl.innerHTML = html([
                 '<div class="page"><div class="page-head"><div class="title-wrap"><h1>' + esc(g.name || g.key) + '</h1>',
@@ -2374,10 +2374,10 @@
 
             wireMemberPicker(viewEl.querySelector(".member-picker"), memberIds, users, userById);
 
-            var msg = document.getElementById("grp-msg");
+            const msg = document.getElementById("grp-msg");
             document.getElementById("grp-edit").addEventListener("submit", function (e) {
                 e.preventDefault();
-                var f = e.target;
+                const f = e.target;
                 setMessageOn(msg, "loading", "Saving…");
                 api("PUT", "/admin/groups/" + encodeURIComponent(key), {
                     key: key,
@@ -2386,7 +2386,7 @@
                     memberUserIds: memberIds.slice(),
                 }).then(function () {
                     setMessageOn(msg, "success", "Saved.");
-                    var c = document.getElementById("grp-count");
+                    const c = document.getElementById("grp-count");
                     if (c) { c.textContent = memberIds.length; }
                 }).catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
             });
@@ -2405,13 +2405,13 @@
     // API keys (Access): mint (token shown once) / list / revoke
     // ============================================================
     function apiKeyScopeBadge(scope) {
-        var v = scope === "AdminWrite" ? " purple" : " info";
+        const v = scope === "AdminWrite" ? " purple" : " info";
         return '<span class="badge' + v + '">' + esc(scope) + '</span>';
     }
 
     function renderApiKeyList() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("API keys"); return; }
-        var envKey = currentEnv.key;
+        const envKey = currentEnv.key;
         viewEl.innerHTML = html([
             '<div class="page"><div class="page-head"><div class="title-wrap"><h1>API keys</h1>',
             '  <span class="sub">Bearer tokens scoped to <code>' + esc(envKey) + '</code>. The plaintext token is shown exactly once, at creation; only an Argon2id hash is stored.</span>',
@@ -2430,9 +2430,9 @@
         ].join("\n"));
         hydrateIcons(viewEl);
 
-        var tbody = document.getElementById("apikey-tbody");
+        const tbody = document.getElementById("apikey-tbody");
         function revealToken(token, heading) {
-            var reveal = document.getElementById("apikey-reveal");
+            const reveal = document.getElementById("apikey-reveal");
             if (!reveal) { return; }
             reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
                 + '<strong>' + esc(heading) + '</strong>'
@@ -2445,8 +2445,8 @@
                 return;
             }
             tbody.innerHTML = html(keys.map(function (k) {
-                var expired = !k.revoked && k.expiresAt && new Date(k.expiresAt) <= new Date();
-                var status = '<span class="badge success"><span class="dot"></span>active</span>';
+                const expired = !k.revoked && k.expiresAt && new Date(k.expiresAt) <= new Date();
+                let status = '<span class="badge success"><span class="dot"></span>active</span>';
                 if (k.revoked) { status = '<span class="badge danger">revoked</span>'; }
                 else if (expired) { status = '<span class="badge warn">expired</span>'; }
                 return '<tr>'
@@ -2465,7 +2465,7 @@
             }).join(""));
             Array.prototype.slice.call(tbody.querySelectorAll("[data-revoke]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var id = btn.dataset.revoke;
+                    const id = btn.dataset.revoke;
                     if (!window.confirm("Revoke this API key? Requests using it start failing immediately.")) { return; }
                     api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/revoke")
                         .then(refresh)
@@ -2474,7 +2474,7 @@
             });
             Array.prototype.slice.call(tbody.querySelectorAll("[data-rotate]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var id = btn.dataset.rotate;
+                    const id = btn.dataset.rotate;
                     if (!window.confirm("Rotate this API key? A replacement is minted and the old key is revoked immediately.")) { return; }
                     api("POST", "/admin/apikeys/" + encodeURIComponent(id) + "/rotate", {})
                         .then(function (res) {
@@ -2494,10 +2494,10 @@
         refresh();
         document.getElementById("apikey-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
-            var msg = document.getElementById("apikey-msg");
+            const f = e.target;
+            const msg = document.getElementById("apikey-msg");
             setMessageOn(msg, "loading", "Minting…");
-            var expiresInDays = Number.parseInt(f.expiresIn.value, 10);
+            const expiresInDays = Number.parseInt(f.expiresIn.value, 10);
             api("POST", "/admin/apikeys", {
                 name: f.name.value.trim(),
                 scope: f.scope.value,
@@ -2521,7 +2521,7 @@
         api("GET", "/admin/projects")
             .then(function (projects) {
                 projects = Array.isArray(projects) ? projects : [];
-                var rows = projects.map(function (p) {
+                const rows = projects.map(function (p) {
                     return '<tr data-key="' + esc(p.key) + '">'
                         + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(p.key) + '</span>'
                         + '<span class="cell-name">' + esc(p.name || "") + '</span></div></td>'
@@ -2550,8 +2550,8 @@
                 wireRowNavigation(viewEl.querySelector(".prj-tbody"), "/projects/");
                 document.getElementById("prj-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("prj-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("prj-msg");
                     setMessageOn(msg, "loading", "Creating…");
                     api("POST", "/admin/projects", {
                         key: f.key.value.trim(),
@@ -2585,10 +2585,10 @@
                     '</dl></div></aside></div></div></div>',
                 ].join("\n"));
 
-                var msg = document.getElementById("prj-msg");
+                const msg = document.getElementById("prj-msg");
                 document.getElementById("prj-edit").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
+                    const f = e.target;
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/projects/" + encodeURIComponent(key), {
                         key: key,
@@ -2611,17 +2611,17 @@
     }
 
     function renderExperimentList() {
-        var sub = "A/B experiments layered on a flag. Start one to collect exposures; track conversions via <code>IEventClient.TrackAsync</code>.";
+        const sub = "A/B experiments layered on a flag. Start one to collect exposures; track conversions via <code>IEventClient.TrackAsync</code>.";
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Experiments"); return; }
         viewEl.innerHTML = listPageShell("Experiments", sub, '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/experiments?env=" + encodeURIComponent(currentEnv.key))
             .then(function (rows) {
                 rows = Array.isArray(rows) ? rows : [];
-                var body;
+                let body;
                 if (rows.length === 0) {
                     body = '<div class="empty"><p>No experiments in this environment yet.</p></div>';
                 } else {
-                    var trs = rows.map(function (e) {
+                    const trs = rows.map(function (e) {
                         return '<tr data-key="' + esc(e.key) + '">'
                             + '<td><div class="cell-keyname"><span class="mono cell-key">' + esc(e.key) + '</span><span class="cell-name">' + esc(e.name || "") + '</span></div></td>'
                             + '<td class="mono">' + esc(e.flagKey) + '</td>'
@@ -2644,14 +2644,14 @@
     function renderExperimentDetail(key) {
         if (!currentEnv) { return; }
         viewEl.innerHTML = detailLoadingShell("Experiment", key);
-        var envQ = "?env=" + encodeURIComponent(currentEnv.key);
+        const envQ = "?env=" + encodeURIComponent(currentEnv.key);
         Promise.all([
             api("GET", "/admin/experiments/" + encodeURIComponent(key) + envQ),
             api("GET", "/admin/experiments/" + encodeURIComponent(key) + "/analytics" + envQ).catch(function () { return null; }),
         ]).then(function (res) {
-            var exp = res[0];
-            var analytics = res[1];
-            var startStop = exp.isActive
+            const exp = res[0];
+            const analytics = res[1];
+            const startStop = exp.isActive
                 ? '<button type="button" class="btn outline xs" data-exp="stop">Stop</button>'
                 : '<button type="button" class="btn primary xs" data-exp="start">' + (exp.stoppedAt ? "Restart" : "Start") + '</button>';
 
@@ -2684,16 +2684,16 @@
                 + '<p class="muted">' + (exp.isActive ? "Evaluate the flag from an SDK client to start collecting data." : "Start the experiment to begin collecting exposures.") + '</p></div>';
         }
 
-        var metricKeys = exp.metricKeys || [];
-        var maxExposed = a.variants.reduce(function (mx, v) { return Math.max(mx, v.exposedSubjects || 0); }, 0) || 1;
+        const metricKeys = exp.metricKeys || [];
+        const maxExposed = a.variants.reduce(function (mx, v) { return Math.max(mx, v.exposedSubjects || 0); }, 0) || 1;
 
         // Exposures by variant.
-        var exposureBars = a.variants.map(function (v) {
-            var pct = Math.round(((v.exposedSubjects || 0) / maxExposed) * 100);
+        const exposureBars = a.variants.map(function (v) {
+            const pct = Math.round(((v.exposedSubjects || 0) / maxExposed) * 100);
             return barRow(v.variantKey, pct, (v.exposedSubjects || 0) + " subject(s)", "bar--exposure");
         }).join("");
 
-        var sections = [
+        const sections = [
             '<div class="card">',
             '<div class="muted exp-total">' + a.totalExposedSubjects + ' subject(s) · ' + a.totalExposureEvents + ' exposure event(s)</div>',
             '<h3 class="preview-h3">Exposures by variant</h3>',
@@ -2704,14 +2704,14 @@
         // One conversion-rate chart per metric, with a significance badge per
         // variant (two-proportion z-test vs the baseline) and a winner callout.
         metricKeys.forEach(function (metric) {
-            var winner = (a.winners || []).find(function (w) { return w.metricKey === metric; });
-            var rows = a.variants.map(function (v) {
-                var m = (v.metrics || []).find(function (x) { return x.metricKey === metric; });
-                var rate = m ? m.conversionRate : 0;
-                var pct = Math.round(rate * 1000) / 10; // one decimal
-                var convs = m ? m.conversions : 0;
-                var isBaseline = v.variantKey === a.baselineVariantKey;
-                var label = v.variantKey;
+            const winner = (a.winners || []).find(function (w) { return w.metricKey === metric; });
+            const rows = a.variants.map(function (v) {
+                const m = (v.metrics || []).find(function (x) { return x.metricKey === metric; });
+                const rate = m ? m.conversionRate : 0;
+                const pct = Math.round(rate * 1000) / 10; // one decimal
+                const convs = m ? m.conversions : 0;
+                const isBaseline = v.variantKey === a.baselineVariantKey;
+                let label = v.variantKey;
                 if (isBaseline) {
                     label += " (baseline)";
                 } else if (m?.pValue != null) {
@@ -2719,7 +2719,7 @@
                 }
                 return barRow(label, Math.min(pct, 100), pct + "% (" + convs + "/" + (v.exposedSubjects || 0) + ")", "bar--conversion");
             }).join("");
-            var winnerCallout = winner?.variantKey
+            const winnerCallout = winner?.variantKey
                 ? '<div class="badge success" style="margin-bottom:8px"><span class="dot"></span>Winner: ' + esc(winner.variantKey) + ' (p=' + winner.pValue.toFixed(3) + ')</div>'
                 : '<div class="muted" style="margin-bottom:8px;font-size:11px">No variant is significantly better than the baseline yet.</div>';
             sections.push(
@@ -2734,7 +2734,7 @@
     }
 
     function barRow(label, pct, valueText, modifier) {
-        var width = Math.max(0, Math.min(100, pct));
+        const width = Math.max(0, Math.min(100, pct));
         return '<div class="bar-row">'
             + '<div class="bar-row__label">' + esc(label) + '</div>'
             + '<div class="bar-row__track"><div class="bar ' + modifier + '" style="width:' + width + '%" role="img" aria-label="' + esc(label + ": " + valueText) + '"></div></div>'
@@ -2743,10 +2743,10 @@
     }
 
     function wireExperimentDetail(exp) {
-        var msg = document.getElementById("exp-msg");
+        const msg = document.getElementById("exp-msg");
         Array.prototype.slice.call(document.querySelectorAll("[data-exp]")).forEach(function (btn) {
             btn.addEventListener("click", function () {
-                var action = btn.dataset.exp;
+                const action = btn.dataset.exp;
                 btn.disabled = true;
                 setMessageOn(msg, "loading", action === "start" ? "Starting…" : "Stopping…");
                 api("POST", "/admin/experiments/" + encodeURIComponent(exp.key) + "/" + action + "?env=" + encodeURIComponent(currentEnv.key))
@@ -2764,8 +2764,8 @@
     // Approval workflow (M8): Inbox, change detail, policy editor
     // ============================================================
     function inboxChangeCard(c) {
-        var approvals = (c.approvals || []).length;
-        var statusLine = approvals + ' approval' + (approvals === 1 ? '' : 's') + ' so far';
+        const approvals = (c.approvals || []).length;
+        const statusLine = approvals + ' approval' + (approvals === 1 ? '' : 's') + ' so far';
         return '<div class="inbox-card urgent" data-cr="' + esc(c.id) + '">'
             + '<span class="ic info"><span class="ti-slot" data-ti="git-pull-request"></span></span>'
             + '<div class="main">'
@@ -2782,7 +2782,7 @@
     // apply whenever a human gets to it" from "scheduled for <time>" so a
     // scheduled apply is visible without already knowing the change's id.
     function inboxApprovedCard(c) {
-        var statusLine = c.scheduledApplyAt
+        const statusLine = c.scheduledApplyAt
             ? "Scheduled for " + (formatDate(c.scheduledApplyAt) || c.scheduledApplyAt)
             : "Ready to apply";
         return '<div class="inbox-card' + (c.scheduledApplyAt ? "" : " urgent") + '" data-cr="' + esc(c.id) + '">'
@@ -2816,16 +2816,16 @@
     function renderInbox() {
         viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
             '<div class="empty"><p class="muted">Loading…</p></div>');
-        var none = Promise.resolve([]);
+        const none = Promise.resolve([]);
         Promise.all([
             featureOn("approvals") ? api("GET", "/admin/changes?status=Pending").catch(function () { return []; }) : none,
             featureOn("approvals") ? api("GET", "/admin/changes?status=Approved").catch(function () { return []; }) : none,
             featureOn("rbac") ? api("GET", "/admin/role-upgrade-requests?status=Pending").catch(function () { return []; }) : none,
         ]).then(function (res) {
-            var changes = Array.isArray(res[0]) ? res[0] : [];
-            var approved = Array.isArray(res[1]) ? res[1] : [];
-            var upgrades = Array.isArray(res[2]) ? res[2] : [];
-            var body = [
+            const changes = Array.isArray(res[0]) ? res[0] : [];
+            const approved = Array.isArray(res[1]) ? res[1] : [];
+            const upgrades = Array.isArray(res[2]) ? res[2] : [];
+            const body = [
                 inboxGroup("Awaiting your approval", changes.length, changes.map(inboxChangeCard).join(""), "Nothing awaiting approval."),
                 inboxGroup("Approved — awaiting apply", approved.length, approved.map(inboxApprovedCard).join(""), "Nothing approved and awaiting apply."),
                 inboxGroup("Role upgrade requests", upgrades.length, upgrades.map(inboxUpgradeCard).join(""), "No pending role-upgrade requests."),
@@ -2833,11 +2833,11 @@
             viewEl.innerHTML = listPageShell("Inbox", "Everything that needs your attention — approvals and role-upgrade requests.",
                 '<div class="inbox-list">' + body + '</div>');
             hydrateIcons(viewEl);
-            var list = viewEl.querySelector(".inbox-list");
+            const list = viewEl.querySelector(".inbox-list");
             if (list) {
                 list.addEventListener("click", function (e) {
                     if (e.target.closest("a, button")) { return; }
-                    var card = e.target.closest(".inbox-card[data-cr]");
+                    const card = e.target.closest(".inbox-card[data-cr]");
                     if (card) { navigate("/inbox/" + encodeURIComponent(card.dataset.cr)); }
                 });
             }
@@ -2845,8 +2845,8 @@
     }
 
     function crStatusBadge(status) {
-        var s = String(status == null ? "" : status);
-        var v = { Approved: " success", Applied: " success", Rejected: " danger", Pending: " warn" }[s] || "";
+        const s = String(status == null ? "" : status);
+        const v = { Approved: " success", Applied: " success", Rejected: " danger", Pending: " warn" }[s] || "";
         return '<span class="badge' + v + '">' + esc(s || "—") + '</span>';
     }
 
@@ -2854,11 +2854,11 @@
         viewEl.innerHTML = listPageShell("Change request", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/changes/" + encodeURIComponent(id))
             .then(function (c) {
-                var actions = changeActionButtons(c);
-                var comments = (c.comments || []).map(function (m) {
+                const actions = changeActionButtons(c);
+                const comments = (c.comments || []).map(function (m) {
                     return '<div class="cr-comment"><div class="muted">' + code(truncate(m.authorUserId, 8)) + ' · ' + formatDate(m.at) + '</div><div>' + esc(m.body) + '</div></div>';
                 }).join("");
-                var approvals = (c.approvals || []).map(function (a) {
+                const approvals = (c.approvals || []).map(function (a) {
                     return '<li>' + badge(a.decision) + ' ' + code(truncate(a.approverUserId, 8)) + (a.comment ? ' — ' + esc(a.comment) : '') + '</li>';
                 }).join("");
                 viewEl.innerHTML = html([
@@ -2894,7 +2894,7 @@
     }
 
     function changeActionButtons(c) {
-        var buttons = [];
+        const buttons = [];
         if (c.status === "Pending") {
             buttons.push('<button type="button" class="btn primary xs" data-cr="approve">Approve</button>');
             buttons.push('<button type="button" class="btn outline xs" data-cr="reject">Reject</button>');
@@ -2913,7 +2913,7 @@
     // future UTC time for the background worker to apply it automatically,
     // instead of clicking Apply themselves.
     function scheduleControls(c) {
-        var prefill = c.scheduledApplyAt ? toLocalDateTimeInputValue(c.scheduledApplyAt) : "";
+        const prefill = c.scheduledApplyAt ? toLocalDateTimeInputValue(c.scheduledApplyAt) : "";
         return '<div class="cr-schedule">'
             + '<input type="datetime-local" id="cr-schedule-input" value="' + esc(prefill) + '" />'
             + '<button type="button" class="btn outline xs" data-cr="schedule">' + (c.scheduledApplyAt ? "Reschedule" : "Schedule") + '</button>'
@@ -2926,17 +2926,17 @@
     // way so re-opening a scheduled change shows the operator's own local
     // time, not the raw UTC instant.
     function toLocalDateTimeInputValue(iso) {
-        var d = new Date(iso);
+        const d = new Date(iso);
         if (Number.isNaN(d.getTime())) { return ""; }
-        var pad = function (n) { return String(n).padStart(2, "0"); };
+        const pad = function (n) { return String(n).padStart(2, "0"); };
         return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
     }
 
     function wireChangeDetail(c) {
-        var msg = document.getElementById("cr-msg");
+        const msg = document.getElementById("cr-msg");
         document.getElementById("cr-comment-form").addEventListener("submit", function (e) {
             e.preventDefault();
-            var body = document.getElementById("cr-comment").value.trim();
+            const body = document.getElementById("cr-comment").value.trim();
             if (!body) { return; }
             api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/comments", { body: body })
                 .then(function () { renderChangeDetail(c.id); })
@@ -2944,31 +2944,31 @@
         });
         Array.prototype.slice.call(document.querySelectorAll("[data-cr]")).forEach(function (btn) {
             btn.addEventListener("click", function () {
-                var action = btn.dataset.cr;
+                const action = btn.dataset.cr;
                 if (action === "approve") {
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/approvals", { decision: "Approve" })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "reject") {
-                    var reason = window.prompt("Reason for rejection (optional):") || "";
+                    const reason = window.prompt("Reason for rejection (optional):") || "";
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/approvals", { decision: "Reject", comment: reason })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "apply") {
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/apply")
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "schedule") {
-                    var input = document.getElementById("cr-schedule-input");
+                    const input = document.getElementById("cr-schedule-input");
                     if (!input?.value) {
                         if (msg) { msg.className = "save-msg save-msg--error"; msg.textContent = "Pick a date and time first."; }
                         return;
                     }
-                    var scheduledApplyAt = new Date(input.value).toISOString();
+                    const scheduledApplyAt = new Date(input.value).toISOString();
                     api("PATCH", "/admin/changes/" + encodeURIComponent(c.id) + "/schedule", { scheduledApplyAt: scheduledApplyAt })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "cancel-schedule") {
                     api("PATCH", "/admin/changes/" + encodeURIComponent(c.id) + "/schedule", { scheduledApplyAt: null })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
                 } else if (action === "bypass") {
-                    var why = window.prompt("Emergency bypass reason (required):");
+                    const why = window.prompt("Emergency bypass reason (required):");
                     if (!why) { return; }
                     api("POST", "/admin/changes/" + encodeURIComponent(c.id) + "/bypass", { reason: why })
                         .then(function () { renderChangeDetail(c.id); }).catch(crErr(msg));
@@ -2996,16 +2996,17 @@
     function diffLines(a, b) {
         a = String(a == null ? "" : a).split("\n");
         b = String(b == null ? "" : b).split("\n");
-        var n = a.length, m = b.length;
+        const n = a.length, m = b.length;
         // LCS length table (bottom-up), then walk it to emit add/del/context.
-        var dp = [];
-        for (var x = 0; x <= n; x++) { dp.push(new Array(m + 1).fill(0)); }
-        for (var i = n - 1; i >= 0; i--) {
-            for (var j = m - 1; j >= 0; j--) {
+        const dp = [];
+        for (let x = 0; x <= n; x++) { dp.push(new Array(m + 1).fill(0)); }
+        for (let i = n - 1; i >= 0; i--) {
+            for (let j = m - 1; j >= 0; j--) {
                 dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
             }
         }
-        var out = [], p = 0, q = 0, oldN = 1, newN = 1;
+        const out = [];
+        let p = 0, q = 0, oldN = 1, newN = 1;
         while (p < n && q < m) {
             if (a[p] === b[q]) { out.push({ t: "ctx", text: a[p], o: oldN++, nn: newN++ }); p++; q++; }
             else if (dp[p + 1][q] >= dp[p][q + 1]) { out.push({ t: "del", text: a[p], o: oldN++, nn: null }); p++; }
@@ -3017,12 +3018,12 @@
     }
 
     function renderDiff(oldStr, newStr, title) {
-        var lines = diffLines(oldStr, newStr);
-        var adds = 0, dels = 0;
-        var body = lines.map(function (l) {
+        const lines = diffLines(oldStr, newStr);
+        let adds = 0, dels = 0;
+        const body = lines.map(function (l) {
             if (l.t === "add") { adds++; } else if (l.t === "del") { dels++; }
-            var cls = { add: " add", del: " del" }[l.t] || "";
-            var sym = { add: "+", del: "-" }[l.t] || " ";
+            const cls = { add: " add", del: " del" }[l.t] || "";
+            const sym = { add: "+", del: "-" }[l.t] || " ";
             return '<div class="line' + cls + '">'
                 + '<span class="ln">' + (l.o == null ? "" : l.o) + '</span>'
                 + '<span class="ln">' + (l.nn == null ? "" : l.nn) + '</span>'
@@ -3038,7 +3039,7 @@
     // ============================================================
     // Modal: built once, appended to <body>. Esc / backdrop close.
     // ============================================================
-    var modalEl = null;
+    let modalEl = null;
     function ensureModal() {
         if (modalEl) { return modalEl; }
         modalEl = document.createElement("div");
@@ -3063,11 +3064,11 @@
 
     function renderApprovalsEditor() {
         if (!currentEnv) { viewEl.innerHTML = listEmptyEnv("Approval policy"); return; }
-        var envKey = currentEnv.key;
+        const envKey = currentEnv.key;
         viewEl.innerHTML = listPageShell("Approval policy", "Loading…", '<div class="empty"><p class="muted">Loading…</p></div>');
         api("GET", "/admin/approval-policies/" + encodeURIComponent(envKey))
             .then(function (p) {
-                var rules = (p.approverRules || []).map(function (r) {
+                const rules = (p.approverRules || []).map(function (r) {
                     return '<li>' + badge(r.type) + (r.mandatory ? ' ' + badge("mandatory") : '') + ' · min ' + (r.minFromThisRule || 1) + '</li>';
                 }).join("");
                 viewEl.innerHTML = html([
@@ -3087,8 +3088,8 @@
                 ].join("\n"));
                 document.getElementById("policy-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target.elements;
-                    var pmsg = document.getElementById("policy-msg");
+                    const f = e.target.elements;
+                    const pmsg = document.getElementById("policy-msg");
                     setMessageOn(pmsg, "loading", "Saving…");
                     api("PUT", "/admin/approval-policies/" + encodeURIComponent(envKey), {
                         required: f["required"].checked,
@@ -3113,12 +3114,12 @@
     // Webhooks + Audit log (M10)
     // ============================================================
     function deliveryStatusBadge(status) {
-        var v = { Succeeded: " success", Dead: " danger" }[status] || " warn";
+        const v = { Succeeded: " success", Dead: " danger" }[status] || " warn";
         return '<span class="badge' + v + '">' + esc(status) + '</span>';
     }
 
     // Known webhook event types, grouped (mirrors Featly.Abstractions/FeatlyDomainEvent.cs).
-    var WEBHOOK_EVENT_GROUPS = [
+    const WEBHOOK_EVENT_GROUPS = [
         { label: "Flags", types: ["flag.created", "flag.updated", "flag.archived", "flag.unarchived"] },
         { label: "Configs", types: ["config.created", "config.updated", "config.archived", "config.unarchived"] },
         { label: "Segments", types: ["segment.created", "segment.updated", "segment.deleted", "segment.archived", "segment.unarchived"] },
@@ -3132,11 +3133,11 @@
     // Multi-select for event types. An empty saved set means "all events", so an
     // explicit "All events" master checkbox disables the per-type grid.
     function webhookEventPicker(selected) {
-        var all = !selected || selected.length === 0;
-        var groups = WEBHOOK_EVENT_GROUPS.map(function (g) {
+        const all = !selected || selected.length === 0;
+        const groups = WEBHOOK_EVENT_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.types.map(function (t) {
-                    var on = !all && selected.includes(t);
+                    const on = !all && selected.includes(t);
                     return '<label class="check evt"><input type="checkbox" class="evt-cb" value="' + t + '"'
                         + (on ? " checked" : "") + (all ? " disabled" : "") + ' /> ' + t + '</label>';
                 }).join("")
@@ -3155,11 +3156,11 @@
 
     function wireEventPicker(root) {
         if (!root) { return; }
-        var allCb = root.querySelector(".evt-all-cb");
-        var matrix = root.querySelector(".evt-matrix");
-        var cbs = root.querySelectorAll(".evt-cb");
+        const allCb = root.querySelector(".evt-all-cb");
+        const matrix = root.querySelector(".evt-matrix");
+        const cbs = root.querySelectorAll(".evt-cb");
         function sync() {
-            var dis = allCb.checked;
+            const dis = allCb.checked;
             matrix.classList.toggle("disabled", dis);
             Array.prototype.forEach.call(cbs, function (c) {
                 c.disabled = dis;
@@ -3178,8 +3179,8 @@
         api("GET", "/admin/webhooks")
             .then(function (hooks) {
                 hooks = Array.isArray(hooks) ? hooks : [];
-                var rows = hooks.map(function (w) {
-                    var types = (w.eventTypes || []).length ? (w.eventTypes).map(code).join(" ") : '<span class="muted">all events</span>';
+                const rows = hooks.map(function (w) {
+                    const types = (w.eventTypes || []).length ? (w.eventTypes).map(code).join(" ") : '<span class="muted">all events</span>';
                     return '<tr>'
                         + '<td><a data-link="/webhooks/' + encodeURIComponent(w.id) + '">' + esc(w.name) + '</a></td>'
                         + '<td>' + code(truncate(w.url, 48)) + '</td>'
@@ -3208,8 +3209,8 @@
 
                 document.getElementById("wh-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("wh-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("wh-msg");
                     setMessageOn(msg, "loading", "Creating…");
                     api("POST", "/admin/webhooks", {
                         name: f.name.value.trim(),
@@ -3219,7 +3220,7 @@
                     }).then(function (created) {
                         // The signing secret is returned exactly once. Reveal it so
                         // the operator can copy it into the receiver, then link to detail.
-                        var reveal = document.getElementById("wh-reveal");
+                        const reveal = document.getElementById("wh-reveal");
                         if (reveal && created?.secret) {
                             reveal.innerHTML = '<div class="card-pad" style="border-color:var(--warn-border);background:var(--warn-bg);margin-bottom:12px">'
                                 + '<strong>Webhook created. Copy the signing secret now — it will not be shown again.</strong>'
@@ -3242,9 +3243,9 @@
             api("GET", "/admin/webhooks/" + encodeURIComponent(id)),
             api("GET", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries").catch(function () { return []; }),
         ]).then(function (res) {
-            var w = res[0];
-            var deliveries = Array.isArray(res[1]) ? res[1] : [];
-            var deliveryRows = deliveries.map(function (d) {
+            const w = res[0];
+            const deliveries = Array.isArray(res[1]) ? res[1] : [];
+            const deliveryRows = deliveries.map(function (d) {
                 return '<tr>'
                     + '<td>' + code(d.eventType) + '</td>'
                     + '<td>' + deliveryStatusBadge(d.status) + '</td>'
@@ -3290,10 +3291,10 @@
             hydrateIcons(viewEl);
             wireEventPicker(viewEl.querySelector(".evt-picker"));
 
-            var msg = document.getElementById("wh-msg");
+            const msg = document.getElementById("wh-msg");
             document.getElementById("wh-edit").addEventListener("submit", function (e) {
                 e.preventDefault();
-                var f = e.target;
+                const f = e.target;
                 setMessageOn(msg, "loading", "Saving…");
                 api("PUT", "/admin/webhooks/" + encodeURIComponent(id), {
                     name: f.name.value.trim(),
@@ -3305,10 +3306,10 @@
                   .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
             });
 
-            var deliveriesBody = document.getElementById("wh-deliveries");
+            const deliveriesBody = document.getElementById("wh-deliveries");
             if (deliveriesBody) {
                 deliveriesBody.addEventListener("click", function (e) {
-                    var btn = e.target.closest("[data-resend]");
+                    const btn = e.target.closest("[data-resend]");
                     if (!btn) { return; }
                     btn.disabled = true;
                     api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/deliveries/" + encodeURIComponent(btn.dataset.resend) + "/resend")
@@ -3322,7 +3323,7 @@
             }
             Array.prototype.slice.call(document.querySelectorAll("[data-wh]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var action = btn.dataset.wh;
+                    const action = btn.dataset.wh;
                     if (action === "test") {
                         setMessageOn(msg, "loading", "Enqueuing test…");
                         api("POST", "/admin/webhooks/" + encodeURIComponent(id) + "/test")
@@ -3375,8 +3376,8 @@
 
         document.getElementById("env-new").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
-            var msg = document.getElementById("env-new-msg");
+            const f = e.target;
+            const msg = document.getElementById("env-new-msg");
             setMessageOn(msg, "loading", "Creating…");
             api("POST", "/admin/environments", { key: f.key.value.trim(), name: f.name.value.trim() || null })
                 .then(function () { refreshSettings(msg); })
@@ -3391,9 +3392,9 @@
 
         function loadRateLimitSettings() {
             api("GET", "/admin/settings/rate-limit").then(function (view) {
-                var v = view?.value || {};
-                var source = view?.source || "";
-                var prov = source === "Database"
+                const v = view?.value || {};
+                const source = view?.source || "";
+                const prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
                 document.getElementById("ratelimit-settings").innerHTML = html([
@@ -3407,8 +3408,8 @@
                 ].join("\n"));
                 document.getElementById("ratelimit-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("ratelimit-settings-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("ratelimit-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/rate-limit", {
                         enabled: f.enabled.checked,
@@ -3437,9 +3438,9 @@
         }
         function loadApprovalDefaultsSettings() {
             api("GET", "/admin/settings/approval-defaults").then(function (view) {
-                var v = view?.value || {};
-                var source = view?.source || "";
-                var prov = source === "Database"
+                const v = view?.value || {};
+                const source = view?.source || "";
+                const prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
                 document.getElementById("apprdef-settings").innerHTML = html([
@@ -3450,9 +3451,9 @@
                 ].join("\n"));
                 document.getElementById("apprdef-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
+                    const f = e.target;
                     function tmpl(prefix) {
-                        var g = function (n) { return f.querySelector('[data-f="' + prefix + '.' + n + '"]'); };
+                        const g = function (n) { return f.querySelector('[data-f="' + prefix + '.' + n + '"]'); };
                         return {
                             required: g("required").checked,
                             minApprovals: Number.parseInt(g("minApprovals").value, 10) || 1,
@@ -3460,7 +3461,7 @@
                             allowEmergencyBypass: g("allowEmergencyBypass").checked,
                         };
                     }
-                    var msg = document.getElementById("apprdef-msg");
+                    const msg = document.getElementById("apprdef-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/approval-defaults", { prod: tmpl("prod"), nonProd: tmpl("nonProd") })
                         .then(function () { setMessageOn(msg, "success", "Saved."); loadApprovalDefaultsSettings(); })
@@ -3474,9 +3475,9 @@
 
         function loadAuditSettings() {
             api("GET", "/admin/settings/audit").then(function (view) {
-                var v = view?.value || {};
-                var source = view?.source || "";
-                var prov = source === "Database"
+                const v = view?.value || {};
+                const source = view?.source || "";
+                const prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
                 document.getElementById("audit-settings").innerHTML = html([
@@ -3487,8 +3488,8 @@
                 ].join("\n"));
                 document.getElementById("audit-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("audit-settings-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("audit-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/audit", { retentionDays: Number.parseInt(f.retentionDays.value, 10) || 0 })
                         .then(function () { setMessageOn(msg, "success", "Saved."); loadAuditSettings(); })
@@ -3502,10 +3503,10 @@
 
         function loadAuthorizationSettings() {
             api("GET", "/admin/settings/authorization").then(function (view) {
-                var v = view?.value || {};
-                var mode = v.autoProvisionMode || "Open";
-                var source = view?.source || "";
-                var prov = source === "Database"
+                const v = view?.value || {};
+                const mode = v.autoProvisionMode || "Open";
+                const source = view?.source || "";
+                const prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
                 document.getElementById("authz-settings").innerHTML = html([
@@ -3518,8 +3519,8 @@
                 ].join("\n"));
                 document.getElementById("authz-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("authz-settings-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("authz-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/authorization", { autoProvisionMode: f.autoProvisionMode.value })
                         .then(function () { setMessageOn(msg, "success", "Saved."); loadAuthorizationSettings(); })
@@ -3533,9 +3534,9 @@
 
         function loadWebhookSettings() {
             api("GET", "/admin/settings/webhook").then(function (view) {
-                var v = view?.value || {};
-                var source = view?.source || "";
-                var prov = source === "Database"
+                const v = view?.value || {};
+                const source = view?.source || "";
+                const prov = source === "Database"
                     ? '<span class="badge success"><span class="dot"></span>from database</span>'
                     : '<span class="badge">from ' + (source === "AppSettings" ? "appsettings" : "default") + '</span>';
                 document.getElementById("webhook-settings").innerHTML = html([
@@ -3548,8 +3549,8 @@
                 ].join("\n"));
                 document.getElementById("webhook-settings-form").addEventListener("submit", function (e) {
                     e.preventDefault();
-                    var f = e.target;
-                    var msg = document.getElementById("webhook-settings-msg");
+                    const f = e.target;
+                    const msg = document.getElementById("webhook-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/webhook", {
                         maxAttempts: Number.parseInt(f.maxAttempts.value, 10),
@@ -3566,11 +3567,11 @@
 
         api("GET", "/admin/environments").then(function (envs) {
             envs = Array.isArray(envs) ? envs : [];
-            var rows = envs.map(function (e) {
-                var frozen = e.readOnly;
-                var action = frozen ? "unlock" : "lock";
-                var label = frozen ? "Unlock" : "Lock";
-                var btnClass = frozen ? "btn primary xs" : "btn outline xs danger";
+            const rows = envs.map(function (e) {
+                const frozen = e.readOnly;
+                const action = frozen ? "unlock" : "lock";
+                const label = frozen ? "Unlock" : "Lock";
+                const btnClass = frozen ? "btn primary xs" : "btn outline xs danger";
                 return '<tr>'
                     + '<td>' + code(e.key) + (e.isDefault ? ' ' + badge("default") : '') + '</td>'
                     + '<td>' + esc(e.name) + '</td>'
@@ -3593,25 +3594,25 @@
             // multi-replica server only reflects the clients on this replica).
             envs.forEach(function (e) {
                 api("GET", "/admin/environments/" + encodeURIComponent(e.key) + "/sdk-activity").then(function (a) {
-                    var cell = document.getElementById("env-sdk-" + e.key);
+                    const cell = document.getElementById("env-sdk-" + e.key);
                     if (!cell) { return; }
-                    var conns = a.activeStreamConnections || 0;
-                    var synced = a.lastConfigSyncAt ? formatDate(a.lastConfigSyncAt) : "never synced";
+                    const conns = a.activeStreamConnections || 0;
+                    const synced = a.lastConfigSyncAt ? formatDate(a.lastConfigSyncAt) : "never synced";
                     cell.textContent = conns + " connected · " + synced;
                 }).catch(function () { /* best-effort; leave the placeholder */ });
             });
 
             Array.prototype.slice.call(document.querySelectorAll("#env-settings [data-env-action]")).forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    var key = btn.dataset.envKey;
-                    var action = btn.dataset.envAction;
-                    var msg = document.getElementById("env-msg");
-                    var p;
+                    const key = btn.dataset.envKey;
+                    const action = btn.dataset.envAction;
+                    const msg = document.getElementById("env-msg");
+                    let p;
                     if (action === "lock" || action === "unlock") {
                         setMessageOn(msg, "loading", action === "lock" ? "Freezing…" : "Unfreezing…");
                         p = api("POST", "/admin/environments/" + encodeURIComponent(key) + "/" + action);
                     } else if (action === "rename") {
-                        var name = window.prompt("New name for environment '" + key + "':", btn.dataset.envName || "");
+                        const name = window.prompt("New name for environment '" + key + "':", btn.dataset.envName || "");
                         if (name == null) { return; }
                         setMessageOn(msg, "loading", "Renaming…");
                         p = api("PUT", "/admin/environments/" + encodeURIComponent(key), { key: key, name: name.trim() || null });
@@ -3657,22 +3658,22 @@
         ].join("\n"));
 
         function load(filters) {
-            var qs = [];
+            const qs = [];
             if (filters.entityType) { qs.push("entityType=" + encodeURIComponent(filters.entityType)); }
             if (filters.entityKey) { qs.push("entityKey=" + encodeURIComponent(filters.entityKey)); }
             if (filters.actor) { qs.push("actor=" + encodeURIComponent(filters.actor)); }
             if (filters.from) { qs.push("from=" + encodeURIComponent(filters.from + "T00:00:00Z")); }
             if (filters.to) { qs.push("to=" + encodeURIComponent(filters.to + "T23:59:59Z")); }
-            var path = "/admin/audit" + (qs.length ? "?" + qs.join("&") : "");
+            const path = "/admin/audit" + (qs.length ? "?" + qs.join("&") : "");
             api("GET", path).then(function (entries) {
                 entries = Array.isArray(entries) ? entries : [];
-                var resultsEl = document.getElementById("audit-results");
+                const resultsEl = document.getElementById("audit-results");
                 if (entries.length === 0) {
                     resultsEl.innerHTML = '<div class="empty"><p class="muted">No audit entries match.</p></div>';
                     return;
                 }
-                var rows = entries.map(function (a, idx) {
-                    var warn = /lock|bypass|drop|delete|revoke|bootstrap/i.test(a.action || "");
+                const rows = entries.map(function (a, idx) {
+                    const warn = /lock|bypass|drop|delete|revoke|bootstrap/i.test(a.action || "");
                     return '<div class="audit-row' + (warn ? ' warn' : '') + '" data-idx="' + idx + '" role="button" tabindex="0" title="View details" style="cursor:pointer">'
                         + '<span class="ts">' + (formatDate(a.at) || "—") + '</span>'
                         + '<span class="ic"><span class="ti-slot" data-ti="' + auditIcon(a.entityType) + '"></span></span>'
@@ -3684,20 +3685,20 @@
                 resultsEl.innerHTML = html('<div class="audit-list">' + rows + '</div>');
                 hydrateIcons(resultsEl);
                 function openAuditEntry(idx) {
-                    var a = entries[idx];
+                    const a = entries[idx];
                     if (!a) { return; }
-                    var d = a.data;
-                    var title = (a.action || "Audit entry") + (a.entityKey ? " · " + a.entityKey : "");
-                    var body;
+                    const d = a.data;
+                    const title = (a.action || "Audit entry") + (a.entityKey ? " · " + a.entityKey : "");
+                    let body;
                     if (d && typeof d === "object" && !Array.isArray(d) &&
                         (d.before !== undefined || d.after !== undefined || d.currentState !== undefined || d.proposedState !== undefined)) {
-                        var before = d.before !== undefined ? d.before : d.currentState;
-                        var after = d.after !== undefined ? d.after : d.proposedState;
+                        const before = d.before !== undefined ? d.before : d.currentState;
+                        const after = d.after !== undefined ? d.after : d.proposedState;
                         body = renderDiff(prettyJson(before), prettyJson(after), a.entityType ? esc(a.entityType) + " " + esc(a.entityKey || "") : "");
                     } else {
                         body = '<pre class="cr-json">' + esc(prettyJson(d === undefined ? null : d)) + '</pre>';
                     }
-                    var meta = '<dl class="side-dl" style="margin-bottom:12px">'
+                    const meta = '<dl class="side-dl" style="margin-bottom:12px">'
                         + '<dt>Actor</dt><dd>' + esc(a.actorIdentifier || "—") + '</dd>'
                         + '<dt>Action</dt><dd class="mono">' + esc(a.action || "—") + '</dd>'
                         + '<dt>Entity</dt><dd>' + esc((a.entityType || "—") + (a.entityKey ? " / " + a.entityKey : "")) + '</dd>'
@@ -3716,7 +3717,7 @@
 
         document.getElementById("audit-filter").addEventListener("submit", function (e) {
             e.preventDefault();
-            var f = e.target;
+            const f = e.target;
             load({
                 entityType: f.entityType.value.trim(),
                 entityKey: f.entityKey.value.trim(),
@@ -3739,19 +3740,19 @@
     // (attr op value) + the outcome. Computed from the saved data; refreshes on
     // the next render. Editing happens in the body.
     function ruleSummary(rule, context) {
-        var conds = rule.conditions || [];
-        var head;
+        const conds = rule.conditions || [];
+        let head;
         if (!conds.length) {
             head = '<span class="op">any context</span>';
         } else {
-            var c = conds[0];
-            var val = typeof c.value === "string" ? c.value : JSON.stringify(c.value);
+            const c = conds[0];
+            const val = typeof c.value === "string" ? c.value : JSON.stringify(c.value);
             head = '<span class="mono">' + esc(c.attribute || "?") + '</span>'
                 + '<span class="op">' + esc(c.operator || "") + '</span>'
                 + '<span class="val">' + esc(truncate(val == null ? "" : String(val), 28)) + '</span>'
                 + (conds.length > 1 ? '<span class="op">+' + (conds.length - 1) + '</span>' : '');
         }
-        var out = "";
+        let out = "";
         if (context.kind === "flag") {
             if (rule.outcome?.splits?.length) {
                 out = '<span class="op">&rarr; split</span>';
@@ -3765,13 +3766,13 @@
     }
 
     function renderRuleCard(rule, context, index) {
-        var outcomeHtml;
+        let outcomeHtml;
         if (context.kind === "flag") {
-            var hasSplits = !!rule.outcome?.splits?.length;
-            var variantOpts = (context.variants || []).map(function (v) {
+            const hasSplits = !!rule.outcome?.splits?.length;
+            const variantOpts = (context.variants || []).map(function (v) {
                 return '<option value="' + esc(v.key) + '"' + (rule.outcome && rule.outcome.variantKey === v.key ? " selected" : "") + '>' + esc(v.key) + '</option>';
             }).join("");
-            var splitsHtml = '<div class="splits' + (hasSplits ? "" : " hidden") + '">'
+            const splitsHtml = '<div class="splits' + (hasSplits ? "" : " hidden") + '">'
                 + (rule.outcome?.splits || []).map(renderSplitRow).join("")
                 + '<button type="button" class="btn outline xs" data-action="add-split">+ Add split</button>'
                 + '</div>';
@@ -3788,7 +3789,7 @@
                 + '</div>';
         }
 
-        var num = (typeof index === "number" ? index + 1 : 0);
+        const num = (typeof index === "number" ? index + 1 : 0);
         return '<div class="rule rule-card" data-rule-id="' + esc(rule.id || cryptoId()) + '">'
             + '<div class="rule-head" data-action="rule-toggle">'
             + '  <span class="grip" aria-hidden="true">' + icon("grip") + '</span>'
@@ -3812,7 +3813,7 @@
     }
 
     function renderConditionRow(c) {
-        var opts = OPERATORS.map(function (o) {
+        const opts = OPERATORS.map(function (o) {
             return '<option value="' + o + '"' + (c.operator === o ? " selected" : "") + '>' + o + '</option>';
         }).join("");
         return '<div class="condition-row">'
@@ -3833,10 +3834,10 @@
     }
 
     function handleRuleAction(event, form, context) {
-        var btn = event.target.closest("[data-action]");
+        const btn = event.target.closest("[data-action]");
         if (!btn) { return; }
-        var action = btn.dataset.action;
-        var card = btn.closest(".rule-card");
+        const action = btn.dataset.action;
+        const card = btn.closest(".rule-card");
         if (action === "rule-remove" && card) { card.remove(); }
         else if (action === "rule-up" && card?.previousElementSibling) { card.parentNode.insertBefore(card, card.previousElementSibling); }
         else if (action === "rule-down" && card?.nextElementSibling) { card.parentNode.insertBefore(card.nextElementSibling, card); }
@@ -3855,7 +3856,7 @@
         else { return; }
         // Re-bind split toggle in case we added one.
         if (context.kind === "flag" && card) {
-            var toggle = card.querySelector(".split-toggle");
+            const toggle = card.querySelector(".split-toggle");
             if (toggle && !toggle.dataset.wired) {
                 toggle.dataset.wired = "1";
                 toggle.addEventListener("change", function () {
@@ -3868,7 +3869,7 @@
 
     function collectRules(form, context) {
         return Array.prototype.slice.call(form.querySelectorAll(".rule-card")).map(function (card, idx) {
-            var rule = {
+            const rule = {
                 id: card.dataset.ruleId,
                 order: idx,
                 name: card.querySelector(".r-name").value.trim() || null,
@@ -3876,22 +3877,22 @@
                 conditions: collectConditions(card.querySelector(".conditions-list")),
             };
             if (context.kind === "flag") {
-                var useSplits = card.querySelector(".split-toggle").checked;
+                const useSplits = card.querySelector(".split-toggle").checked;
                 if (useSplits) {
-                    var splits = Array.prototype.slice.call(card.querySelectorAll(".split-row")).map(function (row) {
+                    const splits = Array.prototype.slice.call(card.querySelectorAll(".split-row")).map(function (row) {
                         return {
                             variantKey: row.querySelector(".s-variant").value.trim(),
                             weight: Number.parseInt(row.querySelector(".s-weight").value, 10) || 0,
                         };
                     }).filter(function (s) { return s.variantKey; });
-                    var total = splits.reduce(function (a, s) { return a + s.weight; }, 0);
+                    const total = splits.reduce(function (a, s) { return a + s.weight; }, 0);
                     if (total !== 10000) { throw new Error("Rule '" + (rule.name || idx) + "': splits must sum to 10000 (got " + total + ")."); }
                     rule.outcome = { splits: splits };
                 } else {
                     rule.outcome = { variantKey: card.querySelector(".r-variant").value };
                 }
             } else {
-                var raw = card.querySelector(".r-value").value;
+                const raw = card.querySelector(".r-value").value;
                 try { rule.value = JSON.parse(raw); }
                 catch (_) { throw new Error("Rule '" + (rule.name || idx) + "': value must be valid JSON."); }
             }
@@ -3901,10 +3902,10 @@
 
     function collectConditions(listEl) {
         return Array.prototype.slice.call(listEl.querySelectorAll(".condition-row")).map(function (row) {
-            var attr = row.querySelector(".c-attr").value.trim();
-            var op = row.querySelector(".c-op").value;
-            var raw = row.querySelector(".c-value").value;
-            var value;
+            const attr = row.querySelector(".c-attr").value.trim();
+            const op = row.querySelector(".c-op").value;
+            const raw = row.querySelector(".c-value").value;
+            let value;
             try { value = JSON.parse(raw); } catch (_) { value = raw; }
             return {
                 attribute: attr,
@@ -3919,8 +3920,8 @@
     // Preview ("test this context") panel
     // ============================================================
     function renderPreviewPanel(kind) {
-        var panelId = "preview-panel";
-        var title = "Test this context";
+        const panelId = "preview-panel";
+        const title = "Test this context";
         return '<section class="preview-panel" id="' + panelId + '">'
             + '<h2>' + esc(title) + '</h2>'
             + '<p class="muted">Server-side dry-run against the current saved ' + esc(kind) + ' &mdash; nothing is persisted.</p>'
@@ -3948,16 +3949,16 @@
     }
 
     function wirePreviewPanel(kind, entityKey) {
-        var panel = document.getElementById("preview-panel");
+        const panel = document.getElementById("preview-panel");
         if (!panel) { return; }
-        var attrsList = panel.querySelector(".preview-attrs");
+        const attrsList = panel.querySelector(".preview-attrs");
         // Seed with one empty row so the user has something to type into.
         attrsList.insertAdjacentHTML("beforeend", renderPreviewAttrRow());
 
         panel.addEventListener("click", function (e) {
-            var btn = e.target.closest("[data-action]");
+            const btn = e.target.closest("[data-action]");
             if (!btn) { return; }
-            var action = btn.dataset.action;
+            const action = btn.dataset.action;
             if (action === "preview-add-attr") {
                 attrsList.insertAdjacentHTML("beforeend", renderPreviewAttrRow());
             } else if (action === "preview-remove-attr") {
@@ -3969,24 +3970,24 @@
     }
 
     function evaluatePreview(panel, kind, entityKey) {
-        var tkey = panel.querySelector(".preview-tkey").value.trim();
-        var attrs = {};
+        const tkey = panel.querySelector(".preview-tkey").value.trim();
+        const attrs = {};
         Array.prototype.slice.call(panel.querySelectorAll(".preview-attr-row")).forEach(function (row) {
-            var k = row.querySelector(".pa-key").value.trim();
+            const k = row.querySelector(".pa-key").value.trim();
             if (!k) { return; }
-            var raw = row.querySelector(".pa-value").value;
-            var v;
+            const raw = row.querySelector(".pa-value").value;
+            let v;
             try { v = JSON.parse(raw); }
             catch (_) { v = raw; }
             attrs[k] = v;
         });
-        var body = { targetingKey: tkey || null, attributes: attrs };
-        var msg = panel.querySelector(".preview-msg");
-        var resultEl = panel.querySelector(".preview-result");
+        const body = { targetingKey: tkey || null, attributes: attrs };
+        const msg = panel.querySelector(".preview-msg");
+        const resultEl = panel.querySelector(".preview-result");
         msg.textContent = "Evaluating…";
         resultEl.classList.add("hidden");
 
-        var resource = kind === "flag" ? "flags" : "configs";
+        const resource = kind === "flag" ? "flags" : "configs";
         api("POST", "/admin/preview/" + resource + "/" + encodeURIComponent(entityKey) + "?env=" + encodeURIComponent(currentEnv.key), body)
             .then(function (result) {
                 msg.textContent = "";
@@ -4001,8 +4002,8 @@
     }
 
     function renderPreviewResult(result) {
-        var reasonBadge = '<span class="preview-reason preview-reason--' + esc(result.reason || "Unknown") + '">' + esc(result.reason || "Unknown") + '</span>';
-        var lines = [
+        const reasonBadge = '<span class="preview-reason preview-reason--' + esc(result.reason || "Unknown") + '">' + esc(result.reason || "Unknown") + '</span>';
+        const lines = [
             '<div class="preview-result__head">' + reasonBadge + (result.ruleMatched ? ' <span class="muted">rule: ' + esc(result.ruleMatched) + '</span>' : "") + '</div>',
             '<dl class="preview-result__dl">',
             '  <dt>Value</dt><dd>' + code(JSON.stringify(result.value)) + '</dd>',
@@ -4024,7 +4025,7 @@
         return '<label class="field"><span class="field__label">' + esc(label) + '</span>' + innerMarkup + '</label>';
     }
     function htmlToElement(markup) {
-        var d = document.createElement("div");
+        const d = document.createElement("div");
         d.innerHTML = html(markup.trim());
         return d.firstChild;
     }
@@ -4044,7 +4045,7 @@
     // ============================================================
     function boot() {
         if (!isAuthenticated()) { showAuthPrompt(); return; }
-        var who = session.displayName || session.identifier || "Signed in";
+        const who = session.displayName || session.identifier || "Signed in";
         if (sbUserName) { sbUserName.textContent = who; }
         if (sbUserRole) { sbUserRole.textContent = session.identifier || "Admin"; }
         if (sbAvatar) { sbAvatar.textContent = (who.charAt(0) || "F"); }
