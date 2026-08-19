@@ -84,6 +84,11 @@ internal static class AdminSegmentsEndpoints
             return guard!;
         }
 
+        if (body.Validate() is { } errors)
+        {
+            return Problems.Validation(errors);
+        }
+
         var existing = await store.Segments.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
@@ -131,6 +136,11 @@ internal static class AdminSegmentsEndpoints
         if (existing is null)
         {
             return Problems.NotFound($"Segment '{key}' not found.");
+        }
+
+        if (body.Validate() is { } errors)
+        {
+            return Problems.Validation(errors);
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
@@ -264,6 +274,12 @@ public sealed record SegmentWriteRequest(
     string? Description,
     IReadOnlyList<Condition> Conditions)
 {
+    /// <summary>Presence errors for members the binder lets through as null (issue #324); null when the body is complete.</summary>
+    internal Dictionary<string, string[]>? Validate() => WriteRequestValidation.Begin()
+        .Text("key", Key).Text("name", Name)
+        .List("conditions", Conditions)
+        .Result();
+
     internal Segment ToEntity(Guid environmentId, string actor) => new()
     {
         Id = Guid.NewGuid(),

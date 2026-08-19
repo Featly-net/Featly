@@ -349,6 +349,46 @@ public class ApiErrorPathsTests
         (await c.PostAsJsonAsync("/api/admin/role-assignments", new { roleId = adminRoleId, assigneeType = "Group", assigneeId = id }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // Issue #324: a body that omits a non-nullable member (which the JSON binder
+    // happily leaves null/default) must be a 400 validation problem naming the
+    // field, never an unhandled exception surfacing as a 500.
+    [Theory]
+    [InlineData("/api/admin/flags", """{"key":"x1","name":"x","type":"Boolean"}""", "variants")]
+    [InlineData("/api/admin/flags", """{"key":"x1","name":"x","type":"Boolean","variants":[]}""", "defaultVariantKey")]
+    [InlineData("/api/admin/configs", """{"key":"x2","name":"x"}""", "defaultValue")]
+    [InlineData("/api/admin/segments", """{"key":"x3","name":"x"}""", "conditions")]
+    [InlineData("/api/admin/segments", """{"name":"x","conditions":[]}""", "key")]
+    public async Task Create_with_missing_required_member_is_400_validation_problem(string path, string json, string field)
+    {
+        using var host = await FeatlyTestHost.CreateAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var res = await c.PostAsync(new Uri(path, UriKind.Relative), content, ct);
+
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        res.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        using var body = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+        body.RootElement.GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue($"'{field}' should be reported");
+    }
+
+    [Fact]
+    public async Task Update_with_missing_required_member_is_400_after_existence_check()
+    {
+        using var host = await FeatlyTestHost.CreateAsync();
+        var c = Admin(host);
+        var ct = TestContext.Current.CancellationToken;
+
+        (await c.PostAsJsonAsync("/api/admin/segments", new { key = "s", name = "S", conditions = Array.Empty<object>() }, ct))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Existing entity, body without conditions -> 400 (not 500).
+        (await c.PutAsJsonAsync("/api/admin/segments/s", new { key = "s", name = "S" }, ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Unknown entity keeps winning: 404 regardless of the body shape.
+        (await c.PutAsJsonAsync("/api/admin/segments/nope", new { key = "nope", name = "S" }, ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private static HttpClient Admin(IHost host)
     {
         var client = host.GetTestClient();

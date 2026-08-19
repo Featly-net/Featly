@@ -86,6 +86,11 @@ internal static class AdminFlagsEndpoints
             return guard!;
         }
 
+        if (body.Validate() is { } errors)
+        {
+            return Problems.Validation(errors);
+        }
+
         var existing = await store.Flags.GetAsync(environment.Id, body.Key, ct).ConfigureAwait(false);
         if (existing is not null)
         {
@@ -146,6 +151,11 @@ internal static class AdminFlagsEndpoints
         if (existing is null)
         {
             return Problems.NotFound($"Flag '{key}' not found.");
+        }
+
+        if (body.Validate() is { } errors)
+        {
+            return Problems.Validation(errors);
         }
 
         if (!string.Equals(body.Key, key, StringComparison.Ordinal))
@@ -349,6 +359,12 @@ public sealed record FlagWriteRequest(
     IReadOnlyList<Rule>? Rules = null,
     IReadOnlyList<Prerequisite>? Prerequisites = null)
 {
+    /// <summary>Presence errors for members the binder lets through as null (issue #324); null when the body is complete.</summary>
+    internal Dictionary<string, string[]>? Validate() => WriteRequestValidation.Begin()
+        .Text("key", Key).Text("name", Name).Text("defaultVariantKey", DefaultVariantKey)
+        .List("variants", Variants)
+        .Result();
+
     internal Flag ToEntity(Guid environmentId, string actor) => new()
     {
         Id = Guid.NewGuid(),
