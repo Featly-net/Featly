@@ -196,7 +196,7 @@
             }
             if (res.status === 204) { return null; }
             var ct = res.headers.get("Content-Type") || "";
-            return ct.indexOf("application/json") >= 0 ? res.json() : res.text();
+            return ct.includes("application/json") ? res.json() : res.text();
         });
     }
 
@@ -258,7 +258,7 @@
     function formatDate(iso) {
         if (!iso) { return ""; }
         var d = new Date(iso);
-        if (isNaN(d.getTime())) { return esc(iso); }
+        if (Number.isNaN(d.getTime())) { return esc(iso); }
         var fmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
         return '<time datetime="' + esc(iso) + '" title="' + esc(iso) + '">' + esc(fmt.format(d)) + '</time>';
     }
@@ -444,18 +444,18 @@
 
     function navRouteFor(key) {
         if (key === "overview") { return "/"; }
-        if (key.indexOf("flag") === 0) { return "/flags"; }
-        if (key.indexOf("config") === 0) { return "/configs"; }
-        if (key.indexOf("segment") === 0) { return "/segments"; }
-        if (key.indexOf("experiment") === 0) { return "/experiments"; }
-        if (key.indexOf("user") === 0) { return "/users"; }
-        if (key.indexOf("role") === 0) { return "/roles"; }
-        if (key.indexOf("group") === 0) { return "/groups"; }
-        if (key.indexOf("apiKey") === 0) { return "/apikeys"; }
-        if (key.indexOf("project") === 0) { return "/projects"; }
+        if (key.startsWith("flag")) { return "/flags"; }
+        if (key.startsWith("config")) { return "/configs"; }
+        if (key.startsWith("segment")) { return "/segments"; }
+        if (key.startsWith("experiment")) { return "/experiments"; }
+        if (key.startsWith("user")) { return "/users"; }
+        if (key.startsWith("role")) { return "/roles"; }
+        if (key.startsWith("group")) { return "/groups"; }
+        if (key.startsWith("apiKey")) { return "/apikeys"; }
+        if (key.startsWith("project")) { return "/projects"; }
         if (key === "inbox" || key === "changeDetail") { return "/inbox"; }
         if (key === "approvals") { return "/approvals"; }
-        if (key.indexOf("webhook") === 0) { return "/webhooks"; }
+        if (key.startsWith("webhook")) { return "/webhooks"; }
         if (key === "auditLog") { return "/audit"; }
         if (key === "settings") { return "/settings"; }
         return "/";
@@ -618,10 +618,10 @@
 
     function paletteFilter(q) {
         q = (q || "").trim().toLowerCase();
-        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().indexOf(q) >= 0); })
+        var nav = NAV_COMMANDS.filter(function (c) { return isNavEnabled(c.route) && (!q || c.label.toLowerCase().includes(q)); })
             .map(function (c) { return { label: c.label, sub: "", kind: "Go to", route: c.route, ti: c.ti, group: "Navigate" }; });
         var ents = (paletteEntityCache.items || []).filter(function (e) {
-            return !q || e.label.toLowerCase().indexOf(q) >= 0 || (e.sub && e.sub.toLowerCase().indexOf(q) >= 0);
+            return !q || e.label.toLowerCase().includes(q) || (e.sub && e.sub.toLowerCase().includes(q));
         });
         ents.forEach(function (e) { e.group = "Entities"; });
         var ordered = q ? ents.concat(nav) : nav.concat(ents.slice(0, 8));
@@ -648,15 +648,15 @@
         list.innerHTML = html(markup);
         hydrateIcons(list);
         Array.prototype.slice.call(list.querySelectorAll(".palette-item")).forEach(function (el) {
-            el.addEventListener("mousemove", function () { paletteActive = parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
-            el.addEventListener("click", function () { paletteSelect(parseInt(el.getAttribute("data-i"), 10)); });
+            el.addEventListener("mousemove", function () { paletteActive = Number.parseInt(el.getAttribute("data-i"), 10); paletteHighlight(); });
+            el.addEventListener("click", function () { paletteSelect(Number.parseInt(el.getAttribute("data-i"), 10)); });
         });
     }
 
     function paletteHighlight() {
         var els = paletteEl.querySelectorAll(".palette-item");
         Array.prototype.forEach.call(els, function (el) {
-            el.classList.toggle("active", parseInt(el.getAttribute("data-i"), 10) === paletteActive);
+            el.classList.toggle("active", Number.parseInt(el.getAttribute("data-i"), 10) === paletteActive);
         });
         var active = paletteEl.querySelector(".palette-item.active");
         if (active && active.scrollIntoView) { active.scrollIntoView({ block: "nearest" }); }
@@ -997,7 +997,7 @@
                 if (flagListTab === "disabled" && f.enabled) { return false; }
                 if (q) {
                     var hay = (f.key + " " + (f.name || "") + " " + (f.tags || []).join(" ")).toLowerCase();
-                    if (hay.indexOf(q) < 0) { return false; }
+                    if (!hay.includes(q)) { return false; }
                 }
                 return true;
             });
@@ -1140,7 +1140,7 @@
             var rows = all.filter(function (r) {
                 if (!q) { return true; }
                 var hay = fields.map(function (f) { return searchableText(r[f]); }).join(" ").toLowerCase();
-                return hay.indexOf(q) >= 0;
+                return hay.includes(q);
             });
             tbody.innerHTML = html(rows.length
                 ? rows.map(rowFn).join("")
@@ -1347,13 +1347,13 @@
         raw = raw == null ? "" : raw;
         switch (type) {
             case "Int": case "Long": {
-                var i = parseInt(raw, 10);
-                if (isNaN(i)) { throw new Error("Default value must be an integer."); }
+                var i = Number.parseInt(raw, 10);
+                if (Number.isNaN(i)) { throw new Error("Default value must be an integer."); }
                 return i;
             }
             case "Double": case "Decimal": {
-                var n = parseFloat(raw);
-                if (isNaN(n)) { throw new Error("Default value must be a number."); }
+                var n = Number.parseFloat(raw);
+                if (Number.isNaN(n)) { throw new Error("Default value must be a number."); }
                 return n;
             }
             case "Bool": return raw === "true" || raw === true;
@@ -1611,7 +1611,7 @@
         var target = (otherFlags || []).find(function (f) { return f.key === p.flagKey; });
         if (!target) { return '<span class="muted">Select a flag</span>'; }
         return (target.variants || []).map(function (v) {
-            var checked = (p.requiredVariantKeys || []).indexOf(v.key) !== -1;
+            var checked = (p.requiredVariantKeys || []).includes(v.key);
             return '<label class="check"><input type="checkbox" class="prereq-variant" value="' + esc(v.key) + '"' + (checked ? " checked" : "") + ' /> ' + esc(v.key) + '</label>';
         }).join(" ") || '<span class="muted">No variants</span>';
     }
@@ -2023,7 +2023,7 @@
         return PERMISSION_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.perms.map(function (p) {
-                    var on = current.indexOf(p) >= 0;
+                    var on = current.includes(p);
                     return '<label class="check perm"><input type="checkbox" class="perm-cb" value="' + p + '"'
                         + (on ? " checked" : "") + (readOnly ? " disabled" : "") + ' /> ' + p + '</label>';
                 }).join("")
@@ -2248,8 +2248,8 @@
         function renderResults() {
             var q = (searchEl.value || "").trim().toLowerCase();
             var matches = q ? users.filter(function (u) {
-                if (memberIds.indexOf(u.id) >= 0) { return false; }
-                return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().indexOf(q) >= 0;
+                if (memberIds.includes(u.id)) { return false; }
+                return (userDisplay(u) + " " + (u.email || "") + " " + (u.identifier || "")).toLowerCase().includes(q);
             }).slice(0, 8) : [];
             var emptyState = q ? '<div class="ur-empty muted">No matching users.</div>' : "";
             resultsEl.innerHTML = html(matches.length
@@ -2266,7 +2266,7 @@
             var btn = e.target.closest("[data-add]");
             if (!btn) { return; }
             var id = btn.getAttribute("data-add");
-            if (memberIds.indexOf(id) < 0) { memberIds.push(id); }
+            if (!memberIds.includes(id)) { memberIds.push(id); }
             searchEl.value = "";
             renderResults();
             renderChips();
@@ -2515,7 +2515,7 @@
             var f = e.target;
             var msg = document.getElementById("apikey-msg");
             setMessageOn(msg, "loading", "Minting…");
-            var expiresInDays = parseInt(f.expiresIn.value, 10);
+            var expiresInDays = Number.parseInt(f.expiresIn.value, 10);
             api("POST", "/admin/apikeys", {
                 name: f.name.value.trim(),
                 scope: f.scope.value,
@@ -2959,7 +2959,7 @@
     // time, not the raw UTC instant.
     function toLocalDateTimeInputValue(iso) {
         var d = new Date(iso);
-        if (isNaN(d.getTime())) { return ""; }
+        if (Number.isNaN(d.getTime())) { return ""; }
         var pad = function (n) { return String(n).padStart(2, "0"); };
         return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
     }
@@ -3124,7 +3124,7 @@
                     setMessageOn(pmsg, "loading", "Saving…");
                     api("PUT", "/admin/approval-policies/" + encodeURIComponent(envKey), {
                         required: f["required"].checked,
-                        minApprovals: parseInt(f["minApprovals"].value, 10) || 1,
+                        minApprovals: Number.parseInt(f["minApprovals"].value, 10) || 1,
                         authorCanApproveOwnChange: f["self"].checked,
                         allowEmergencyBypass: f["bypass"].checked,
                         approverRules: p.approverRules || [],
@@ -3168,7 +3168,7 @@
         var groups = WEBHOOK_EVENT_GROUPS.map(function (g) {
             return '<div class="perm-group"><div class="perm-group-h">' + esc(g.label) + '</div><div class="perm-list">'
                 + g.types.map(function (t) {
-                    var on = !all && selected.indexOf(t) >= 0;
+                    var on = !all && selected.includes(t);
                     return '<label class="check evt"><input type="checkbox" class="evt-cb" value="' + t + '"'
                         + (on ? " checked" : "") + (all ? " disabled" : "") + ' /> ' + t + '</label>';
                 }).join("")
@@ -3444,9 +3444,9 @@
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/rate-limit", {
                         enabled: f.enabled.checked,
-                        authPermitsPerMinute: parseInt(f.authPermitsPerMinute.value, 10) || 0,
-                        adminPermitsPerMinute: parseInt(f.adminPermitsPerMinute.value, 10) || 0,
-                        sdkPermitsPerMinute: parseInt(f.sdkPermitsPerMinute.value, 10) || 0,
+                        authPermitsPerMinute: Number.parseInt(f.authPermitsPerMinute.value, 10) || 0,
+                        adminPermitsPerMinute: Number.parseInt(f.adminPermitsPerMinute.value, 10) || 0,
+                        sdkPermitsPerMinute: Number.parseInt(f.sdkPermitsPerMinute.value, 10) || 0,
                     }).then(function () { setMessageOn(msg, "success", "Saved."); loadRateLimitSettings(); })
                         .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                 });
@@ -3487,7 +3487,7 @@
                         var g = function (n) { return f.querySelector('[data-f="' + prefix + '.' + n + '"]'); };
                         return {
                             required: g("required").checked,
-                            minApprovals: parseInt(g("minApprovals").value, 10) || 1,
+                            minApprovals: Number.parseInt(g("minApprovals").value, 10) || 1,
                             authorCanApproveOwnChange: g("authorCanApproveOwnChange").checked,
                             allowEmergencyBypass: g("allowEmergencyBypass").checked,
                         };
@@ -3522,7 +3522,7 @@
                     var f = e.target;
                     var msg = document.getElementById("audit-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
-                    api("PUT", "/admin/settings/audit", { retentionDays: parseInt(f.retentionDays.value, 10) || 0 })
+                    api("PUT", "/admin/settings/audit", { retentionDays: Number.parseInt(f.retentionDays.value, 10) || 0 })
                         .then(function () { setMessageOn(msg, "success", "Saved."); loadAuditSettings(); })
                         .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                 });
@@ -3584,9 +3584,9 @@
                     var msg = document.getElementById("webhook-settings-msg");
                     setMessageOn(msg, "loading", "Saving…");
                     api("PUT", "/admin/settings/webhook", {
-                        maxAttempts: parseInt(f.maxAttempts.value, 10),
-                        baseRetryDelaySeconds: parseInt(f.baseRetryDelaySeconds.value, 10),
-                        maxRetryDelaySeconds: parseInt(f.maxRetryDelaySeconds.value, 10),
+                        maxAttempts: Number.parseInt(f.maxAttempts.value, 10),
+                        baseRetryDelaySeconds: Number.parseInt(f.baseRetryDelaySeconds.value, 10),
+                        maxRetryDelaySeconds: Number.parseInt(f.maxRetryDelaySeconds.value, 10),
                     }).then(function () { setMessageOn(msg, "success", "Saved."); loadWebhookSettings(); })
                         .catch(function (err) { if (err.kind === "auth") { showAuthPrompt(); return; } setMessageOn(msg, "error", err.message); });
                 });
@@ -3738,9 +3738,9 @@
                     openModal(title, meta + body, true);
                 }
                 Array.prototype.slice.call(resultsEl.querySelectorAll(".audit-row")).forEach(function (row) {
-                    row.addEventListener("click", function () { openAuditEntry(parseInt(row.getAttribute("data-idx"), 10)); });
+                    row.addEventListener("click", function () { openAuditEntry(Number.parseInt(row.getAttribute("data-idx"), 10)); });
                     row.addEventListener("keydown", function (e) {
-                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditEntry(parseInt(row.getAttribute("data-idx"), 10)); }
+                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditEntry(Number.parseInt(row.getAttribute("data-idx"), 10)); }
                     });
                 });
             }).catch(handleErrOnView("Audit log"));
@@ -3913,7 +3913,7 @@
                     var splits = Array.prototype.slice.call(card.querySelectorAll(".split-row")).map(function (row) {
                         return {
                             variantKey: row.querySelector(".s-variant").value.trim(),
-                            weight: parseInt(row.querySelector(".s-weight").value, 10) || 0,
+                            weight: Number.parseInt(row.querySelector(".s-weight").value, 10) || 0,
                         };
                     }).filter(function (s) { return s.variantKey; });
                     var total = splits.reduce(function (a, s) { return a + s.weight; }, 0);
