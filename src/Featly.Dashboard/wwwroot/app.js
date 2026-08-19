@@ -517,7 +517,7 @@
         tbody.addEventListener("click", function (e) {
             if (e.target.closest("input, button, a")) { return; }
             var tr = e.target.closest("tr[data-key]");
-            if (tr) { navigate(routePrefix + encodeURIComponent(tr.getAttribute("data-key"))); }
+            if (tr) { navigate(routePrefix + encodeURIComponent(tr.dataset.key)); }
         });
     }
 
