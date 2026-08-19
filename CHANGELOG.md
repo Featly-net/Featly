@@ -8,6 +8,15 @@ Until version `1.0.0`, the public API is unstable and minor versions may introdu
 
 ## [Unreleased]
 
+### Fixed
+
+- **Admin write bodies missing required members are a 400, not a 500** (#324 → #326). `POST`/`PUT` on `/api/admin/flags`, `/configs`, `/segments` with a body that omits `variants`, `defaultVariantKey`, `defaultValue` or `conditions` (which the JSON binder leaves `null`/`default`) now return an RFC 7807 validation problem naming the field, after the existing 404 checks for unknown environment/entity. Previously the handler threw and the stack trace came back as the 500 body.
+
+### Changed
+
+- **Dashboard JavaScript baseline is ES2020 on evergreen browsers** (ADR-0036; #319–#323, #325, #327; issue #229). `app.js` is still served verbatim with no build step, but now uses `const`/`let`, optional chaining, `dataset`, `includes`/`startsWith`, `Number.isNaN`/`Number.parseInt`, `replaceAll`; the ESLint config enforces `no-var`/`prefer-const`. Each rule family landed as its own PR with lint, Playwright smoke and a rendered-DOM diff against `main` as proof of unchanged behaviour. Anyone opening the dashboard in a non-evergreen browser (none is known) now gets a syntax error instead of a partially working page.
+- **Release process is written down** — [docs/RELEASING.md](docs/RELEASING.md) (#316, #317): MinVer tag-is-the-release, the two publish paths, the pre-release checklist, and the `nuget-org` environment's required-reviewer gate.
+
 ## [0.2.0-preview.1] - 2026-08-18
 
 The storage-provider release. Four new storage packages — **PostgreSQL, SQL Server, MySQL/MariaDB, and MongoDB** — join SQLite behind the same `IFeatlyStore` contract, each a one-line `AddFeatly<Provider>Store()` swap, with real cross-replica change push on Postgres (`LISTEN`/`NOTIFY`) and MongoDB (Change Streams). Around them: scheduled releases, flag prerequisites, a tamper-evident audit hash chain, a webhook circuit breaker, offline SDK resilience, RFC 7807 errors, `Accept-Version` negotiation, opt-in rate limiting, a CSRF layer, API-key expiry/rotation, statistical significance for experiments, and a large **security-hardening pass** (SSRF guard on webhook targets, always-on login throttle, strict CSP, environment-scoped RBAC actually enforced, ReadOnly freeze closed on every path). CI gained SonarCloud + CodeQL gates and a Playwright dashboard smoke. 881 test methods across 11 projects.
