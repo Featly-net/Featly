@@ -44,9 +44,6 @@ internal sealed class SqliteFlagStore(IDbContextFactory<FeatlyDbContext> context
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
         var existing = await db.Flags
-            .Include(f => f.Variants)
-            .Include(f => f.Rules)
-            .Include(f => f.Prerequisites)
             .FirstOrDefaultAsync(f => f.EnvironmentId == environmentId && f.Key == flag.Key, ct)
             .ConfigureAwait(false);
 
