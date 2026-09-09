@@ -70,7 +70,7 @@ async function main() {
         consoleErrors.push(msg.text());
       }
     };
-    const onPageError = (err) => pageErrors.push(String(err && err.message ? err.message : err));
+    const onPageError = (err) => pageErrors.push(String(err?.message || err));
     page.on("console", onConsole);
     page.on("pageerror", onPageError);
 
@@ -124,7 +124,9 @@ async function main() {
   console.log(`\nDashboard smoke passed: ${ROUTES.length} screens rendered with no page or console errors.`);
 }
 
-main().catch((e) => {
+try {
+  await main();
+} catch (e) {
   console.error("Smoke runner crashed:", e);
   process.exit(1);
-});
+}
