@@ -44,7 +44,6 @@ internal sealed class PostgresConfigStore(IDbContextFactory<FeatlyDbContext> con
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
         var existing = await db.Configs
-            .Include(c => c.Rules)
             .FirstOrDefaultAsync(c => c.EnvironmentId == environmentId && c.Key == config.Key, ct)
             .ConfigureAwait(false);
 
