@@ -44,7 +44,6 @@ internal sealed class SqlServerSegmentStore(IDbContextFactory<FeatlyDbContext> c
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
         var existing = await db.Segments
-            .Include(s => s.Conditions)
             .FirstOrDefaultAsync(s => s.EnvironmentId == environmentId && s.Key == segment.Key, ct)
             .ConfigureAwait(false);
 

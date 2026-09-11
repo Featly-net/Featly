@@ -19,7 +19,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
@@ -47,13 +47,13 @@
          pulls in transitively, pinned explicitly because the test project's
          MySqlTestHost opens a raw MySqlConnection for throwaway-database
          setup/teardown (EF Core has no "create database by name" API). -->
-    <PackageVersion Include="MySqlConnector" Version="2.6.1" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.2" />
     <!-- Matches the version Microsoft.EntityFrameworkCore.SqlServer 10.0.9
          already pulls in transitively — pinned explicitly because the test
          project's SqlServerTestHost opens raw SqlConnection/SqlCommand for
          throwaway-database setup/teardown (EF Core has no "create database
          by name" API). -->
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.2" />
     <!-- Pin away from the vulnerable 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf)
          that EF Core Design pulls in transitively via Microsoft.Build/MSBuild stack. -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.8" />
@@ -69,7 +69,7 @@
   </ItemGroup>
 
   <ItemGroup Label="OpenFeature provider">
-    <PackageVersion Include="OpenFeature" Version="2.14.0" />
+    <PackageVersion Include="OpenFeature" Version="2.14.1" />
   </ItemGroup>
 
   <ItemGroup Label="Observability — OpenTelemetry (server-side only, net10.0)">
@@ -104,7 +104,7 @@
       migration is the package-id swap plus `using FluentAssertions;` ->
       `using AwesomeAssertions;` across the test projects. See ADR-0021.
     -->
-    <PackageVersion Include="AwesomeAssertions" Version="9.5.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />

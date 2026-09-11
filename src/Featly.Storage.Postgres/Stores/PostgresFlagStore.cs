@@ -44,8 +44,6 @@ internal sealed class PostgresFlagStore(IDbContextFactory<FeatlyDbContext> conte
         await using var db = await contextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
         var existing = await db.Flags
-            .Include(f => f.Variants)
-            .Include(f => f.Rules)
             .FirstOrDefaultAsync(f => f.EnvironmentId == environmentId && f.Key == flag.Key, ct)
             .ConfigureAwait(false);
 
