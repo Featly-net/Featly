@@ -91,7 +91,7 @@
 
   <ItemGroup Label="SourceLink + MinVer (referenced by Directory.Build.props)">
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
-    <PackageVersion Include="MinVer" Version="7.0.0" />
+    <PackageVersion Include="MinVer" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">
