@@ -102,7 +102,7 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: TestResults/**/*
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
   postgres-tests:
     name: postgres provider tests
@@ -165,7 +165,7 @@ jobs:
           name: test-results-postgres
           path: TestResults/**/*
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
   sqlserver-tests:
     name: sqlserver provider tests
@@ -230,7 +230,7 @@ jobs:
           name: test-results-sqlserver
           path: TestResults/**/*
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
   mysql-tests:
     name: mysql provider tests
@@ -300,7 +300,7 @@ jobs:
           name: test-results-mysql
           path: TestResults/**/*
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
   mongodb-tests:
     name: mongodb provider tests
@@ -376,7 +376,7 @@ jobs:
           name: test-results-mongodb
           path: TestResults/**/*
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
       - name: Stop MongoDB
         if: always()
@@ -428,4 +428,4 @@ jobs:
           name: nupkgs
           path: artifacts/*.*nupkg
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3

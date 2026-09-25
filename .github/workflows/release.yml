@@ -86,7 +86,9 @@ jobs:
           name: nupkgs
           path: artifacts/*.*nupkg
           if-no-files-found: error
-          retention-days: 30
+          # Only consumed by the publish jobs of this same run. 7 days (not 1)
+          # leaves room for the nuget-org environment approval and re-runs.
+          retention-days: 7
 
   publish-github-packages:
     name: Publish to GitHub Packages (main)
