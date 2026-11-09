@@ -29,7 +29,10 @@ env:
 jobs:
   smoke:
     name: dashboard smoke
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: ubuntu-latest moved to 26.04, which Playwright
+    # does not support yet ("does not support chromium on ubuntu26.04-x64").
+    # Move back to ubuntu-latest once Playwright ships 26.04 support.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
