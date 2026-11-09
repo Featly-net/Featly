@@ -57,6 +57,11 @@
     <!-- Pin away from the vulnerable 9.0.0 (GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf)
          that EF Core Design pulls in transitively via Microsoft.Build/MSBuild stack. -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.8" />
+    <!-- Pin away from 9.0.18 (GHSA-846f-f764-76mx high, GHSA-2fmv-rv2c-59x7 moderate;
+         patched in 10.0.13) that Microsoft.Data.SqlClient 7.1.1 pulls in transitively.
+         NuGetAudit warnings are errors here (TreatWarningsAsErrors), so the
+         advisory broke restore for every project referencing SqlClient. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <!-- Pin away from the vulnerable native SQLite < 3.50.2 (GHSA-2m69-gcr7-jv3q)
          bundled by SQLitePCLRaw.lib.e_sqlite3 <= 2.1.11, which EF Core Sqlite pulls
          in transitively. Only the native-lib package tracks the SQLite version
