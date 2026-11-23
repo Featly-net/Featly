@@ -32,7 +32,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <!-- Postgres provider (ADR-0026), same EF Core line as the SQLite provider. -->
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.4" />
     <!-- SQL Server provider (ADR-0032), same EF Core line as the other providers. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
     <!-- MySQL provider (ADR-0033). Pomelo has not yet released an EF Core 10
